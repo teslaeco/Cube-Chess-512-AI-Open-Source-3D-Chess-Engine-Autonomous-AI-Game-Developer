@@ -1,10 +1,25 @@
 import { createSquareAddress } from "../renderer/coordinates.js";
 
-const BACK_RANK = ["rook", "knight", "bishop", "queen", "king", "bishop", "knight", "rook"];
+const BACK_RANK = [
+  "rook",
+  "knight",
+  "bishop",
+  "queen",
+  "king",
+  "bishop",
+  "knight",
+  "rook",
+];
 
 function piece(color, type, x, y, ordinal) {
   const position = createSquareAddress(x, y, 0);
-  return { id: `${color}-${type}-${ordinal}`, color, type, position };
+  return {
+    id: `${color}-${type}-${ordinal}`,
+    color,
+    type,
+    position,
+    hasMoved: false,
+  };
 }
 
 export function createInitialPieces() {
