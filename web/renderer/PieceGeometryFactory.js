@@ -10,8 +10,8 @@ function mesh(geometry, material, y, scale = 1) {
 }
 
 function addOutline(group, color) {
-  group.traverse((child) => {
-    if (!child.isMesh) return;
+  const sourceMeshes = group.children.filter((child) => child.isMesh);
+  for (const child of sourceMeshes) {
     const outline = new THREE.Mesh(
       child.geometry,
       new THREE.MeshBasicMaterial({
@@ -26,27 +26,16 @@ function addOutline(group, color) {
     outline.rotation.copy(child.rotation);
     outline.scale.copy(child.scale).multiplyScalar(1.055);
     outline.renderOrder = 30;
+    outline.userData.decorative = true;
     group.add(outline);
-  });
+  }
 }
 
 export class PieceGeometryFactory {
   constructor() {
     this.materials = {
-      white: new THREE.MeshStandardMaterial({
-        color: 0xf5f5f2,
-        metalness: 0.12,
-        roughness: 0.3,
-        opacity: 1,
-        transparent: false,
-      }),
-      black: new THREE.MeshStandardMaterial({
-        color: 0x171b22,
-        metalness: 0.28,
-        roughness: 0.25,
-        opacity: 1,
-        transparent: false,
-      }),
+      white: new THREE.MeshStandardMaterial({ color: 0xf5f5f2, metalness: 0.12, roughness: 0.3 }),
+      black: new THREE.MeshStandardMaterial({ color: 0x171b22, metalness: 0.28, roughness: 0.25 }),
     };
   }
 
