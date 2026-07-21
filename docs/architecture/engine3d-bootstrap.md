@@ -9,6 +9,17 @@ generation, move application, and layer-visibility helpers. The existing
 8×8×8 move-generation implementation remains outside `src/engine3d` and is
 intentionally untouched by this bootstrap.
 
+Unit tests live in `test/engine.test.ts` and run with Vitest. `npm run build`
+typechecks the TypeScript engine and produces the browser application bundle
+with Vite. `npm run dev` serves the HTML entry point and visual application.
+
+## Three.js integration points
+
+The visual application loads Three.js as pinned native browser ESM modules via
+the import map in `index.html`. Its renderer lives under `web/renderer/`; the
+existing `src/rendering/visibility.ts` remains a future level-opacity policy.
+The renderer consumes presentation state through `web/app/GamePresentation.js`
+and does not import engine rule modules.
 Unit tests live in `test/engine.test.ts` and run with Vitest. TypeScript emits
 declarations and JavaScript to `dist`; `npm run build` invokes that compiler.
 `npm run dev` uses Vite only as the local development server. There is no HTML
