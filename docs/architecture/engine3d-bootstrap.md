@@ -20,21 +20,6 @@ the import map in `index.html`. Its renderer lives under `web/renderer/`; the
 existing `src/rendering/visibility.ts` remains a future level-opacity policy.
 The renderer consumes presentation state through `web/app/GamePresentation.js`
 and does not import engine rule modules.
-Unit tests live in `test/engine.test.ts` and run with Vitest. TypeScript emits
-declarations and JavaScript to `dist`; `npm run build` invokes that compiler.
-`npm run dev` uses Vite only as the local development server. There is no HTML
-entry point or current browser UI in this checkout, so the server is a runtime
-smoke check rather than a rendered game.
-
-## Three.js integration points
-
-There is no Three.js package, scene, renderer, model, or UI component in the
-current checkout. The sole rendering-oriented module is
-`src/rendering/visibility.ts`: it defines level opacity values and documents
-the expected `THREE.Material` updates. A future renderer adapter should consume
-engine state through the `src/engine3d/index.ts` public boundary, then map
-engine coordinates to mesh transforms. It must not import rule modules into
-rendering code.
 
 ## chess.js usage
 
