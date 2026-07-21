@@ -12,6 +12,11 @@ function leavesOwnKingSafe(
   move: Move,
   color: PieceColor,
 ): boolean {
+  const target = board.getPieceAt(move.to);
+  if (target?.type === "king") {
+    return false;
+  }
+
   const next = board.clone();
   next.applyMove(move);
   return !isInCheck(next, color);
