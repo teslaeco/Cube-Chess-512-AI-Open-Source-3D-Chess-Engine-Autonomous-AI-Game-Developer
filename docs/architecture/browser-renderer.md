@@ -27,10 +27,11 @@ renderer. Device pixel ratio is capped at two for mobile rendering cost.
 
 `coordinates.js` validates `x`, `y`, and `z` in the range 0–7 and produces a
 canonical address such as `A:e4`. It defines 8 board squares per axis, 8 total
-levels, 512 total cube squares, square sizing, and level spacing. The first
-renderer instance creates only level index zero as a `THREE.Group` named Level
-A. The same address and position API accepts levels B–H, so later layers can be
-added without redefining coordinate mapping.
+levels, 512 total cube squares, square sizing, and level spacing. The renderer
+creates one `THREE.Group` for each of Levels A–H and stacks them vertically.
+Layer opacity is derived from the shared `src/rendering/visibility.ts` policy:
+the active layer is readable, adjacent layers are translucent, and pieces stay
+opaque unless the user explicitly hides their level.
 
 ## Browser module delivery
 

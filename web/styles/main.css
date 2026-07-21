@@ -6,6 +6,7 @@
 .hud h1 { margin: 0 0 1.4rem; font-size: 1.4rem; letter-spacing: .02em; } .hud h1 span { color: #67d9f6; font-weight: 500; }
 .hud dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: .65rem .8rem; } .hud dt { color: #aebfd0; } .hud dd { margin: 0; text-align: right; font-weight: 700; color: #fff; }
 .hud p { margin: 1.5rem 0; color: #75ddf7; line-height: 1.45; font-size: .88rem; }.hud-actions { display: grid; gap: .7rem; }
+.level-buttons { display: grid; grid-template-columns: repeat(8, 1fr); gap: .25rem; margin-top: 1rem; }.level-buttons button.active { background: #4d9db8; color: #fff; }
 .coordinate-guide { margin-top: 1.25rem; color: #b8c9d8; font-size: .82rem; line-height: 1.4; }.coordinates-hidden .coordinate-guide { display: none; }
 .hud button { cursor: pointer; border: 1px solid #54829a; color: #effaff; border-radius: .45rem; background: #203c50; min-height: 2.7rem; padding: .55rem .8rem; }.hud button:hover { background: #29546f; }.hud button:focus-visible { outline: 3px solid #71dff7; outline-offset: 2px; }
 @media (max-width: 720px) { body { overflow: auto; }.cube-chess-app { grid-template-columns: 1fr; grid-template-rows: minmax(62dvh, 1fr) auto; }.game-stage { min-height: 62dvh; }.hud { border-left: 0; border-top: 1px solid #33485e; padding: 1rem; }.hud h1 { margin-bottom: 1rem; }.hud dl { grid-template-columns: repeat(2, auto); justify-content: space-between; }.hud-actions { grid-template-columns: 1fr 1fr; } }

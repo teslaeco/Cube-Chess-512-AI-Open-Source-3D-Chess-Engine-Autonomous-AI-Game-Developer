@@ -1,12 +1,12 @@
-import { createLevelSquares } from "../renderer/coordinates.js";
+import { BOARD_SIZE, createCubeSquareAddresses } from "../renderer/coordinates.js";
 import { createInitialPieces } from "../state/initialPosition.js";
 
 /** Presentation-only state boundary. It intentionally contains no move rules. */
 export class GamePresentation {
   constructor() {
     this.activeLevel = 0;
-    this.levels = [{ index: 0, name: "A", visible: true }];
-    this.squares = createLevelSquares(this.activeLevel);
+    this.levels = Array.from({ length: BOARD_SIZE }, (_, index) => ({ index, name: String.fromCharCode(65 + index), visible: true }));
+    this.squares = createCubeSquareAddresses();
     this.pieces = createInitialPieces();
     this.selectedSquare = null;
     this.selectedPieceId = null;
@@ -30,6 +30,12 @@ export class GamePresentation {
     this.selectedPieceId = null;
     this.highlightedSquares = [];
   }
+
+  setActiveLevel(levelIndex) { this.assertLevel(levelIndex); this.activeLevel = levelIndex; }
+  setLevelVisible(levelIndex, visible) { this.assertLevel(levelIndex); this.levels[levelIndex].visible = Boolean(visible); }
+  showAllLevels() { this.levels.forEach((level) => { level.visible = true; }); }
+  isolateActiveLevel() { this.levels.forEach((level) => { level.visible = level.index === this.activeLevel; }); }
+  assertLevel(levelIndex) { if (!Number.isInteger(levelIndex) || levelIndex < 0 || levelIndex >= BOARD_SIZE) throw new RangeError(`Level must be 0 to 7; received ${levelIndex}`); }
 
   snapshot() {
     return JSON.parse(JSON.stringify({

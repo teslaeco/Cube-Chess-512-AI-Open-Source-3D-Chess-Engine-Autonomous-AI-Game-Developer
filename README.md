@@ -3,8 +3,8 @@
 > Screenshot placeholder: run the browser application to view the current Level A board.
 
 Cube Chess 512 is an open-source TypeScript foundation for 8×8×8 chess. This
-stage includes a working browser visualizer: a single classical 8×8 board
-(`Layer A`) with procedural Three.js pieces, lighting, shadows, orbit camera,
+stage includes a working browser visualizer: eight 8×8 levels stacked vertically
+as one 8×8×8 cube, with procedural Three.js pieces, lighting, shadows, orbit camera,
 raycast selection, and a responsive HUD.
 
 ## Run
@@ -37,15 +37,15 @@ dependencies, lock their versions, and retain the same renderer module API.
   existing tests remain in `test/`.
 - `web/app/GamePresentation.js` is the presentation boundary: it supplies a
   serializable snapshot to the renderer and contains no movement rules.
-- The visual application currently renders only level A (64 visible squares of
-  the eventual 512), with a normal 32-piece starting arrangement.
+- The visual application renders levels A–H (512 squares) one above another;
+  the classic 32-piece starting arrangement remains only on level A.
 - Figures are real Three.js geometry groups; no external models, textures, or
   2D chess-piece images are used.
 
 ## Current limitations
 
 Movement, captures, legal-move generation in the UI, AI, check/checkmate,
-undo/redo, persistence, and levels B–H are intentionally disabled. Selecting a
+undo/redo, persistence, and 3D move rules are intentionally disabled. Selecting a
 piece or square changes only presentation state. The renderer needs internet
 access in the end-user browser to load the pinned Three.js CDN modules.
 
