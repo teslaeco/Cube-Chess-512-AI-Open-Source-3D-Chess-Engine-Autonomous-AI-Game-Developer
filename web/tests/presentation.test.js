@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { boardPosition, createCubeSquareAddresses, createLevelSquares, createSquareAddress } from "../renderer/coordinates.js";
 import { GamePresentation } from "../app/GamePresentation.js";
 import { createInitialPieces } from "../state/initialPosition.js";
+import { visibleLayerOpacity } from "../renderer/layerVisibility.js";
 
 describe("browser presentation data", () => {
   it("maps a board square into a centered 3D position", () => {
@@ -17,4 +18,6 @@ describe("browser presentation data", () => {
   it("keeps selection state serializable in the presentation adapter", () => { const presentation = new GamePresentation(); presentation.selectPiece(presentation.pieces[0]); const state = presentation.snapshot(); expect(state.selectedPieceId).toBe(presentation.pieces[0].id); expect(state.selectedSquare.square3D).toBe("A:a1"); });
   it("tracks eight level visibility states and can isolate the active level", () => { const presentation = new GamePresentation(); expect(presentation.levels).toHaveLength(8); expect(presentation.squares).toHaveLength(512); presentation.setActiveLevel(3); presentation.isolateActiveLevel(); expect(presentation.levels.filter((level) => level.visible).map((level) => level.name)).toEqual(["D"]); presentation.showAllLevels(); expect(presentation.levels.every((level) => level.visible)).toBe(true); });
   it("maps a piece position onto level D vertically", () => { const position = createSquareAddress(4, 3, 3); expect(position.square3D).toBe("D:e4"); expect(boardPosition(position).y).toBeGreaterThan(0); });
+  it("keeps every enabled distant level faintly visible", () => { expect(visibleLayerOpacity(0, 0)).toBe(0.82); expect(visibleLayerOpacity(1, 0)).toBe(0.28); expect(visibleLayerOpacity(2, 0)).toBe(0.08); expect(visibleLayerOpacity(7, 0)).toBe(0.08); });
+  it("restores manually hidden H through Show All Levels", () => { const presentation = new GamePresentation(); presentation.setLevelVisible(7, false); expect(presentation.levels[7].visible).toBe(false); presentation.showAllLevels(); expect(presentation.levels[7].visible).toBe(true); });
 });

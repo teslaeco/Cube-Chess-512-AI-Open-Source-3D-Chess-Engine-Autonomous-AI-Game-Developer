@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { SQUARE_SIZE, boardPosition } from "./coordinates.js";
-import { DEFAULT_LAYER_VISIBILITY, opacityForLevel } from "../../src/rendering/visibility.ts";
+import { visibleLayerOpacity } from "./layerVisibility.js";
 
 export class BoardRenderer {
   constructor(squares) {
@@ -18,7 +18,7 @@ export class BoardRenderer {
       overlay.rotation.x = -Math.PI / 2; overlay.position.set(position.x, position.y + 0.012, position.z); level.add(overlay); this.overlays.set(square.square3D, overlay);
     }
   }
-  setLevels(levels, activeLevel) { for (const level of levels) { const group = this.levelGroups.get(level.index); group.visible = level.visible; const opacity = opacityForLevel(level.index, { ...DEFAULT_LAYER_VISIBILITY, activeLevel }); for (const material of this.levelMaterials.get(level.index)) { material.opacity = opacity; material.depthWrite = opacity >= 0.5; material.depthTest = true; } group.renderOrder = level.index; } }
+  setLevels(levels, activeLevel) { for (const level of levels) { const group = this.levelGroups.get(level.index); group.visible = level.visible; const opacity = visibleLayerOpacity(level.index, activeLevel); for (const material of this.levelMaterials.get(level.index)) { material.opacity = opacity; material.depthWrite = opacity >= 0.5; material.depthTest = true; } group.renderOrder = level.index; } }
   setHighlighted(square3D) { this.overlays.forEach((overlay, key) => { overlay.material.opacity = key === square3D ? 0.42 : 0; }); }
   dispose() {
     this.group.traverse((child) => {

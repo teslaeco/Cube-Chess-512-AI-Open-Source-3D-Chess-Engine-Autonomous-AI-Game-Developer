@@ -2,7 +2,7 @@ import * as THREE from "three";
 
 function mesh(geometry, material, y, scale = 1) { const item = new THREE.Mesh(geometry, material); item.position.y = y; item.scale.setScalar(scale); item.castShadow = true; item.receiveShadow = true; return item; }
 export class PieceGeometryFactory {
-  constructor() { this.materials = { white: new THREE.MeshStandardMaterial({ color: 0xf7eee0, metalness: 0.16, roughness: 0.31 }), black: new THREE.MeshStandardMaterial({ color: 0x1d2732, metalness: 0.35, roughness: 0.27 }) }; }
+  constructor() { this.materials = { white: new THREE.MeshStandardMaterial({ color: 0xf7eee0, metalness: 0.16, roughness: 0.31, opacity: 1, transparent: false }), black: new THREE.MeshStandardMaterial({ color: 0x1d2732, metalness: 0.35, roughness: 0.27, opacity: 1, transparent: false }) }; }
   create(type, color) {
     const group = new THREE.Group(); const material = this.materials[color];
     group.add(mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.16, 32), material, 0.08));
