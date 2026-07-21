@@ -1,7 +1,11 @@
-import { Coordinate3D } from "../coordinates/Coordinate3D.js"; import type { Board3D } from "../board/Board3D.js"; import type { Piece,PieceColor } from "../pieces/Piece.js"; import type { Move } from "./Move.js"; import { ROOK_DIRECTIONS,BISHOP_DIRECTIONS,QUEEN_DIRECTIONS,KING_DIRECTIONS,KNIGHT_OFFSETS, type Vector } from "./DirectionVectors.js";
-const at=(p:Coordinate3D,v:Vector,n=1)=>p.tryAdd(v[0]*n,v[1]*n,v[2]*n); const move=(p:Piece,to:Coordinate3D,target?:Piece):Move=>target?{pieceId:p.id,from:p.position,to,capturedPieceId:target.id,kind:"capture"}:{pieceId:p.id,from:p.position,to,kind:"quiet"};
-function slide(b:Board3D,p:Piece,ds:readonly Vector[]){const out:Move[]=[];for(const d of ds)for(let n=1;;n++){const to=at(p.position,d,n);if(!to)break;const t=b.getPieceAt(to);if(t?.color===p.color)break;out.push(move(p,to,t));if(t)break;}return out;}
-function leap(b:Board3D,p:Piece,ds:readonly Vector[]){return ds.flatMap(d=>{const to=at(p.position,d);if(!to||b.isOccupiedByColor(to,p.color))return [];return [move(p,to,b.getPieceAt(to))];});}
-function pawn(b:Board3D,p:Piece){const s=p.color==="white"?1:-1;const out:Move[]=[];for(const d of [[0,s,0],[0,0,s]] as Vector[]){const to=at(p.position,d);if(to&&b.isEmpty(to))out.push(move(p,to));}const two=at(p.position,[0,s,0],2);const mid=at(p.position,[0,s,0]);if(!p.hasMoved&&two&&mid&&b.isEmpty(mid)&&b.isEmpty(two))out.push(move(p,two));for(const d of [[1,s,0],[-1,s,0],[1,0,s],[-1,0,s]] as Vector[]){const to=at(p.position,d),t=to&&b.getPieceAt(to);if(to&&t&&t.color!==p.color)out.push(move(p,to,t));}return out;}
-export function generatePseudoLegalMoves(board:Board3D,piece:Piece):Move[]{switch(piece.type){case"rook":return slide(board,piece,ROOK_DIRECTIONS);case"bishop":return slide(board,piece,BISHOP_DIRECTIONS);case"queen":return slide(board,piece,QUEEN_DIRECTIONS);case"king":return leap(board,piece,KING_DIRECTIONS);case"knight":return leap(board,piece,KNIGHT_OFFSETS);case"pawn":return pawn(board,piece);}}
-export function generatePseudoLegalMovesForColor(board:Board3D,color:PieceColor){return board.getPiecesByColor(color).flatMap(p=>generatePseudoLegalMoves(board,p));}
+import type { Board3D } from "../board/Board3D.js";
+import type { Piece, PieceColor } from "../pieces/Piece.js";
+import type { Move } from "./Move.js";
+import { BISHOP_DIRECTIONS, KING_DIRECTIONS, KNIGHT_OFFSETS, QUEEN_DIRECTIONS, ROOK_DIRECTIONS } from "./DirectionVectors.js";
+import { generateLeapingMoves } from "./LeapingMoveGenerator.js";
+import { generatePawnMoves } from "./PawnMoveGenerator.js";
+import { generateSlidingMoves } from "./SlidingMoveGenerator.js";
+export function generatePseudoLegalMoves(board: Board3D, piece: Piece): Move[] {
+  switch (piece.type) { case "rook": return generateSlidingMoves(board,piece,ROOK_DIRECTIONS); case "bishop": return generateSlidingMoves(board,piece,BISHOP_DIRECTIONS); case "queen": return generateSlidingMoves(board,piece,QUEEN_DIRECTIONS); case "king": return generateLeapingMoves(board,piece,KING_DIRECTIONS); case "knight": return generateLeapingMoves(board,piece,KNIGHT_OFFSETS); case "pawn": return generatePawnMoves(board,piece); }
+}
+export function generatePseudoLegalMovesForColor(board: Board3D, color: PieceColor): Move[] { return board.getPiecesByColor(color).flatMap((piece) => generatePseudoLegalMoves(board,piece)); }
