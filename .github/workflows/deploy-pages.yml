@@ -25,6 +25,8 @@ jobs:
       LIBGL_ALWAYS_SOFTWARE: "1"
       GALLIUM_DRIVER: llvmpipe
       MOZ_WEBRENDER: "1"
+      MOZ_DISABLE_HW_ACCELERATION: "1"
+      PW_FIREFOX_XVFB: "1"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -41,8 +43,11 @@ jobs:
       - name: Install browser engines
         run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Run browser interaction tests
-        run: npm run test:e2e
+      - name: Run browser interaction tests in virtual display
+        run: >-
+          xvfb-run --auto-servernum
+          --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render -noreset"
+          npm run test:e2e
 
       - name: Upload failure evidence
         if: failure()
