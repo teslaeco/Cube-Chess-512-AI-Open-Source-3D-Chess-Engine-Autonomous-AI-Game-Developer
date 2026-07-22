@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const basePath =
   "/Cube-Chess-512-AI-Open-Source-3D-Chess-Engine-Autonomous-AI-Game-Developer/";
+const firefoxUsesXvfb = process.env.PW_FIREFOX_XVFB === "1";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -32,17 +33,17 @@ export default defineConfig({
       name: "firefox-desktop",
       use: {
         ...devices["Desktop Firefox"],
+        // Firefox's built-in Linux headless mode can disable WebGL. In CI the
+        // workflow supplies an Xvfb display, so launch a normal headed browser.
+        headless: firefoxUsesXvfb ? false : undefined,
         viewport: { width: 1920, height: 1080 },
         launchOptions: {
           firefoxUserPrefs: {
-            // Firefox on GitHub's headless Linux runner can block hardware WebGL.
-            // Force the Mesa/llvmpipe software path required by Three.js WebGL2.
             "webgl.disabled": false,
             "webgl.force-enabled": true,
             "webgl.enable-webgl2": true,
             "gfx.webrender.all": true,
             "gfx.webrender.software": true,
-            "layers.acceleration.force-enabled": true,
           },
         },
       },
