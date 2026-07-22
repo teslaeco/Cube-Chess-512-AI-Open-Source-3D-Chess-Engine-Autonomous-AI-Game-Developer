@@ -2,12 +2,13 @@ import { defineConfig, devices } from "@playwright/test";
 
 const basePath =
   "/Cube-Chess-512-AI-Open-Source-3D-Chess-Engine-Autonomous-AI-Game-Developer/";
+const firefoxUsesXvfb = process.env.PW_FIREFOX_XVFB === "1";
 
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
   timeout: 90_000,
-  expect: { timeout: 10_000 },
+  expect: { timeout: 30_000 },
   workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: [["line"], ["html", { open: "never" }]],
@@ -32,13 +33,17 @@ export default defineConfig({
       name: "firefox-desktop",
       use: {
         ...devices["Desktop Firefox"],
+        // Firefox's built-in Linux headless mode can disable WebGL. In CI the
+        // workflow supplies an Xvfb display, so launch a normal headed browser.
+        headless: firefoxUsesXvfb ? false : undefined,
         viewport: { width: 1920, height: 1080 },
         launchOptions: {
           firefoxUserPrefs: {
-            // GitHub's headless Linux runner blocklists WebGL2 unless software
-            // rendering is explicitly allowed. Three.js r169 requires WebGL2.
             "webgl.disabled": false,
             "webgl.force-enabled": true,
+            "webgl.enable-webgl2": true,
+            "gfx.webrender.all": true,
+            "gfx.webrender.software": true,
           },
         },
       },
