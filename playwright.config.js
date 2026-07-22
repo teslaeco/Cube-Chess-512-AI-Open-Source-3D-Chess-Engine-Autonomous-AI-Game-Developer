@@ -30,7 +30,18 @@ export default defineConfig({
     },
     {
       name: "firefox-desktop",
-      use: { ...devices["Desktop Firefox"], viewport: { width: 1920, height: 1080 } },
+      use: {
+        ...devices["Desktop Firefox"],
+        viewport: { width: 1920, height: 1080 },
+        launchOptions: {
+          firefoxUserPrefs: {
+            // GitHub's headless Linux runner blocklists WebGL2 unless software
+            // rendering is explicitly allowed. Three.js r169 requires WebGL2.
+            "webgl.disabled": false,
+            "webgl.force-enabled": true,
+          },
+        },
+      },
     },
     {
       name: "webkit-desktop",
