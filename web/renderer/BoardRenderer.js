@@ -5,10 +5,9 @@ import { visibleLayerOpacity } from "./layerVisibility.js";
 const LIGHT_COLOR = 0xd9d9d9;
 const DARK_COLOR = 0x222a34;
 const GRID_COLOR = 0x111820;
-const SELECTED_COLOR = 0x43d9ff;
-const QUIET_COLOR = 0x54d67a;
+const SELECTED_COLOR = 0x2f7dff;
+const LEGAL_MOVE_COLOR = 0x145a32;
 const CAPTURE_COLOR = 0xff6b6b;
-const HEIGHT_COLOR = 0xb887ff;
 const BOARD_THICKNESS = 0.045;
 
 export class BoardRenderer {
@@ -43,9 +42,9 @@ export class BoardRenderer {
       depthWrite: false,
     });
     this.pathMaterial = new THREE.LineDashedMaterial({
-      color: HEIGHT_COLOR,
+      color: LEGAL_MOVE_COLOR,
       transparent: true,
-      opacity: 0.72,
+      opacity: 0.9,
       dashSize: 0.2,
       gapSize: 0.12,
       depthWrite: false,
@@ -139,17 +138,14 @@ export class BoardRenderer {
     this.overlays.forEach((overlay, key) => {
       const target = targets.get(key);
       const selected = key === selectedKey;
-      const changesLevel = target && target.to.z !== target.from.z;
       overlay.visible = selected || Boolean(target);
-      overlay.material.opacity = selected ? 0.58 : target ? 0.5 : 0;
+      overlay.material.opacity = selected ? 0.62 : target ? 0.56 : 0;
       overlay.material.color.setHex(
         selected
           ? SELECTED_COLOR
           : target?.kind === "capture"
             ? CAPTURE_COLOR
-            : changesLevel
-              ? HEIGHT_COLOR
-              : QUIET_COLOR,
+            : LEGAL_MOVE_COLOR,
       );
     });
 
