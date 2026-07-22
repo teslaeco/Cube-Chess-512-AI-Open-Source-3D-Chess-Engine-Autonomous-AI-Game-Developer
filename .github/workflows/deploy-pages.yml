@@ -21,6 +21,10 @@ concurrency:
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    env:
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      GALLIUM_DRIVER: llvmpipe
+      MOZ_WEBRENDER: "1"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
