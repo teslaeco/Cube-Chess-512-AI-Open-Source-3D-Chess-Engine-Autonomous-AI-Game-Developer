@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { boardPosition } from "./coordinates.js";
 
 const MOVE_DURATION = 0.58;
+const BLUE_HIGHLIGHT = 0x2f7dff;
 
 function capturedPosition(piece) {
   const index = Number(piece.captureIndex) || 0;
@@ -39,6 +40,7 @@ export class PieceRenderer {
     this.factory = factory;
     this.onAnimationState = onAnimationState;
     this.lastMoveSequence = null;
+    this.selectedPieceId = null;
     this.sync(pieces, [], null);
   }
 
@@ -59,7 +61,44 @@ export class PieceRenderer {
     });
   }
 
+  setBlueHighlight(object, enabled, intensity = 0.95) {
+    object.traverse((child) => {
+      if (!child.material?.emissive) return;
+      child.material.emissive.setHex(enabled ? BLUE_HIGHLIGHT : 0x000000);
+      child.material.emissiveIntensity = enabled ? intensity : 0;
+    });
+  }
+
+  addMoveAura(object) {
+    if (object.getObjectByName("move-aura")) return;
+    const aura = new THREE.Mesh(
+      new THREE.TorusGeometry(0.52, 0.045, 10, 40),
+      new THREE.MeshBasicMaterial({
+        color: BLUE_HIGHLIGHT,
+        transparent: true,
+        opacity: 0.88,
+        depthWrite: false,
+      }),
+    );
+    aura.name = "move-aura";
+    aura.rotation.x = Math.PI / 2;
+    aura.position.y = 0.09;
+    object.add(aura);
+  }
+
+  removeMoveAura(object) {
+    const aura = object.getObjectByName("move-aura");
+    if (!aura) return;
+    aura.geometry.dispose();
+    aura.material.dispose();
+    aura.removeFromParent();
+  }
+
   animateObject(id, object, target, piece, kind = "move") {
+    if (kind === "move") {
+      this.addMoveAura(object);
+      this.setBlueHighlight(object, true, 1.15);
+    }
     this.animations.set(id, {
       object,
       piece,
@@ -85,6 +124,7 @@ export class PieceRenderer {
         this.capturedGroup.add(object);
         object.userData = { kind: "captured", piece: capturedPiece };
         object.scale.setScalar(0.82);
+        this.removeMoveAura(object);
         this.addCaptureAura(object, capturedPiece.color);
         this.captured.set(id, object);
         this.animateObject(
@@ -188,26 +228,35 @@ export class PieceRenderer {
       const raw = Math.min(1, animation.elapsed / animation.duration);
       const progress = easeInOut(raw);
       animation.object.position.lerpVectors(animation.from, animation.to, progress);
+      const moveAura = animation.object.getObjectByName("move-aura");
+      if (moveAura) {
+        moveAura.rotation.z += deltaSeconds * 2.4;
+        moveAura.material.opacity = 0.62 + Math.sin(progress * Math.PI) * 0.3;
+      }
       if (animation.piece.type === "knight" && animation.kind === "move") {
         animation.object.position.y += Math.sin(Math.PI * progress) * 0.9;
       }
       if (raw >= 1) {
         animation.object.position.copy(animation.to);
         this.animations.delete(id);
+        if (animation.kind === "move") {
+          this.removeMoveAura(animation.object);
+          const remainsSelected = id === this.selectedPieceId;
+          this.setBlueHighlight(animation.object, remainsSelected, 0.95);
+          animation.object.scale.setScalar(remainsSelected ? 1.1 : 1);
+        }
       }
     }
     if (!this.animations.size) this.onAnimationState(false);
   }
 
   setSelected(pieceId) {
+    this.selectedPieceId = pieceId ?? null;
     this.pieces.forEach((object, id) => {
-      const selected = id === pieceId;
+      const selected = id === this.selectedPieceId;
+      const moving = this.animations.has(id);
       object.scale.setScalar(selected ? 1.1 : 1);
-      object.traverse((child) => {
-        if (!child.material?.emissive) return;
-        child.material.emissive.setHex(selected ? 0x0c6b80 : 0x000000);
-        child.material.emissiveIntensity = selected ? 0.85 : 0;
-      });
+      this.setBlueHighlight(object, selected || moving, moving ? 1.15 : 0.95);
     });
   }
 
