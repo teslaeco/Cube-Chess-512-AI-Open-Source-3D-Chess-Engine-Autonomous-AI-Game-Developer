@@ -11,6 +11,7 @@ import {
 
 const LEVEL_NAMES = "ABCDEFGH";
 const clone = (value) => JSON.parse(JSON.stringify(value));
+const storage = typeof localStorage === "undefined" ? null : localStorage;
 
 export class GamePresentation {
   constructor() {
@@ -21,7 +22,7 @@ export class GamePresentation {
       visible: true,
     }));
     this.squares = createCubeSquareAddresses();
-    this.language = localStorage.getItem("cubeChessLanguage") ?? "pl";
+    this.language = storage?.getItem("cubeChessLanguage") ?? "pl";
     this.menuOpen = true;
     this.resetGame();
   }
@@ -40,40 +41,25 @@ export class GamePresentation {
     this.clearSelection();
   }
 
-  startLocalGame() {
-    this.resetGame();
-    this.menuOpen = false;
-  }
-
+  startLocalGame() { this.resetGame(); this.menuOpen = false; }
   openMenu() { this.menuOpen = true; }
   closeMenu() { this.menuOpen = false; }
-
   setLanguage(language) {
     this.language = language;
-    localStorage.setItem("cubeChessLanguage", language);
+    storage?.setItem("cubeChessLanguage", language);
   }
 
   selectSquare(square) {
-    if (!square || square.z !== this.activeLevel || this.status.kind !== "active") {
-      return false;
-    }
-
-    const target = this.legalTargets.find(
-      (candidate) => candidate.square3D === square.square3D,
-    );
-    if (this.selectedPieceId && target) {
-      return this.executeTarget(target);
-    }
-
+    if (!square || square.z !== this.activeLevel || this.status.kind !== "active") return false;
+    const target = this.legalTargets.find((candidate) => candidate.square3D === square.square3D);
+    if (this.selectedPieceId && target) return this.executeTarget(target);
     this.selectedSquare = square;
     this.message = this.selectedPieceId ? "illegalMove" : null;
     return false;
   }
 
   selectPiece(piece) {
-    if (!piece || piece.position.z !== this.activeLevel || this.status.kind !== "active") {
-      return false;
-    }
+    if (!piece || piece.position.z !== this.activeLevel || this.status.kind !== "active") return false;
     if (piece.color !== this.sideToMove) {
       this.message = this.sideToMove === "white" ? "whiteToMove" : "blackToMove";
       return false;
@@ -82,7 +68,6 @@ export class GamePresentation {
       this.clearSelection();
       return true;
     }
-
     this.selectedPieceId = piece.id;
     this.selectedSquare = piece.position;
     this.legalTargets = legalTargetsForPiece(this.pieces, piece.id);
@@ -91,10 +76,7 @@ export class GamePresentation {
       sourceSquare: piece.position.square3D,
       sourceLevel: piece.position.z,
     };
-    this.highlightedSquares = [
-      piece.position.square3D,
-      ...this.legalTargets.map((target) => target.square3D),
-    ];
+    this.highlightedSquares = [piece.position.square3D, ...this.legalTargets.map((target) => target.square3D)];
     this.message = null;
     return true;
   }
@@ -102,28 +84,14 @@ export class GamePresentation {
   executeTarget(target) {
     const selected = this.pieces.find((piece) => piece.id === this.selectedPieceId);
     if (!selected || selected.color !== this.sideToMove) return false;
-
-    const verified = legalTargetsForPiece(this.pieces, selected.id).find(
-      (move) => move.square3D === target.square3D,
-    );
-    if (!verified) {
-      this.message = "illegalMove";
-      return false;
-    }
-
+    const verified = legalTargetsForPiece(this.pieces, selected.id).find((move) => move.square3D === target.square3D);
+    if (!verified) { this.message = "illegalMove"; return false; }
     this.history.push(this.captureState());
     this.redoStack = [];
-    if (verified.capturedPieceId) {
-      this.pieces = this.pieces.filter(
-        (piece) => piece.id !== verified.capturedPieceId,
-      );
-    }
-    selected.position = createSquareAddress(
-      verified.to.x,
-      verified.to.y,
-      verified.to.z,
-    );
-    selected.hasMoved = true;
+    if (verified.capturedPieceId) this.pieces = this.pieces.filter((piece) => piece.id !== verified.capturedPieceId);
+    const moved = this.pieces.find((piece) => piece.id === selected.id);
+    moved.position = createSquareAddress(verified.to.x, verified.to.y, verified.to.z);
+    moved.hasMoved = true;
     this.lastMove = clone(verified);
     this.activeLevel = verified.to.z;
     this.sideToMove = this.sideToMove === "white" ? "black" : "white";
@@ -135,14 +103,7 @@ export class GamePresentation {
   }
 
   captureState() {
-    return clone({
-      pieces: this.pieces,
-      sideToMove: this.sideToMove,
-      fullMoveNumber: this.fullMoveNumber,
-      status: this.status,
-      activeLevel: this.activeLevel,
-      lastMove: this.lastMove,
-    });
+    return clone({ pieces: this.pieces, sideToMove: this.sideToMove, fullMoveNumber: this.fullMoveNumber, status: this.status, activeLevel: this.activeLevel, lastMove: this.lastMove });
   }
 
   restoreState(state) {
@@ -177,52 +138,23 @@ export class GamePresentation {
     this.pendingMoveSelection = null;
   }
 
-  setActiveLevel(levelIndex) {
-    this.assertLevel(levelIndex);
-    this.activeLevel = levelIndex;
-  }
-
-  setLevelVisible(levelIndex, visible) {
-    this.assertLevel(levelIndex);
-    this.levels[levelIndex].visible = Boolean(visible);
-  }
-
-  showAllLevels() {
-    this.levels.forEach((level) => { level.visible = true; });
-  }
-
-  isolateActiveLevel() {
-    this.levels.forEach((level) => {
-      level.visible = level.index === this.activeLevel;
-    });
-  }
-
+  setActiveLevel(levelIndex) { this.assertLevel(levelIndex); this.activeLevel = levelIndex; }
+  setLevelVisible(levelIndex, visible) { this.assertLevel(levelIndex); this.levels[levelIndex].visible = Boolean(visible); }
+  showAllLevels() { this.levels.forEach((level) => { level.visible = true; }); }
+  isolateActiveLevel() { this.levels.forEach((level) => { level.visible = level.index === this.activeLevel; }); }
   assertLevel(levelIndex) {
-    if (!Number.isInteger(levelIndex) || levelIndex < 0 || levelIndex >= BOARD_SIZE) {
-      throw new RangeError(`Level must be 0 to 7; received ${levelIndex}`);
-    }
+    if (!Number.isInteger(levelIndex) || levelIndex < 0 || levelIndex >= BOARD_SIZE) throw new RangeError(`Level must be 0 to 7; received ${levelIndex}`);
   }
 
   snapshot() {
     return clone({
-      activeLevel: this.activeLevel,
-      levels: this.levels,
-      squares: this.squares,
-      pieces: this.pieces,
-      selectedSquare: this.selectedSquare,
-      selectedPieceId: this.selectedPieceId,
-      highlightedSquares: this.highlightedSquares,
-      legalTargets: this.legalTargets,
-      pendingMoveSelection: this.pendingMoveSelection,
-      sideToMove: this.sideToMove,
-      fullMoveNumber: this.fullMoveNumber,
-      status: this.status,
-      lastMove: this.lastMove,
-      canUndo: this.history.length > 0,
-      canRedo: this.redoStack.length > 0,
-      menuOpen: this.menuOpen,
-      language: this.language,
-      message: this.message,
+      activeLevel: this.activeLevel, levels: this.levels, squares: this.squares, pieces: this.pieces,
+      selectedSquare: this.selectedSquare, selectedPieceId: this.selectedPieceId,
+      highlightedSquares: this.highlightedSquares, legalTargets: this.legalTargets,
+      pendingMoveSelection: this.pendingMoveSelection, sideToMove: this.sideToMove,
+      fullMoveNumber: this.fullMoveNumber, status: this.status, lastMove: this.lastMove,
+      canUndo: this.history.length > 0, canRedo: this.redoStack.length > 0,
+      menuOpen: this.menuOpen, language: this.language, message: this.message,
     });
   }
 }
