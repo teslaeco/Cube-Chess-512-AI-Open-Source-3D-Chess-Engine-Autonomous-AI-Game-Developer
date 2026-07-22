@@ -14,13 +14,7 @@ import { createInitialPieces } from "../state/initialPosition.js";
 describe("browser presentation data", () => {
   it("maps a board square into a centered 3D position", () => {
     const address = createSquareAddress(4, 3, 0);
-    expect(address).toMatchObject({
-      file: "e",
-      rank: 4,
-      level: "A",
-      algebraic2D: "e4",
-      square3D: "A:e4",
-    });
+    expect(address).toMatchObject({ file: "e", rank: 4, level: "A", algebraic2D: "e4", square3D: "A:e4" });
     expect(boardPosition(address)).toMatchObject({ y: 0 });
   });
 
@@ -39,7 +33,6 @@ describe("browser presentation data", () => {
     const nextFile = boardPosition(createSquareAddress(1, 0, 0));
     const nextRank = boardPosition(createSquareAddress(0, 1, 0));
     const nextLevel = boardPosition(createSquareAddress(0, 0, 1));
-
     expect(nextFile.x - origin.x).toBe(CELL_SIZE);
     expect(nextRank.z - origin.z).toBe(CELL_SIZE);
     expect(nextLevel.y - origin.y).toBe(CELL_SIZE);
@@ -49,24 +42,50 @@ describe("browser presentation data", () => {
     const pieces = createInitialPieces();
     expect(pieces).toHaveLength(32);
     expect(new Set(pieces.map((piece) => piece.id)).size).toBe(32);
-    expect(
-      pieces.filter(
-        (piece) => piece.color === "white" && piece.position.rank <= 2,
-      ),
-    ).toHaveLength(16);
-    expect(
-      pieces.filter(
-        (piece) => piece.color === "black" && piece.position.rank >= 7,
-      ),
-    ).toHaveLength(16);
+    expect(pieces.filter((piece) => piece.color === "white" && piece.position.rank <= 2)).toHaveLength(16);
+    expect(pieces.filter((piece) => piece.color === "black" && piece.position.rank >= 7)).toHaveLength(16);
   });
 
-  it("keeps selection state serializable in the presentation adapter", () => {
+  it("starts with White and blocks Black selection", () => {
     const presentation = new GamePresentation();
-    presentation.selectPiece(presentation.pieces[0]);
-    const state = presentation.snapshot();
-    expect(state.selectedPieceId).toBe(presentation.pieces[0].id);
-    expect(state.selectedSquare.square3D).toBe("A:a1");
+    const blackPawn = presentation.pieces.find((piece) => piece.id === "black-pawn-1");
+    expect(presentation.sideToMove).toBe("white");
+    expect(presentation.selectPiece(blackPawn)).toBe(false);
+    expect(presentation.selectedPieceId).toBeNull();
+  });
+
+  it("executes a legal move and changes the turn", () => {
+    const presentation = new GamePresentation();
+    const pawn = presentation.pieces.find((piece) => piece.id === "white-pawn-1");
+    presentation.selectPiece(pawn);
+    expect(presentation.selectSquare(createSquareAddress(0, 2, 0))).toBe(true);
+    expect(presentation.pieces.find((piece) => piece.id === pawn.id).position.square3D).toBe("A:a3");
+    expect(presentation.sideToMove).toBe("black");
+    expect(presentation.history).toHaveLength(1);
+  });
+
+  it("preserves pending selection while changing level and executes a vertical pawn move", () => {
+    const presentation = new GamePresentation();
+    const pawn = presentation.pieces.find((piece) => piece.id === "white-pawn-1");
+    presentation.selectPiece(pawn);
+    presentation.setActiveLevel(1);
+    expect(presentation.selectedPieceId).toBe(pawn.id);
+    expect(presentation.selectSquare(createSquareAddress(0, 1, 1))).toBe(true);
+    expect(presentation.pieces.find((piece) => piece.id === pawn.id).position.square3D).toBe("B:a2");
+    expect(presentation.activeLevel).toBe(1);
+  });
+
+  it("undoes and redoes an exact move snapshot", () => {
+    const presentation = new GamePresentation();
+    const pawn = presentation.pieces.find((piece) => piece.id === "white-pawn-1");
+    presentation.selectPiece(pawn);
+    presentation.selectSquare(createSquareAddress(0, 2, 0));
+    expect(presentation.undo()).toBe(true);
+    expect(presentation.pieces.find((piece) => piece.id === pawn.id).position.square3D).toBe("A:a2");
+    expect(presentation.sideToMove).toBe("white");
+    expect(presentation.redo()).toBe(true);
+    expect(presentation.pieces.find((piece) => piece.id === pawn.id).position.square3D).toBe("A:a3");
+    expect(presentation.sideToMove).toBe("black");
   });
 
   it("tracks eight level visibility states and can isolate the active level", () => {
@@ -75,11 +94,7 @@ describe("browser presentation data", () => {
     expect(presentation.squares).toHaveLength(512);
     presentation.setActiveLevel(3);
     presentation.isolateActiveLevel();
-    expect(
-      presentation.levels
-        .filter((level) => level.visible)
-        .map((level) => level.name),
-    ).toEqual(["D"]);
+    expect(presentation.levels.filter((level) => level.visible).map((level) => level.name)).toEqual(["D"]);
     presentation.showAllLevels();
     expect(presentation.levels.every((level) => level.visible)).toBe(true);
   });
