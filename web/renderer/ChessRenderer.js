@@ -55,19 +55,56 @@ export class ChessRenderer {
       state.selectedSquare?.square3D ?? null,
       state.legalTargets,
     );
+    this.pieceRenderer.sync(state.pieces);
     this.pieceRenderer.setSelected(state.selectedPieceId);
     this.pieceRenderer.setLevelVisibility(state.levels);
     this.onStateChange(state);
   }
 
+  refresh() {
+    this.applyPresentation(this.presentation.snapshot());
+  }
+
   setActiveLevel(level) {
     this.presentation.setActiveLevel(level);
-    this.applyPresentation(this.presentation.snapshot());
+    this.refresh();
+  }
+
+  startLocalGame() {
+    this.presentation.startLocalGame();
+    this.refresh();
+    this.resetCamera();
   }
 
   newGame() {
     this.presentation.resetGame();
-    window.location.reload();
+    this.refresh();
+    this.resetCamera();
+  }
+
+  undo() {
+    this.presentation.undo();
+    this.refresh();
+  }
+
+  redo() {
+    this.presentation.redo();
+    this.refresh();
+  }
+
+  openMenu() {
+    this.presentation.openMenu();
+    this.refresh();
+  }
+
+  closeMenu() {
+    this.presentation.closeMenu();
+    this.refresh();
+  }
+
+  setLanguage(language) {
+    this.presentation.setLanguage(language);
+    this.refresh();
   }
 
   setBrightness(value) {
@@ -76,32 +113,28 @@ export class ChessRenderer {
 
   showAllLevels() {
     this.presentation.showAllLevels();
-    this.applyPresentation(this.presentation.snapshot());
+    this.refresh();
   }
 
   isolateActiveLevel() {
     this.presentation.isolateActiveLevel();
-    this.applyPresentation(this.presentation.snapshot());
+    this.refresh();
   }
 
-  cubeView() {
-    this.cameraController.cubeView();
-  }
-
+  cubeView() { this.cameraController.cubeView(); }
   activeLayerView() {
     this.cameraController.activeLayerView(this.presentation.activeLevel);
   }
 
   resize() {
-    const { clientWidth: width, clientHeight: height } =
-      this.sceneController.renderer.domElement.parentElement;
+    const parent = this.sceneController.renderer.domElement.parentElement;
+    const width = Math.max(1, parent.clientWidth);
+    const height = Math.max(1, parent.clientHeight);
     this.sceneController.resize(width, height);
     this.cameraController.resize(width, height);
   }
 
-  resetCamera() {
-    this.cameraController.reset();
-  }
+  resetCamera() { this.cameraController.reset(); }
 
   animate() {
     if (!this.running) return;

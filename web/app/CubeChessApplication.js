@@ -14,6 +14,11 @@ export class CubeChessApplication {
     this.hud = new GameHud(root, {
       reset: () => this.renderer.resetCamera(),
       newGame: () => this.renderer.newGame(),
+      startLocalGame: () => this.renderer.startLocalGame(),
+      undo: () => this.renderer.undo(),
+      redo: () => this.renderer.redo(),
+      openMenu: () => this.renderer.openMenu(),
+      language: (value) => this.renderer.setLanguage(value),
       brightness: (value) => this.renderer.setBrightness(value),
       toggleCoordinates: (visible) =>
         root.classList.toggle("coordinates-hidden", !visible),
