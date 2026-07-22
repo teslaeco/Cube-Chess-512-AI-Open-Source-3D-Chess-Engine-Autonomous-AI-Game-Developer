@@ -5,6 +5,7 @@ export default defineConfig({
     include: [
       "test/**/*.test.ts",
       "src/engine3d/**/*.test.ts",
+      "server/**/*.test.ts",
       "web/**/*.test.js",
     ],
   },

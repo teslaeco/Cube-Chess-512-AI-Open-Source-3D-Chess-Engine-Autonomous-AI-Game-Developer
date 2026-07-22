@@ -64,6 +64,40 @@ describe("browser presentation data", () => {
     expect(presentation.history).toHaveLength(1);
   });
 
+  it("treats an opponent piece on a legal target as a capture click", () => {
+    const presentation = new GamePresentation();
+    const whitePawn = presentation.pieces.find((piece) => piece.id === "white-pawn-1");
+    presentation.selectPiece(whitePawn);
+    presentation.selectSquare(createSquareAddress(0, 3, 0));
+
+    const blackPawn = presentation.pieces.find((piece) => piece.id === "black-pawn-2");
+    presentation.selectPiece(blackPawn);
+    presentation.selectSquare(createSquareAddress(1, 4, 0));
+
+    const movedWhitePawn = presentation.pieces.find((piece) => piece.id === whitePawn.id);
+    const targetBlackPawn = presentation.pieces.find((piece) => piece.id === blackPawn.id);
+    presentation.selectPiece(movedWhitePawn);
+
+    expect(presentation.selectPiece(targetBlackPawn)).toBe(true);
+    expect(presentation.pieces.some((piece) => piece.id === blackPawn.id)).toBe(false);
+    expect(presentation.pieces.find((piece) => piece.id === whitePawn.id).position.square3D).toBe("A:b5");
+    expect(presentation.capturedPieces.map((piece) => piece.id)).toEqual([blackPawn.id]);
+  });
+
+  it("lets a black pawn move upward from A to B after White moves", () => {
+    const presentation = new GamePresentation();
+    const whitePawn = presentation.pieces.find((piece) => piece.id === "white-pawn-1");
+    presentation.selectPiece(whitePawn);
+    presentation.selectSquare(createSquareAddress(0, 2, 0));
+
+    const blackPawn = presentation.pieces.find((piece) => piece.id === "black-pawn-2");
+    presentation.selectPiece(blackPawn);
+    presentation.setActiveLevel(1);
+
+    expect(presentation.selectSquare(createSquareAddress(1, 6, 1))).toBe(true);
+    expect(presentation.pieces.find((piece) => piece.id === blackPawn.id).position.square3D).toBe("B:b7");
+  });
+
   it("preserves pending selection while changing level and executes a vertical pawn move", () => {
     const presentation = new GamePresentation();
     const pawn = presentation.pieces.find((piece) => piece.id === "white-pawn-1");
@@ -86,6 +120,22 @@ describe("browser presentation data", () => {
     expect(presentation.redo()).toBe(true);
     expect(presentation.pieces.find((piece) => piece.id === pawn.id).position.square3D).toBe("A:a3");
     expect(presentation.sideToMove).toBe("black");
+  });
+
+  it("round-trips a versioned game save", () => {
+    const source = new GamePresentation();
+    const pawn = source.pieces.find((piece) => piece.id === "white-pawn-1");
+    source.selectPiece(pawn);
+    source.selectSquare(createSquareAddress(0, 2, 0));
+    const saved = source.serialize();
+
+    const restored = new GamePresentation();
+    restored.load(saved);
+
+    expect(restored.sideToMove).toBe("black");
+    expect(restored.history).toHaveLength(1);
+    expect(restored.pieces.find((piece) => piece.id === pawn.id).position.square3D).toBe("A:a3");
+    expect(restored.menuOpen).toBe(false);
   });
 
   it("tracks eight level visibility states and can isolate the active level", () => {

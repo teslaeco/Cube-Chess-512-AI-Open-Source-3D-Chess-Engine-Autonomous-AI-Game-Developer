@@ -52,12 +52,12 @@ function attacksByRay(
 }
 
 function pawnAttacks(piece: Piece, target: Coordinate3D): boolean {
-  const direction = piece.color === "white" ? 1 : -1;
+  const rankDirection = piece.color === "white" ? 1 : -1;
   const offsets: readonly Vector[] = [
-    [1, direction, 0],
-    [-1, direction, 0],
-    [1, 0, direction],
-    [-1, 0, direction],
+    [1, rankDirection, 0],
+    [-1, rankDirection, 0],
+    [1, 0, 1],
+    [-1, 0, 1],
   ];
 
   return attacksByLeap(piece, target, offsets);

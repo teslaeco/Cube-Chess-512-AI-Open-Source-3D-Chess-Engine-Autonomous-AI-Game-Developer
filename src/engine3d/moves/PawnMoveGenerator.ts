@@ -5,12 +5,15 @@ import type { Move } from "./Move.js";
 import { createMove } from "./MoveFactory.js";
 
 export function generatePawnMoves(board: Board3D, piece: Piece): Move[] {
-  const direction = piece.color === "white" ? 1 : -1;
+  const rankDirection = piece.color === "white" ? 1 : -1;
+  // Both armies start on level A. Height progression is therefore always
+  // A -> H, independently from the classical rank direction.
+  const heightDirection = 1;
   const moves: Move[] = [];
 
   const advanceVectors: readonly Vector[] = [
-    [0, direction, 0],
-    [0, 0, direction],
+    [0, rankDirection, 0],
+    [0, 0, heightDirection],
   ];
 
   for (const vector of advanceVectors) {
@@ -20,8 +23,8 @@ export function generatePawnMoves(board: Board3D, piece: Piece): Move[] {
     }
   }
 
-  const middle = piece.position.tryAdd(0, direction, 0);
-  const twice = piece.position.tryAdd(0, direction * 2, 0);
+  const middle = piece.position.tryAdd(0, rankDirection, 0);
+  const twice = piece.position.tryAdd(0, rankDirection * 2, 0);
   if (
     !piece.hasMoved &&
     middle &&
@@ -33,10 +36,10 @@ export function generatePawnMoves(board: Board3D, piece: Piece): Move[] {
   }
 
   const captureVectors: readonly Vector[] = [
-    [1, direction, 0],
-    [-1, direction, 0],
-    [1, 0, direction],
-    [-1, 0, direction],
+    [1, rankDirection, 0],
+    [-1, rankDirection, 0],
+    [1, 0, heightDirection],
+    [-1, 0, heightDirection],
   ];
 
   for (const vector of captureVectors) {

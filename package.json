@@ -5,12 +5,27 @@
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && vite build",
+    "desktop:build": "tauri build",
+    "desktop:dev": "tauri dev",
     "dev": "vite --host 0.0.0.0",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json",
+    "smoke:dist": "node scripts/smoke-dist.mjs",
+    "server:dev": "tsx watch server/index.ts",
+    "server:start": "tsx server/index.ts"
+  },
+  "dependencies": {
+    "three": "0.169.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.1",
+    "@tauri-apps/cli": "^2.8.4",
+    "@types/node": "^22.20.1",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.20.6",
     "typescript": "^5.6.3",
     "vite": "^5.4.21",
     "vitest": "^2.1.4"
