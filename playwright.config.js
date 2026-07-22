@@ -7,7 +7,7 @@ export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
   timeout: 90_000,
-  expect: { timeout: 10_000 },
+  expect: { timeout: 30_000 },
   workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: [["line"], ["html", { open: "never" }]],
@@ -35,10 +35,14 @@ export default defineConfig({
         viewport: { width: 1920, height: 1080 },
         launchOptions: {
           firefoxUserPrefs: {
-            // GitHub's headless Linux runner blocklists WebGL2 unless software
-            // rendering is explicitly allowed. Three.js r169 requires WebGL2.
+            // Firefox on GitHub's headless Linux runner can block hardware WebGL.
+            // Force the Mesa/llvmpipe software path required by Three.js WebGL2.
             "webgl.disabled": false,
             "webgl.force-enabled": true,
+            "webgl.enable-webgl2": true,
+            "gfx.webrender.all": true,
+            "gfx.webrender.software": true,
+            "layers.acceleration.force-enabled": true,
           },
         },
       },
