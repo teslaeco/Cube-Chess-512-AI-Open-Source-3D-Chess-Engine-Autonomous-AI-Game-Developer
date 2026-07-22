@@ -8,6 +8,7 @@ const GRID_COLOR = 0x111820;
 const SELECTED_COLOR = 0x43d9ff;
 const QUIET_COLOR = 0x54d67a;
 const CAPTURE_COLOR = 0xff6b6b;
+const HEIGHT_COLOR = 0xb887ff;
 const BOARD_THICKNESS = 0.045;
 
 export class BoardRenderer {
@@ -18,6 +19,9 @@ export class BoardRenderer {
     this.overlays = new Map();
     this.levelGroups = new Map();
     this.levelMaterials = new Map();
+    this.movePaths = new THREE.Group();
+    this.movePaths.name = "Cross-level move paths";
+    this.group.add(this.movePaths);
     this.resources = [];
 
     const squareGeometry = new THREE.BoxGeometry(
@@ -38,7 +42,21 @@ export class BoardRenderer {
       opacity: 0.2,
       depthWrite: false,
     });
-    this.resources.push(squareGeometry, overlayGeometry, wireGeometry, wireMaterial);
+    this.pathMaterial = new THREE.LineDashedMaterial({
+      color: HEIGHT_COLOR,
+      transparent: true,
+      opacity: 0.72,
+      dashSize: 0.2,
+      gapSize: 0.12,
+      depthWrite: false,
+    });
+    this.resources.push(
+      squareGeometry,
+      overlayGeometry,
+      wireGeometry,
+      wireMaterial,
+      this.pathMaterial,
+    );
 
     for (const square of squares) {
       this.ensureLevel(square.z, square.level);
@@ -117,9 +135,11 @@ export class BoardRenderer {
 
   setHighlights(selectedSquare, legalTargets = []) {
     const targets = new Map(legalTargets.map((target) => [target.square3D, target]));
+    const selectedKey = selectedSquare?.square3D ?? selectedSquare;
     this.overlays.forEach((overlay, key) => {
       const target = targets.get(key);
-      const selected = key === selectedSquare;
+      const selected = key === selectedKey;
+      const changesLevel = target && target.to.z !== target.from.z;
       overlay.visible = selected || Boolean(target);
       overlay.material.opacity = selected ? 0.58 : target ? 0.5 : 0;
       overlay.material.color.setHex(
@@ -127,17 +147,37 @@ export class BoardRenderer {
           ? SELECTED_COLOR
           : target?.kind === "capture"
             ? CAPTURE_COLOR
-            : QUIET_COLOR,
+            : changesLevel
+              ? HEIGHT_COLOR
+              : QUIET_COLOR,
       );
     });
+
+    this.movePaths.children.forEach((line) => line.geometry.dispose());
+    this.movePaths.clear();
+    for (const target of legalTargets.filter((move) => move.to.z !== move.from.z)) {
+      const from = boardPosition(target.from);
+      const to = boardPosition(target.to);
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(from.x, from.y + 0.16, from.z),
+        new THREE.Vector3(to.x, to.y + 0.16, to.z),
+      ]);
+      const line = new THREE.Line(geometry, this.pathMaterial);
+      line.computeLineDistances();
+      line.renderOrder = 20;
+      line.userData = { kind: "grid" };
+      this.movePaths.add(line);
+    }
   }
 
   dispose() {
+    this.movePaths.children.forEach((line) => line.geometry.dispose());
     this.resources.forEach((resource) => resource.dispose());
     this.group.clear();
     this.squares.clear();
     this.overlays.clear();
     this.levelGroups.clear();
     this.levelMaterials.clear();
+    this.movePaths.clear();
   }
 }

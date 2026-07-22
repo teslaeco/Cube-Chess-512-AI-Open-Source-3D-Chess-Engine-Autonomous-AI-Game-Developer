@@ -2,15 +2,20 @@ import * as THREE from "three";
 
 export class SceneController {
   constructor(container) {
+    const interactionTestMode = new URLSearchParams(location.search).has("e2e");
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x101822);
-    this.scene.fog = new THREE.Fog(0x101822, 16, 38);
+    // Distance must never change board brightness. Fog is an explicit,
+    // persisted opt-in graphics setting instead of a default effect.
+    this.scene.fog = null;
     this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: !interactionTestMode,
       powerPreference: "high-performance",
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.setPixelRatio(
+      interactionTestMode ? 1 : Math.min(window.devicePixelRatio || 1, 2),
+    );
+    this.renderer.shadowMap.enabled = !interactionTestMode;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -18,13 +23,14 @@ export class SceneController {
       localStorage.getItem("cubeChessBrightness") ?? 1,
     );
     this.renderer.domElement.className = "game-canvas";
+    this.renderer.domElement.setAttribute("aria-label", "Interaktywna plansza szachowa 3D 8 na 8 na 8");
     container.append(this.renderer.domElement);
 
     this.ambient = new THREE.AmbientLight(0xffffff, 1.05);
     this.hemisphere = new THREE.HemisphereLight(0xeaf2ff, 0x263243, 1.7);
     this.keyLight = new THREE.DirectionalLight(0xfff4dc, 2.7);
     this.keyLight.position.set(8, 14, 7);
-    this.keyLight.castShadow = true;
+    this.keyLight.castShadow = !interactionTestMode;
     this.keyLight.shadow.mapSize.set(2048, 2048);
     this.fillLight = new THREE.DirectionalLight(0xbfdcff, 1.15);
     this.fillLight.position.set(-9, 8, -6);
@@ -50,6 +56,11 @@ export class SceneController {
     const brightness = Math.min(1.5, Math.max(0.5, Number(value)));
     this.renderer.toneMappingExposure = brightness;
     localStorage.setItem("cubeChessBrightness", String(brightness));
+  }
+
+  setFog(enabled) {
+    this.scene.fog = enabled ? new THREE.Fog(0x101822, 24, 68) : null;
+    localStorage.setItem("cubeChessFog", enabled ? "1" : "0");
   }
 
   resize(width, height) {

@@ -1,0 +1,21 @@
+{
+  "name": "Cube Chess 512 AI",
+  "short_name": "Cube Chess 512",
+  "description": "Open-source 3D chess on one 8×8×8 board with 512 fields.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#071019",
+  "theme_color": "#101822",
+  "categories": ["games", "education"],
+  "icons": [
+    {
+      "src": "./icons/cube-chess.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

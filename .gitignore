@@ -1,2 +1,5 @@
 node_modules/
 dist/
+playwright-report/
+test-results/
+src-tauri/target/

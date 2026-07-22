@@ -18,27 +18,34 @@ export class ChessRenderer {
     this.pieceRenderer = new PieceRenderer(
       state.pieces,
       new PieceGeometryFactory(),
+      (active) => this.handleAnimationState(active),
     );
     this.sceneController.scene.add(
       this.boardRenderer.group,
       this.pieceRenderer.group,
     );
+    this.cameraController.setBoardObject(this.boardRenderer.group);
     this.selection = new SelectionController(
       this.sceneController.renderer.domElement,
       this.cameraController.camera,
       [this.pieceRenderer.group, this.boardRenderer.group],
       () => this.presentation.activeLevel,
       (metadata) => this.select(metadata),
+      () => this.presentation.canHumanInteract(),
     );
+    this.lastFollowedMove = null;
     this.applyPresentation(state);
     this.resize = this.resize.bind(this);
-    window.addEventListener("resize", this.resize);
+    this.resizeObserver = new ResizeObserver(this.resize);
+    this.resizeObserver.observe(container);
     this.resize();
     this.running = true;
-    this.frame = requestAnimationFrame(() => this.animate());
+    this.lastFrameTime = performance.now();
+    this.frame = requestAnimationFrame((time) => this.animate(time));
   }
 
   select(metadata) {
+    if (!this.presentation.canHumanInteract()) return;
     if (!metadata) {
       this.presentation.clearSelection();
     } else if (metadata.kind === "piece") {
@@ -49,16 +56,29 @@ export class ChessRenderer {
     this.applyPresentation(this.presentation.snapshot());
   }
 
+  handleAnimationState(active) {
+    this.presentation.setBusy(active);
+    this.onStateChange(this.presentation.snapshot());
+  }
+
   applyPresentation(state) {
     this.boardRenderer.setLevels(state.levels, state.activeLevel);
-    this.boardRenderer.setHighlights(
-      state.selectedSquare?.square3D ?? null,
-      state.legalTargets,
+    this.boardRenderer.setHighlights(state.selectedSquare, state.legalTargets);
+    this.pieceRenderer.sync(
+      state.pieces,
+      state.capturedPieces,
+      state.lastMove,
     );
-    this.pieceRenderer.sync(state.pieces);
     this.pieceRenderer.setSelected(state.selectedPieceId);
     this.pieceRenderer.setLevelVisibility(state.levels);
-    this.onStateChange(state);
+    if (
+      state.lastMove?.sequence != null &&
+      state.lastMove.sequence !== this.lastFollowedMove
+    ) {
+      this.lastFollowedMove = state.lastMove.sequence;
+      this.cameraController.followSquare(state.lastMove.to);
+    }
+    this.onStateChange(this.presentation.snapshot());
   }
 
   refresh() {
@@ -68,28 +88,52 @@ export class ChessRenderer {
   setActiveLevel(level) {
     this.presentation.setActiveLevel(level);
     this.refresh();
+    this.cameraController.followLevel(level);
+  }
+
+  startGame(config) {
+    this.presentation.startGame(config);
+    this.lastFollowedMove = null;
+    this.refresh();
+    this.cameraController.fitBoard(false);
   }
 
   startLocalGame() {
-    this.presentation.startLocalGame();
+    this.startGame({ mode: "local" });
+  }
+
+  startDemo() {
+    this.presentation.startDemo();
+    this.lastFollowedMove = null;
     this.refresh();
-    this.resetCamera();
+    this.cameraController.fitBoard(false);
+  }
+
+  executeAutomatedMove(move) {
+    const executed = this.presentation.executeMove(move, { allowBusy: true });
+    if (executed) this.refresh();
+    return executed;
   }
 
   newGame() {
-    this.presentation.resetGame();
+    this.presentation.resetGame({ appState: "playing", preserveMenu: true });
     this.refresh();
-    this.resetCamera();
+    this.cameraController.fitBoard(false);
+  }
+
+  loadGame(serialized) {
+    this.presentation.load(serialized);
+    this.lastFollowedMove = null;
+    this.refresh();
+    this.cameraController.fitBoard(false);
   }
 
   undo() {
-    this.presentation.undo();
-    this.refresh();
+    if (this.presentation.undo()) this.refresh();
   }
 
   redo() {
-    this.presentation.redo();
-    this.refresh();
+    if (this.presentation.redo()) this.refresh();
   }
 
   openMenu() {
@@ -111,6 +155,10 @@ export class ChessRenderer {
     this.sceneController.setBrightness(value);
   }
 
+  setFog(enabled) {
+    this.sceneController.setFog(enabled);
+  }
+
   showAllLevels() {
     this.presentation.showAllLevels();
     this.refresh();
@@ -121,7 +169,10 @@ export class ChessRenderer {
     this.refresh();
   }
 
-  cubeView() { this.cameraController.cubeView(); }
+  cubeView() {
+    this.cameraController.fitBoard(false);
+  }
+
   activeLayerView() {
     this.cameraController.activeLayerView(this.presentation.activeLevel);
   }
@@ -134,19 +185,24 @@ export class ChessRenderer {
     this.cameraController.resize(width, height);
   }
 
-  resetCamera() { this.cameraController.reset(); }
+  resetCamera() {
+    this.cameraController.reset();
+  }
 
-  animate() {
+  animate(time) {
     if (!this.running) return;
+    const delta = Math.min(0.05, Math.max(0, (time - this.lastFrameTime) / 1000));
+    this.lastFrameTime = time;
+    this.pieceRenderer.update(delta);
     this.cameraController.update();
     this.sceneController.render(this.cameraController.camera);
-    this.frame = requestAnimationFrame(() => this.animate());
+    this.frame = requestAnimationFrame((nextTime) => this.animate(nextTime));
   }
 
   dispose() {
     this.running = false;
     cancelAnimationFrame(this.frame);
-    window.removeEventListener("resize", this.resize);
+    this.resizeObserver.disconnect();
     this.selection.dispose();
     this.cameraController.dispose();
     this.boardRenderer.dispose();

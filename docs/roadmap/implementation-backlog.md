@@ -4,72 +4,73 @@ GitHub Issues are currently disabled for this repository, so the planned work is
 
 ## P0 — Core playable game
 
-- [ ] authoritative GameController
-- [ ] side to move, White starts
-- [ ] block selection of opponent pieces
-- [ ] execute legal moves
-- [ ] captures
-- [ ] turn switching
-- [ ] game-over lock
-- [ ] pending cross-level move selection
-- [ ] move animation and camera tracking
-- [ ] history, undo and redo
-- [ ] new game without reload
+- [x] authoritative presentation/controller boundary using the engine for legality
+- [x] side to move, White starts
+- [x] block selection of opponent pieces
+- [x] execute legal moves
+- [x] captures
+- [x] turn switching
+- [x] game-over lock
+- [x] pending cross-level move selection
+- [x] move animation and camera tracking
+- [x] history, undo and redo
+- [x] new game without reload
 
 ## P0 — Responsive desktop and mobile UI
 
-- [ ] collapsible desktop panel
-- [ ] mobile portrait and landscape layouts
-- [ ] tablet layout
-- [ ] fit board to view
-- [ ] camera zoom limits
-- [ ] safe-area support
-- [ ] no clipped menu or canvas
+- [x] overlay desktop panel and compact control docks
+- [x] mobile portrait and landscape layouts
+- [x] tablet layout
+- [x] fit board to view
+- [x] camera zoom limits
+- [x] safe-area support
+- [x] no clipped menu or canvas in automated viewport tests
 
 ## P1 — Main menu
 
-- [ ] New Game
-- [ ] Save
-- [ ] Online
-- [ ] Settings
-- [ ] Subscribe
-- [ ] License
-- [ ] Help
-- [ ] About
+- [x] New Game
+- [x] Save
+- [x] Online status (honestly offline until hosted)
+- [x] Settings foundation
+- [x] Subscribe concept (no payments)
+- [x] License
+- [x] Help
+- [x] About
 
 ## P1 — Internationalization
 
-- [ ] Polish and English complete
-- [ ] language picker
-- [ ] automatic detection
-- [ ] fallback
-- [ ] RTL
-- [ ] locale quality status
-- [ ] draft catalog for requested world languages
+- [x] Polish and English technically complete
+- [x] language picker
+- [x] automatic detection
+- [x] exact/base/English fallback
+- [x] RTL
+- [x] locale quality status
+- [x] draft catalog for requested world languages
+- [ ] human review of machine-draft catalogs
 
 ## P1 — Saves and replay
 
-- [ ] IndexedDB storage
-- [ ] JSON import/export
+- [x] IndexedDB storage
+- [x] JSON import/export
 - [ ] replay timeline
 - [ ] 3D FEN
 - [ ] 3D PGN
 
 ## P1 — PWA
 
-- [ ] manifest
-- [ ] service worker
-- [ ] offline shell
-- [ ] update prompt
-- [ ] cache versioning
+- [x] manifest
+- [x] service worker
+- [x] offline shell
+- [x] update prompt
+- [x] cache versioning
 
 ## P2 — Computer and AI modes
 
-- [ ] deterministic computer opponent
-- [ ] minimax
-- [ ] alpha-beta
-- [ ] Web Worker
-- [ ] difficulty levels
+- [x] deterministic legal fallback and reproducible test path
+- [x] minimax
+- [x] alpha-beta
+- [x] Web Worker
+- [x] difficulty levels
 - [ ] tutorial AI
 
 ## P2 — Online multiplayer
@@ -87,56 +88,58 @@ Planned region labels shown in UI, all with the annotation **Option under constr
 
 Backend work:
 
-- [ ] authoritative server
-- [ ] WebSocket
+- [x] authoritative local test server
+- [x] WebSocket
 - [ ] lobby
 - [ ] invites
-- [ ] reconnect
-- [ ] spectators
+- [x] reconnect identity and client backoff foundation
+- [x] spectators
 - [ ] anti-cheat
 - [ ] moderation
 
 ## P2 — Attract-mode demo
 
-- [ ] separate demo controller
-- [ ] one-minute legal 3D game
-- [ ] captures outside board
-- [ ] aura effect
+- [x] separate demo controller
+- [x] one-minute loop using legal engine moves
+- [x] captured models outside board when captures occur
+- [x] aura effect
 - [ ] legal checkmate ending
-- [ ] loop and resource cleanup
+- [x] loop and resource cleanup
 
 ## P3 — Desktop packages
 
-- [ ] Tauri evaluation
-- [ ] Windows x64
-- [ ] Linux x64
-- [ ] macOS Intel
-- [ ] macOS Apple Silicon
-- [ ] CI packaging
+- [x] Tauri evaluation and scaffold
+- [x] Windows x64 workflow target
+- [x] Linux x64 AppImage/`.deb` workflow targets
+- [x] macOS Intel workflow target
+- [x] macOS Apple Silicon workflow target
+- [x] CI packaging configuration
+- [ ] generate, inspect, sign and notarize real release artifacts
 
 ## P3 — Mini Computer 1/8
 
-- [ ] sandboxed tablet UI
-- [ ] game files
-- [ ] media
-- [ ] safe browser adapter
+- [x] sandboxed-in-scope virtual tablet UI
+- [x] game files
+- [x] user-selected local media
+- [x] safe external-browser adapter (no arbitrary embedded execution)
 - [ ] CSP and allowlist
 - [ ] threat model
 
 ## P3 — Subscription concept
 
-- [ ] Pro concept screen
-- [ ] no pay-to-win
-- [ ] no payment claims before implementation
+- [x] Pro concept screen
+- [x] no pay-to-win
+- [x] no payment claims before implementation
 
 ## P3 — Accessibility
 
-- [ ] keyboard
-- [ ] high contrast
-- [ ] large text
-- [ ] reduced motion
-- [ ] screen-reader labels
-- [ ] touch target audit
+- [x] keyboard menu navigation and focus trap
+- [x] high contrast
+- [x] large text
+- [x] reduced motion
+- [x] screen-reader labels for the menu/control shell
+- [x] minimum control sizing and viewport audit
+- [ ] keyboard board navigation and complete move announcements
 
 ## P3 — Performance
 

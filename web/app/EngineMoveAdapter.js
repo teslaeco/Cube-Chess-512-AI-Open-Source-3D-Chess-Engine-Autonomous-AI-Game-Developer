@@ -2,6 +2,7 @@ import {
   Board3D,
   Coordinate3D,
   evaluatePosition,
+  generateLegalMovesForColor,
   generateLegalMovesForPiece,
 } from "../../src/engine3d/index.ts";
 
@@ -29,7 +30,17 @@ export function legalTargetsForPiece(pieces, pieceId) {
 
   if (!selected) return [];
 
-  return generateLegalMovesForPiece(board, selected).map((move) => ({
+  return generateLegalMovesForPiece(board, selected).map(toBrowserMove);
+}
+
+export function legalMovesForSide(pieces, sideToMove) {
+  return generateLegalMovesForColor(createBoard(pieces), sideToMove).map(
+    toBrowserMove,
+  );
+}
+
+function toBrowserMove(move) {
+  return {
     pieceId: move.pieceId,
     from: {
       x: move.from.x,
@@ -46,7 +57,7 @@ export function legalTargetsForPiece(pieces, pieceId) {
     square3D: move.to.toSquareAddress(),
     kind: move.kind,
     capturedPieceId: move.capturedPieceId ?? null,
-  }));
+  };
 }
 
 export function positionStatus(pieces, sideToMove) {

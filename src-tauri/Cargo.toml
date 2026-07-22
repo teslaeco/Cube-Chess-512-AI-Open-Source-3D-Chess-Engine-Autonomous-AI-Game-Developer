@@ -1,0 +1,21 @@
+[package]
+name = "cube-chess-512"
+version = "0.1.0"
+description = "Cube Chess 512 AI desktop shell"
+authors = ["Sebastian Laskowski and Cube Chess 512 contributors"]
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "cube_chess_512_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

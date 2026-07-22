@@ -130,6 +130,55 @@ describe("Cube Chess 512 pseudo-legal movement geometry", () => {
     expect(moves.find((move) => move.to.equals(enemyVerticalDiagonal.position))?.kind).toBe("capture");
   });
 
+  it("lets both pawn colors climb from level A to B", () => {
+    const whitePawn = piece("pawn", 2, 2, 0, "white");
+    const blackPawn = piece("pawn", 5, 5, 0, "black");
+    const board = new Board3D([whitePawn, blackPawn]);
+
+    expect(addresses(generatePseudoLegalMoves(board, whitePawn))).toContain("B:c3");
+    expect(addresses(generatePseudoLegalMoves(board, blackPawn))).toContain("B:f6");
+  });
+
+  it("blocks vertical pawn advance, allows an upward capture, and stops at H", () => {
+    const blackPawn = piece("pawn", 3, 3, 0, "black");
+    const blocker = piece("rook", 3, 3, 1, "white");
+    const captureTarget = piece("knight", 4, 3, 1, "white");
+    const board = new Board3D([blackPawn, blocker, captureTarget]);
+    const moves = generatePseudoLegalMoves(board, blackPawn);
+
+    expect(addresses(moves)).not.toContain("B:d4");
+    expect(moves.find((move) => move.to.equals(captureTarget.position))?.kind).toBe("capture");
+
+    const pawnOnH = piece("pawn", 6, 3, 7, "black");
+    expect(generatePseudoLegalMoves(new Board3D([pawnOnH]), pawnOnH).every((move) => move.to.z === 7)).toBe(true);
+  });
+
+  it("never gives a bishop an axial move while the queen keeps those moves", () => {
+    const bishop = piece("bishop");
+    const queen = piece("queen", 4, 4, 4);
+    const bishopMoves = generatePseudoLegalMoves(new Board3D([bishop]), bishop);
+    const queenMoves = generatePseudoLegalMoves(new Board3D([queen]), queen);
+
+    expect(bishopMoves.some((move) => move.to.x === bishop.position.x && move.to.y === bishop.position.y)).toBe(false);
+    expect(queenMoves.some((move) => move.to.x === queen.position.x && move.to.y === queen.position.y)).toBe(true);
+  });
+
+  it("stops bishop diagonals at friendly pieces and after enemy captures", () => {
+    const bishop = piece("bishop");
+    const friendly = piece("pawn", 4, 4, 4);
+    const enemy = piece("pawn", 2, 2, 2, "black");
+    const moves = generatePseudoLegalMoves(
+      new Board3D([bishop, friendly, enemy]),
+      bishop,
+    );
+    const result = addresses(moves);
+
+    expect(result).not.toContain("E:e5");
+    expect(result).not.toContain("F:f6");
+    expect(moves.find((move) => move.to.equals(enemy.position))?.kind).toBe("capture");
+    expect(result).not.toContain("B:b2");
+  });
+
   it("does not allow a moved pawn to advance two squares", () => {
     const pawn = piece("pawn", 3, 3, 3, "white", true);
     const result = addresses(generatePseudoLegalMoves(new Board3D([pawn]), pawn));

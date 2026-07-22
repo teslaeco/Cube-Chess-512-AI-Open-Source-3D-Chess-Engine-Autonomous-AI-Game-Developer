@@ -1,19 +1,119 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { CELL_SIZE, boardPosition } from "./coordinates.js";
+
+const DEFAULT_DIRECTION = new THREE.Vector3(1, 0.82, 1).normalize();
 
 export class CameraController {
   constructor(canvas) {
-    this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+    this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 180);
     this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.enableDamping = true; this.controls.dampingFactor = 0.07;
-    this.controls.minDistance = 7; this.controls.maxDistance = 32;
-    this.controls.maxPolarAngle = Math.PI * 0.48;
-    this.reset();
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.07;
+    this.controls.enablePan = true;
+    this.controls.screenSpacePanning = true;
+    this.controls.minDistance = 3.5;
+    this.controls.maxDistance = 72;
+    this.controls.maxPolarAngle = Math.PI * 0.94;
+    this.desiredTarget = null;
+    this.desiredPosition = null;
+    this.boardObject = null;
+    this.camera.position.set(18, 18, 18);
+    this.controls.target.set(0, CELL_SIZE * 3.5, 0);
+    this.controls.update();
   }
-  reset() { this.cubeView(); }
-  cubeView() { this.camera.position.set(13, 16, 14); this.controls.target.set(0, 8.4, 0); this.controls.update(); }
-  activeLayerView(levelIndex) { this.camera.position.set(8.8, 10.5 + levelIndex * 2.4, 9.5); this.controls.target.set(0, levelIndex * 2.4, 0); this.controls.update(); }
-  resize(width, height) { this.camera.aspect = width / Math.max(height, 1); this.camera.updateProjectionMatrix(); }
-  update() { this.controls.update(); }
-  dispose() { this.controls.dispose(); }
+
+  setBoardObject(boardObject) {
+    this.boardObject = boardObject;
+    this.fitBoard(true);
+  }
+
+  reset() {
+    this.fitBoard(false);
+  }
+
+  cubeView() {
+    this.fitBoard(false);
+  }
+
+  fitBoard(immediate = false) {
+    if (!this.boardObject) return;
+    const box = new THREE.Box3().setFromObject(this.boardObject);
+    if (box.isEmpty()) return;
+    const sphere = box.getBoundingSphere(new THREE.Sphere());
+    const verticalFov = THREE.MathUtils.degToRad(this.camera.fov);
+    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * this.camera.aspect);
+    const limitingFov = Math.max(0.2, Math.min(verticalFov, horizontalFov));
+    const distance = Math.min(
+      this.controls.maxDistance * 0.92,
+      Math.max(this.controls.minDistance, (sphere.radius / Math.sin(limitingFov / 2)) * 1.16),
+    );
+    const target = sphere.center.clone();
+    const position = target.clone().addScaledVector(DEFAULT_DIRECTION, distance);
+    this.moveTo(position, target, immediate);
+  }
+
+  activeLayerView(levelIndex) {
+    const target = new THREE.Vector3(0, levelIndex * CELL_SIZE, 0);
+    const distance = Math.min(18, this.controls.maxDistance);
+    const position = target
+      .clone()
+      // A high, slightly angled view keeps adjacent pieces from covering one
+      // another on narrow touch screens while preserving spatial orientation.
+      .add(new THREE.Vector3(0.4, 1.65, 0.5).normalize().multiplyScalar(distance));
+    this.moveTo(position, target, false);
+  }
+
+  followLevel(levelIndex) {
+    const currentOffset = this.camera.position.clone().sub(this.controls.target);
+    const target = new THREE.Vector3(0, levelIndex * CELL_SIZE, 0);
+    this.moveTo(target.clone().add(currentOffset), target, false);
+  }
+
+  followSquare(square) {
+    if (!square) return;
+    const world = boardPosition(square);
+    const target = new THREE.Vector3(world.x, world.y, world.z);
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    this.moveTo(target.clone().add(offset), target, false);
+  }
+
+  moveTo(position, target, immediate) {
+    if (immediate) {
+      this.camera.position.copy(position);
+      this.controls.target.copy(target);
+      this.desiredPosition = null;
+      this.desiredTarget = null;
+      this.controls.update();
+      return;
+    }
+    this.desiredPosition = position;
+    this.desiredTarget = target;
+  }
+
+  resize(width, height) {
+    this.camera.aspect = width / Math.max(height, 1);
+    this.camera.updateProjectionMatrix();
+  }
+
+  update() {
+    if (this.desiredPosition && this.desiredTarget) {
+      this.camera.position.lerp(this.desiredPosition, 0.075);
+      this.controls.target.lerp(this.desiredTarget, 0.09);
+      if (
+        this.camera.position.distanceToSquared(this.desiredPosition) < 0.002 &&
+        this.controls.target.distanceToSquared(this.desiredTarget) < 0.002
+      ) {
+        this.camera.position.copy(this.desiredPosition);
+        this.controls.target.copy(this.desiredTarget);
+        this.desiredPosition = null;
+        this.desiredTarget = null;
+      }
+    }
+    this.controls.update();
+  }
+
+  dispose() {
+    this.controls.dispose();
+  }
 }

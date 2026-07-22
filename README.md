@@ -1,68 +1,112 @@
 # Cube Chess 512 AI
 
-[Open the live Cube Chess 512 browser build](https://teslaeco.github.io/Cube-Chess-512-AI-Open-Source-3D-Chess-Engine-Autonomous-AI-Game-Developer/)
+[Play the current browser release](https://teslaeco.github.io/Cube-Chess-512-AI-Open-Source-3D-Chess-Engine-Autonomous-AI-Game-Developer/)
 
-Cube Chess 512 is an open-source TypeScript foundation for 8×8×8 chess. The
-browser renderer presents one continuous cubic lattice containing 512 selectable
-cells: eight levels, each containing a complete 8×8 board. It uses procedural
-Three.js pieces, lighting, shadows, an orbit camera, raycast selection, and a
-responsive HUD.
+Cube Chess 512 AI is an open-source 8×8×8 chess project. One continuous 3D
+lattice contains 512 addressable cells across levels A–H. The rules engine is
+kept independent from Three.js and the browser UI.
 
-## Run locally
+![Desktop main menu](docs/audits/screenshots/desktop-main-menu.png)
+
+## Working in this branch
+
+- legal pointer and touch moves, captures, turn changes, check, checkmate and
+  stalemate;
+- legal cross-level movement with persistent highlights, a path guide, piece
+  animation and camera tracking;
+- corrected upward pawn movement for both colours and diagonal-only bishops;
+- undo, redo, exact state restoration and versioned local saves in IndexedDB;
+- an eight-section start menu, local two-player mode and a Web Worker computer
+  opponent with three search limits;
+- a legal engine-driven attract demo that stops when a real game starts;
+- responsive desktop, phone and tablet layouts, keyboard focus handling, RTL,
+  high contrast, large text and reduced-motion preferences;
+- 38 BCP 47 locale choices, including `ar-PS`. Polish and English are complete;
+  other languages are explicitly labelled machine drafts and fall back to
+  English for untranslated copy;
+- an optional, sandboxed-in-scope Mini Computer 1/8 for game saves, safe
+  external search and user-selected local audio;
+- a PWA shell, a local authoritative WebSocket test server and Tauri 2 release
+  configuration for Windows, Linux and both macOS architectures.
+
+The [implementation checklist](docs/tasks/major-playability-product-upgrade.md)
+separates completed work from unfinished product features. In particular, the
+public GitHub Pages site does **not** claim that multiplayer regions, payments,
+signed desktop binaries or human-verified global translations are live.
+
+## Run the web game
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. To validate the repository:
+Use the URL printed by Vite. To validate a production build:
 
 ```bash
-npm run build
-npm run test
 npm run typecheck
+npm run test
+npm run build
+npm run smoke:dist
 ```
 
-## GitHub Pages deployment
+Three.js `0.169.0` is a pinned npm dependency. The built game no longer needs a
+runtime CDN connection.
 
-The workflow in `.github/workflows/deploy-pages.yml` validates and publishes the
-production `dist` directory after every push to `main`. The public site is:
+## Browser interaction tests
 
-https://teslaeco.github.io/Cube-Chess-512-AI-Open-Source-3D-Chess-Engine-Autonomous-AI-Game-Developer/
+```bash
+npx playwright install chromium firefox webkit
+npm run test:e2e
+```
 
-The repository must use **GitHub Actions** as the Pages publishing source under
-**Settings → Pages → Build and deployment**.
+The test matrix covers Chromium, Firefox and WebKit on desktop, phone and tablet
+profiles. Tests click projected Three.js objects through the real canvas rather
+than calling presentation methods as a substitute for user input.
 
-## Three.js delivery
+## Local multiplayer test server
 
-The browser loads pinned Three.js `0.169.0` native ESM modules from jsDelivr via
-the import map in `index.html`. This deliberately avoids adding `three` or
-`@types/three` to npm. The import map exposes `three` and `three/addons/`, and
-`OrbitControls` is imported as an ESM addon. A future release may migrate the
-pinned CDN imports to local npm dependencies while retaining the same renderer
-module API.
+```bash
+npm run server:start
+```
 
-## Current status
+The server listens on `127.0.0.1:8787` by default. It exposes `/health` and
+`/regions`, validates room moves against the authoritative engine and supports
+room rejoin, spectators and sequence numbers. It is development infrastructure,
+not eight deployed production servers. See
+[the server guide](docs/online-test-server.md).
 
-- `src/engine3d` is independent from Three.js and DOM code.
-- The engine defines canonical 8×8×8 movement geometry.
-- The rules layer detects attacked cells, check, legal moves, checkmate, and
-  stalemate.
-- `web/app/GamePresentation.js` is the serializable presentation boundary.
-- The renderer displays a true 8×8×8 lattice with exactly 512 cubic cells.
-- The classic 32-piece starting arrangement is currently placed on level A.
-- Pieces are procedural Three.js geometry groups; no 2D chess-piece images are
-  used.
+## PWA and desktop
 
-## Current limitations
+The web build contains a manifest, versioned service worker, local icon and
+offline shell. Tauri development uses the same UI:
 
-The browser interface does not yet execute engine-approved moves. Undo/redo,
-turn state, promotion, castling, en passant, persistence, multiplayer, and AI
-remain future stages. The end-user browser requires internet access to load the
-pinned Three.js CDN modules.
+```bash
+npm run desktop:dev
+npm run desktop:build
+```
 
-## Next stage
+The release workflow prepares draft, unsigned prerelease artifacts for Windows
+x64, Linux x64, macOS Intel and macOS Apple Silicon. Signing, notarization and a
+real release tag remain owner-operated steps. See
+[the desktop build guide](docs/desktop-builds.md).
 
-The next implementation stage is a complete game-state controller with turns,
-move history, undo, and a strict command boundary between the browser UI and the
-engine.
+## Deployment
+
+`.github/workflows/deploy-pages.yml` is the only Pages publisher. It runs unit,
+integration, browser and production-artifact smoke tests before deploying
+`dist`. Pages must use **GitHub Actions** under **Settings → Pages → Build and
+deployment**.
+
+## Project status and boundaries
+
+The game is now interactively playable, but the broader roadmap is not finished.
+Replay navigation, a teaching/explanation layer, a curated demo ending in a
+proved checkmate, hosted multiplayer/lobbies, full settings, strict typing of
+the remaining JavaScript UI, signed desktop installers and professional review
+of draft translations remain open work. See the
+[audit](docs/audits/playability-and-ui-audit.md) and
+[roadmap](docs/roadmap/full-product-roadmap.md).
+
+Cube Chess 512 AI is licensed under the MIT License. The original 8×8×8 game
+concept is by Sebastian Laskowski.
