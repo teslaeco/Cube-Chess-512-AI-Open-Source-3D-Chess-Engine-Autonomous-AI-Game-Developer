@@ -85,6 +85,22 @@ describe("Cube Chess 512 pseudo-legal movement geometry", () => {
     expect(result).not.toContain("H:d4");
   });
 
+  it("never lets a bishop move straight forward, sideways, or vertically", () => {
+    const bishop = piece("bishop");
+    const moves = generatePseudoLegalMoves(new Board3D([bishop]), bishop);
+
+    for (const move of moves) {
+      const delta = move.to.subtract(bishop.position);
+      const changedAxes = [delta.x, delta.y, delta.z].filter((value) => value !== 0);
+      expect(changedAxes.length).toBeGreaterThanOrEqual(2);
+    }
+
+    const result = addresses(moves);
+    expect(result).not.toContain("D:d5");
+    expect(result).not.toContain("D:e4");
+    expect(result).not.toContain("E:d4");
+  });
+
   it("gives a central king 26 one-step destinations", () => {
     const king = piece("king");
     const moves = generatePseudoLegalMoves(new Board3D([king]), king);
