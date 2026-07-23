@@ -9,18 +9,51 @@ export class CameraController {
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 180);
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.07;
+    this.controls.dampingFactor = 0.055;
+    this.controls.enableRotate = true;
+    this.controls.rotateSpeed = 0.82;
+    this.controls.enableZoom = true;
+    this.controls.zoomSpeed = 0.9;
     this.controls.enablePan = true;
+    this.controls.panSpeed = 0.72;
     this.controls.screenSpacePanning = true;
     this.controls.minDistance = 3.5;
     this.controls.maxDistance = 72;
-    this.controls.maxPolarAngle = Math.PI * 0.94;
+    this.controls.minPolarAngle = 0.04;
+    this.controls.maxPolarAngle = Math.PI - 0.04;
+    this.controls.minAzimuthAngle = -Infinity;
+    this.controls.maxAzimuthAngle = Infinity;
+    this.controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+    this.controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
+    this.controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+    this.controls.touches.ONE = THREE.TOUCH.ROTATE;
+    this.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+    canvas.style.touchAction = "none";
+    canvas.style.userSelect = "none";
+
     this.desiredTarget = null;
     this.desiredPosition = null;
     this.boardObject = null;
+    this.userInteracting = false;
+
+    this.handleInteractionStart = () => {
+      this.userInteracting = true;
+      this.cancelAutomaticMove();
+    };
+    this.handleInteractionEnd = () => {
+      this.userInteracting = false;
+    };
+    this.controls.addEventListener("start", this.handleInteractionStart);
+    this.controls.addEventListener("end", this.handleInteractionEnd);
+
     this.camera.position.set(18, 18, 18);
     this.controls.target.set(0, CELL_SIZE * 3.5, 0);
     this.controls.update();
+  }
+
+  cancelAutomaticMove() {
+    this.desiredPosition = null;
+    this.desiredTarget = null;
   }
 
   setBoardObject(boardObject) {
@@ -58,20 +91,19 @@ export class CameraController {
     const distance = Math.min(18, this.controls.maxDistance);
     const position = target
       .clone()
-      // A high, slightly angled view keeps adjacent pieces from covering one
-      // another on narrow touch screens while preserving spatial orientation.
       .add(new THREE.Vector3(0.4, 1.65, 0.5).normalize().multiplyScalar(distance));
     this.moveTo(position, target, false);
   }
 
   followLevel(levelIndex) {
+    if (this.userInteracting) return;
     const currentOffset = this.camera.position.clone().sub(this.controls.target);
     const target = new THREE.Vector3(0, levelIndex * CELL_SIZE, 0);
     this.moveTo(target.clone().add(currentOffset), target, false);
   }
 
   followSquare(square) {
-    if (!square) return;
+    if (!square || this.userInteracting) return;
     const world = boardPosition(square);
     const target = new THREE.Vector3(world.x, world.y, world.z);
     const offset = this.camera.position.clone().sub(this.controls.target);
@@ -82,11 +114,11 @@ export class CameraController {
     if (immediate) {
       this.camera.position.copy(position);
       this.controls.target.copy(target);
-      this.desiredPosition = null;
-      this.desiredTarget = null;
+      this.cancelAutomaticMove();
       this.controls.update();
       return;
     }
+    if (this.userInteracting) return;
     this.desiredPosition = position;
     this.desiredTarget = target;
   }
@@ -97,7 +129,7 @@ export class CameraController {
   }
 
   update() {
-    if (this.desiredPosition && this.desiredTarget) {
+    if (!this.userInteracting && this.desiredPosition && this.desiredTarget) {
       this.camera.position.lerp(this.desiredPosition, 0.075);
       this.controls.target.lerp(this.desiredTarget, 0.09);
       if (
@@ -106,14 +138,15 @@ export class CameraController {
       ) {
         this.camera.position.copy(this.desiredPosition);
         this.controls.target.copy(this.desiredTarget);
-        this.desiredPosition = null;
-        this.desiredTarget = null;
+        this.cancelAutomaticMove();
       }
     }
     this.controls.update();
   }
 
   dispose() {
+    this.controls.removeEventListener("start", this.handleInteractionStart);
+    this.controls.removeEventListener("end", this.handleInteractionEnd);
     this.controls.dispose();
   }
 }
