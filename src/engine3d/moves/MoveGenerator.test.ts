@@ -35,8 +35,8 @@ function addresses(moves: ReturnType<typeof generatePseudoLegalMoves>): string[]
 describe("Cube Chess 512 pseudo-legal movement geometry", () => {
   it("defines the canonical number of 3D directions", () => {
     expect(ROOK_DIRECTIONS).toHaveLength(6);
-    expect(BISHOP_DIRECTIONS).toHaveLength(20);
-    expect(QUEEN_DIRECTIONS).toHaveLength(26);
+    expect(BISHOP_DIRECTIONS).toHaveLength(12);
+    expect(QUEEN_DIRECTIONS).toHaveLength(18);
     expect(KING_DIRECTIONS).toHaveLength(26);
     expect(KNIGHT_OFFSETS).toHaveLength(24);
   });
@@ -75,30 +75,37 @@ describe("Cube Chess 512 pseudo-legal movement geometry", () => {
     expect(moves.some((move) => move.to.z === 7)).toBe(false);
   });
 
-  it("supports bishop diagonals in a level, between two axes, and through 3D space", () => {
+  it("keeps bishops diagonal on the 8x8 board projection", () => {
     const bishop = piece("bishop");
     const result = addresses(generatePseudoLegalMoves(new Board3D([bishop]), bishop));
 
     expect(result).toContain("D:h8");
-    expect(result).toContain("H:h4");
     expect(result).toContain("H:h8");
+    expect(result).not.toContain("H:h4");
+    expect(result).not.toContain("H:d8");
     expect(result).not.toContain("H:d4");
   });
 
-  it("never lets a bishop move straight forward, sideways, or vertically", () => {
+  it("never lets a bishop move forward between levels without changing both board axes", () => {
     const bishop = piece("bishop");
     const moves = generatePseudoLegalMoves(new Board3D([bishop]), bishop);
 
     for (const move of moves) {
       const delta = move.to.subtract(bishop.position);
-      const changedAxes = [delta.x, delta.y, delta.z].filter((value) => value !== 0);
-      expect(changedAxes.length).toBeGreaterThanOrEqual(2);
+      expect(delta.x).not.toBe(0);
+      expect(delta.y).not.toBe(0);
+      expect(Math.abs(delta.x)).toBe(Math.abs(delta.y));
+      if (delta.z !== 0) {
+        expect(Math.abs(delta.z)).toBe(Math.abs(delta.x));
+      }
     }
 
     const result = addresses(moves);
     expect(result).not.toContain("D:d5");
     expect(result).not.toContain("D:e4");
     expect(result).not.toContain("E:d4");
+    expect(result).not.toContain("E:d5");
+    expect(result).not.toContain("E:e4");
   });
 
   it("gives a central king 26 one-step destinations", () => {
@@ -169,13 +176,13 @@ describe("Cube Chess 512 pseudo-legal movement geometry", () => {
     expect(generatePseudoLegalMoves(new Board3D([pawnOnH]), pawnOnH).every((move) => move.to.z === 7)).toBe(true);
   });
 
-  it("never gives a bishop an axial move while the queen keeps those moves", () => {
+  it("never gives a bishop an axial move while the queen keeps axial moves", () => {
     const bishop = piece("bishop");
     const queen = piece("queen", 4, 4, 4);
     const bishopMoves = generatePseudoLegalMoves(new Board3D([bishop]), bishop);
     const queenMoves = generatePseudoLegalMoves(new Board3D([queen]), queen);
 
-    expect(bishopMoves.some((move) => move.to.x === bishop.position.x && move.to.y === bishop.position.y)).toBe(false);
+    expect(bishopMoves.some((move) => move.to.x === bishop.position.x || move.to.y === bishop.position.y)).toBe(false);
     expect(queenMoves.some((move) => move.to.x === queen.position.x && move.to.y === queen.position.y)).toBe(true);
   });
 
