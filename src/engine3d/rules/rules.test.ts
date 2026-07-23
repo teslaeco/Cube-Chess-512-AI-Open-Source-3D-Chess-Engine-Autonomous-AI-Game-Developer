@@ -110,11 +110,22 @@ describe("Cube Chess 512 legal rules", () => {
     });
   });
 
-  it("detects checkmate in a corner of the 8x8x8 board", () => {
+  it("detects checkmate in a corner with the restricted bishop geometry", () => {
     const blackKing = piece("king", "black", 0, 0, 0);
     const whiteQueen = piece("queen", "white", 1, 1, 1);
     const whiteKing = piece("king", "white", 2, 2, 2);
-    const board = new Board3D([blackKing, whiteQueen, whiteKing]);
+    // With bishops restricted to true board diagonals, the queen no longer
+    // attacks the x-z and y-z plane escapes. These rooks cover those two
+    // remaining corner exits without reintroducing illegal bishop geometry.
+    const fileGuard = piece("rook", "white", 1, 2, 0);
+    const rankGuard = piece("rook", "white", 2, 1, 0);
+    const board = new Board3D([
+      blackKing,
+      whiteQueen,
+      whiteKing,
+      fileGuard,
+      rankGuard,
+    ]);
 
     expect(evaluatePosition(board, "black")).toEqual({
       kind: "checkmate",
