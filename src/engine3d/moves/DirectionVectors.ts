@@ -27,10 +27,13 @@ export const BISHOP_DIRECTIONS: readonly Vector[] = ALL_DIRECTIONS.filter(
     (z === 0 || Math.abs(z) === Math.abs(x)),
 );
 
-export const QUEEN_DIRECTIONS: readonly Vector[] = [
-  ...ROOK_DIRECTIONS,
-  ...BISHOP_DIRECTIONS,
-];
+/**
+ * The queen is the unrestricted sliding piece in Cube Chess 512. She may
+ * travel along every straight 3D ray: axes, board diagonals, vertical-plane
+ * diagonals and full spatial diagonals. This restores forward/upward capture
+ * lines without changing the stricter bishop geometry.
+ */
+export const QUEEN_DIRECTIONS: readonly Vector[] = ALL_DIRECTIONS;
 
 // The king may move one square in every adjacent 3D direction.
 export const KING_DIRECTIONS: readonly Vector[] = ALL_DIRECTIONS;
