@@ -36,7 +36,7 @@ describe("Cube Chess 512 pseudo-legal movement geometry", () => {
   it("defines the canonical number of 3D directions", () => {
     expect(ROOK_DIRECTIONS).toHaveLength(6);
     expect(BISHOP_DIRECTIONS).toHaveLength(12);
-    expect(QUEEN_DIRECTIONS).toHaveLength(18);
+    expect(QUEEN_DIRECTIONS).toHaveLength(26);
     expect(KING_DIRECTIONS).toHaveLength(26);
     expect(KNIGHT_OFFSETS).toHaveLength(24);
   });
@@ -184,6 +184,17 @@ describe("Cube Chess 512 pseudo-legal movement geometry", () => {
 
     expect(bishopMoves.some((move) => move.to.x === bishop.position.x || move.to.y === bishop.position.y)).toBe(false);
     expect(queenMoves.some((move) => move.to.x === queen.position.x && move.to.y === queen.position.y)).toBe(true);
+  });
+
+  it("lets the queen move and capture forward through vertical planes", () => {
+    const queen = piece("queen", 3, 3, 3, "white");
+    const forwardTarget = piece("rook", 3, 5, 5, "black");
+    const sidewaysTarget = piece("knight", 5, 3, 5, "black");
+    const board = new Board3D([queen, forwardTarget, sidewaysTarget]);
+    const moves = generatePseudoLegalMoves(board, queen);
+
+    expect(moves.find((move) => move.to.equals(forwardTarget.position))?.kind).toBe("capture");
+    expect(moves.find((move) => move.to.equals(sidewaysTarget.position))?.kind).toBe("capture");
   });
 
   it("stops bishop diagonals at friendly pieces and after enemy captures", () => {
