@@ -2,8 +2,8 @@ import * as THREE from "three";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 
 export const ORIGINAL_CHESS_MODEL_URL = new URL(
-  "assets/original-chess-models/chess.fbx",
-  document.baseURI,
+  "../../assets/original-chess-models/chess.fbx",
+  import.meta.url,
 ).href;
 
 const MAX_HEIGHT = 0.78;
@@ -22,11 +22,11 @@ function cleanFbxName(name) {
   return String(name ?? "").split("\u0000")[0];
 }
 
-function findPiece(scene, type) {
+export function findImportedPiece(scene, type) {
   const patterns = MODEL_NAMES[type] ?? [];
   let result = null;
   scene.traverse((object) => {
-    if (result || !object.isMesh) return;
+    if (result) return;
     const name = cleanFbxName(object.name);
     if (patterns.some((pattern) => pattern.test(name))) result = object;
   });
@@ -86,16 +86,16 @@ export function normalizeImportedPiece(piece) {
 }
 
 function preparePiece(source, material, outlineColor, type, color) {
-  const mesh = source.clone(true);
-  mesh.name = `${color}-${type}-original-mesh`;
-  mesh.traverse((child) => {
+  const model = source.clone(true);
+  model.name = `${color}-${type}-original-source`;
+  model.traverse((child) => {
     if (!child.isMesh) return;
     child.material = material;
     child.castShadow = true;
     child.receiveShadow = true;
   });
 
-  const normalized = normalizeImportedPiece(mesh);
+  const normalized = normalizeImportedPiece(model);
   normalized.name = `${color}-${type}-original`;
   addOutline(normalized, outlineColor);
   return normalized;
@@ -110,7 +110,10 @@ export class OriginalChessModelSet {
 
   loadScene() {
     if (!this.scenePromise) {
-      this.scenePromise = this.loader.loadAsync(ORIGINAL_CHESS_MODEL_URL);
+      this.scenePromise = this.loader.loadAsync(ORIGINAL_CHESS_MODEL_URL).then((scene) => {
+        scene.updateMatrixWorld(true);
+        return scene;
+      });
     }
     return this.scenePromise;
   }
@@ -123,9 +126,8 @@ export class OriginalChessModelSet {
 
     this.loadScene()
       .then((scene) => {
-        if (!holder.parent) return;
-        const source = findPiece(scene, type);
-        if (!source) throw new Error(`The FBX scene does not contain a ${type} mesh`);
+        const source = findImportedPiece(scene, type);
+        if (!source) throw new Error(`The FBX scene does not contain a ${type} object`);
         const model = preparePiece(
           source,
           this.materials[color],
@@ -140,7 +142,10 @@ export class OriginalChessModelSet {
       .catch((error) => {
         holder.userData.originalModelState = "fallback";
         holder.userData.originalModelError = String(error?.message ?? error);
-        console.warn(`Cube Chess could not load the original ${type} model.`, error);
+        console.warn(
+          `Cube Chess could not load the original ${type} model from ${ORIGINAL_CHESS_MODEL_URL}.`,
+          error,
+        );
       });
 
     return holder;
