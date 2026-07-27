@@ -1,8 +1,10 @@
 import * as THREE from "three";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 
+const MODEL_REVISION = "20260727-2";
+
 export const ORIGINAL_CHESS_MODEL_URL = new URL(
-  "../../assets/original-chess-models/chess.fbx",
+  `../../assets/original-chess-models/chess.fbx?v=${MODEL_REVISION}`,
   import.meta.url,
 ).href;
 
@@ -22,15 +24,36 @@ function cleanFbxName(name) {
   return String(name ?? "").split("\u0000")[0];
 }
 
+function hasRenderableMesh(object) {
+  let found = false;
+  object.traverse((child) => {
+    if (child.isMesh && child.geometry) found = true;
+  });
+  return found;
+}
+
+function objectVolume(object) {
+  object.updateMatrixWorld(true);
+  const size = new THREE.Box3().setFromObject(object).getSize(new THREE.Vector3());
+  if (![size.x, size.y, size.z].every((value) => Number.isFinite(value) && value > 0)) {
+    return 0;
+  }
+  return size.x * size.y * size.z;
+}
+
 export function findImportedPiece(scene, type) {
   const patterns = MODEL_NAMES[type] ?? [];
-  let result = null;
+  const candidates = [];
+
   scene.traverse((object) => {
-    if (result) return;
     const name = cleanFbxName(object.name);
-    if (patterns.some((pattern) => pattern.test(name))) result = object;
+    if (!patterns.some((pattern) => pattern.test(name))) return;
+    if (!hasRenderableMesh(object)) return;
+    candidates.push(object);
   });
-  return result;
+
+  candidates.sort((left, right) => objectVolume(right) - objectVolume(left));
+  return candidates[0] ?? null;
 }
 
 function addOutline(group, color) {
@@ -45,13 +68,13 @@ function addOutline(group, color) {
         color,
         side: THREE.BackSide,
         transparent: true,
-        opacity: 0.38,
+        opacity: 0.24,
         depthWrite: false,
       }),
     );
     outline.position.copy(source.position);
-    outline.rotation.copy(source.rotation);
-    outline.scale.copy(source.scale).multiplyScalar(1.018);
+    outline.quaternion.copy(source.quaternion);
+    outline.scale.copy(source.scale).multiplyScalar(1.012);
     outline.renderOrder = 30;
     outline.userData.decorative = true;
     source.parent.add(outline);
@@ -93,6 +116,7 @@ function preparePiece(source, material, outlineColor, type, color) {
     child.material = material;
     child.castShadow = true;
     child.receiveShadow = true;
+    child.frustumCulled = false;
   });
 
   const normalized = normalizeImportedPiece(model);
@@ -127,7 +151,7 @@ export class OriginalChessModelSet {
     this.loadScene()
       .then((scene) => {
         const source = findImportedPiece(scene, type);
-        if (!source) throw new Error(`The FBX scene does not contain a ${type} object`);
+        if (!source) throw new Error(`The FBX scene does not contain a complete ${type} object`);
         const model = preparePiece(
           source,
           this.materials[color],
