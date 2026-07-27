@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 
 export const ORIGINAL_CHESS_MODEL_URL = new URL(
-  "../../assets/original-chess-models/chess.fbx?revision=20260727-original-only",
+  "../../assets/original-chess-models/chess.fbx?revision=20260727-original-only-2",
   import.meta.url,
 ).href;
 
@@ -130,6 +130,22 @@ function preparePiece(source, material, outlineColor, type, color) {
   return normalized;
 }
 
+function createLoadingHitTarget(type, color) {
+  const geometry = new THREE.CylinderGeometry(0.28, 0.34, 0.72, 12);
+  const material = new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    colorWrite: false,
+  });
+  const target = new THREE.Mesh(geometry, material);
+  target.name = `${color}-${type}-loading-hit-target`;
+  target.position.y = 0.36;
+  target.userData.loadingHitTarget = true;
+  target.frustumCulled = false;
+  return target;
+}
+
 export class OriginalChessModelSet {
   constructor(materials) {
     this.materials = materials;
@@ -151,6 +167,7 @@ export class OriginalChessModelSet {
     const holder = new THREE.Group();
     holder.name = `${color}-${type}`;
     holder.userData.originalModelState = "loading";
+    holder.add(createLoadingHitTarget(type, color));
 
     this.loadScene()
       .then((scene) => {
