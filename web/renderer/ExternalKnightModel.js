@@ -3,8 +3,8 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const MODEL_URL =
   "https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Assets@2bac6f8c57bf471df0d2a1e8a8ec023c7801dddf/Models/ABeautifulGame/glTF-Binary/ABeautifulGame.glb";
-const MAX_HEIGHT = 1.02;
-const MAX_FOOTPRINT = 0.92;
+const MAX_HEIGHT = 0.78;
+const MAX_FOOTPRINT = 0.68;
 
 function addOutline(group, color) {
   const meshes = [];

@@ -2,8 +2,8 @@ import * as THREE from "three";
 import { ExternalKnightModel } from "./ExternalKnightModel.js";
 
 const RADIAL_SEGMENTS = 40;
-const MAX_PIECE_HEIGHT = 1.02;
-const MAX_PIECE_FOOTPRINT = 0.92;
+const MAX_PIECE_HEIGHT = 0.78;
+const MAX_PIECE_FOOTPRINT = 0.68;
 
 function mesh(geometry, material, y = 0) {
   const item = new THREE.Mesh(geometry, material);
@@ -181,35 +181,45 @@ function createKnightFallback(material, accentMaterial) {
       0.27,
     ),
   );
-  const neck = mesh(new THREE.CapsuleGeometry(0.2, 0.58, 8, 18), material, 0.94);
-  neck.rotation.z = -0.48;
-  neck.scale.set(0.9, 1.14, 0.78);
-  neck.position.x = -0.02;
-  group.add(neck);
-  const head = mesh(new THREE.SphereGeometry(0.25, 30, 20), material, 1.28);
-  head.scale.set(1.18, 0.82, 0.82);
-  head.position.x = 0.13;
-  head.rotation.z = -0.18;
-  group.add(head);
-  const muzzle = mesh(new THREE.CapsuleGeometry(0.12, 0.3, 6, 16), material, 1.24);
-  muzzle.rotation.z = Math.PI / 2 - 0.15;
-  muzzle.position.x = 0.35;
-  muzzle.scale.set(0.78, 1, 0.72);
-  group.add(muzzle);
-  for (const z of [-0.12, 0.12]) {
-    const ear = mesh(new THREE.ConeGeometry(0.075, 0.27, 14), material, 1.56);
-    ear.position.set(0.0, 1.56, z);
-    ear.rotation.z = -0.14;
-    group.add(ear);
-    const eye = mesh(new THREE.SphereGeometry(0.035, 14, 10), accentMaterial, 1.36);
-    eye.position.set(0.3, 1.36, z * 1.22);
-    eye.userData.decorative = true;
-    group.add(eye);
-  }
-  const mane = mesh(new THREE.ConeGeometry(0.19, 0.74, 6), accentMaterial, 1.08);
-  mane.rotation.z = -0.52;
-  mane.position.x = -0.19;
-  mane.scale.z = 0.55;
+
+  const silhouette = new THREE.Shape();
+  silhouette.moveTo(-0.28, 0.02);
+  silhouette.bezierCurveTo(-0.34, 0.28, -0.27, 0.58, -0.12, 0.83);
+  silhouette.bezierCurveTo(-0.02, 1.01, 0.02, 1.18, -0.04, 1.36);
+  silhouette.lineTo(0.03, 1.55);
+  silhouette.lineTo(0.14, 1.34);
+  silhouette.bezierCurveTo(0.31, 1.30, 0.49, 1.20, 0.61, 1.04);
+  silhouette.bezierCurveTo(0.69, 0.93, 0.63, 0.83, 0.48, 0.80);
+  silhouette.lineTo(0.29, 0.76);
+  silhouette.bezierCurveTo(0.21, 0.62, 0.17, 0.46, 0.19, 0.30);
+  silhouette.bezierCurveTo(0.20, 0.18, 0.12, 0.07, -0.02, 0.02);
+  silhouette.closePath();
+
+  const body = mesh(
+    new THREE.ExtrudeGeometry(silhouette, {
+      depth: 0.34,
+      bevelEnabled: true,
+      bevelSegments: 4,
+      steps: 1,
+      bevelSize: 0.055,
+      bevelThickness: 0.055,
+      curveSegments: 20,
+    }),
+    material,
+    0.68,
+  );
+  body.position.z = -0.17;
+  body.rotation.y = Math.PI / 2;
+  group.add(body);
+
+  const eye = mesh(new THREE.SphereGeometry(0.035, 16, 12), accentMaterial, 1.84);
+  eye.position.set(0.17, 1.84, -0.19);
+  eye.userData.decorative = true;
+  group.add(eye);
+
+  const mane = mesh(new THREE.BoxGeometry(0.12, 0.72, 0.3), accentMaterial, 1.35);
+  mane.position.x = -0.17;
+  mane.rotation.z = -0.16;
   mane.userData.decorative = true;
   group.add(mane);
   return group;
