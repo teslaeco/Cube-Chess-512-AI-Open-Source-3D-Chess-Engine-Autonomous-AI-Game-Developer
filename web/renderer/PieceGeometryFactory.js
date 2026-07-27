@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { ExternalKnightModel } from "./ExternalKnightModel.js";
 
 const RADIAL_SEGMENTS = 40;
 
@@ -140,7 +141,7 @@ function createBishop(material, cutMaterial) {
   return group;
 }
 
-function createKnight(material, accentMaterial) {
+function createKnightFallback(material, accentMaterial) {
   const group = new THREE.Group();
   addBase(group, material);
   group.add(
@@ -273,6 +274,7 @@ export class PieceGeometryFactory {
       white: new THREE.MeshStandardMaterial({ color: 0x171b22, roughness: 0.8 }),
       black: new THREE.MeshStandardMaterial({ color: 0xd7dde5, roughness: 0.72 }),
     };
+    this.externalKnight = new ExternalKnightModel(this.materials);
   }
 
   create(type, color) {
@@ -281,14 +283,17 @@ export class PieceGeometryFactory {
     const builders = {
       pawn: () => createPawn(material),
       rook: () => createRook(material),
-      knight: () => createKnight(material, accent),
+      knight: () =>
+        this.externalKnight.create(color, createKnightFallback(material, accent)),
       bishop: () => createBishop(material, this.bishopCuts[color]),
       queen: () => createQueen(material, accent),
       king: () => createKing(material, accent),
     };
     const group = builders[type]?.() ?? createPawn(material);
     group.name = `${color}-${type}`;
-    addOutline(group, color === "white" ? 0x202733 : 0xc8d3df);
+    if (type !== "knight") {
+      addOutline(group, color === "white" ? 0x202733 : 0xc8d3df);
+    }
     return group;
   }
 }
