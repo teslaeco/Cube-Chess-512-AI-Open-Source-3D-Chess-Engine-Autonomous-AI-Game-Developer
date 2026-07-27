@@ -1,13 +1,34 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { normalizeImportedPiece } from "./OriginalChessModelSet.js";
+import {
+  findImportedPiece,
+  normalizeImportedPiece,
+  ORIGINAL_CHESS_MODEL_URL,
+} from "./OriginalChessModelSet.js";
 
 function bounds(object) {
   object.updateMatrixWorld(true);
   return new THREE.Box3().setFromObject(object);
 }
 
-describe("original FBX chess-piece normalization", () => {
+describe("original FBX chess-piece loading", () => {
+  it("resolves the FBX asset relative to the renderer module", () => {
+    expect(ORIGINAL_CHESS_MODEL_URL).toContain(
+      "/assets/original-chess-models/chess.fbx",
+    );
+    expect(ORIGINAL_CHESS_MODEL_URL).not.toContain("undefined");
+  });
+
+  it("finds named FBX groups as well as directly named meshes", () => {
+    const scene = new THREE.Group();
+    const namedGroup = new THREE.Group();
+    namedGroup.name = "Pawn.000";
+    namedGroup.add(new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1)));
+    scene.add(namedGroup);
+
+    expect(findImportedPiece(scene, "pawn")).toBe(namedGroup);
+  });
+
   it("centers an imported piece, places it on the board and fits it inside one cube", () => {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(4, 10, 3));
     mesh.position.set(6, 8, -5);
