@@ -12,7 +12,10 @@ async function projectedPoint(page, kind, id) {
       if (!object) throw new Error(`Missing ${kind} ${id}`);
       renderer.sceneController.scene.updateMatrixWorld(true);
       renderer.cameraController.camera.updateMatrixWorld(true);
-      const position = object.getWorldPosition(object.position.clone());
+      const position =
+        kind === "piece"
+          ? object.localToWorld(object.position.clone().set(0, 0.72, 0))
+          : object.getWorldPosition(object.position.clone());
       position.project(renderer.cameraController.camera);
       const rect = renderer.sceneController.renderer.domElement.getBoundingClientRect();
       return {
@@ -89,6 +92,7 @@ test("starts a local game and executes a real raycast pawn move", async ({ page 
   await page.locator("[data-language]").selectOption("pl");
   await page.getByTestId("start-game").click();
   await expect(page.locator("[data-start-menu]")).not.toHaveClass(/open/);
+  await waitForSceneSettled(page);
   await clickProjected(page, "piece", "white-pawn-5");
   await expect(page.locator("[data-legal]")).not.toHaveText("0");
   await clickProjected(page, "square", "A:e3");
@@ -204,6 +208,7 @@ test("clicking an enemy piece on a legal target executes the capture", async ({ 
 test("persists and reloads an exact game through IndexedDB", async ({ page }) => {
   await page.locator("[data-language]").selectOption("pl");
   await page.getByTestId("start-game").click();
+  await waitForSceneSettled(page);
   await clickProjected(page, "piece", "white-pawn-1");
   await clickProjected(page, "square", "A:a3");
   await expect(page.locator("[data-turn]")).toHaveText("Czarne");
