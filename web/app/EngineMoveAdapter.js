@@ -5,6 +5,7 @@ import {
   generateLegalMovesForColor,
   generateLegalMovesForPiece,
 } from "../../src/engine3d/index.ts";
+import { applyLoneKingLevelRule } from "../rules/LoneKingLevelRule.js";
 
 function toEnginePiece(piece) {
   return {
@@ -30,13 +31,15 @@ export function legalTargetsForPiece(pieces, pieceId) {
 
   if (!selected) return [];
 
-  return generateLegalMovesForPiece(board, selected).map(toBrowserMove);
+  const moves = generateLegalMovesForPiece(board, selected).map(toBrowserMove);
+  return applyLoneKingLevelRule(pieces, selected.color, moves);
 }
 
 export function legalMovesForSide(pieces, sideToMove) {
-  return generateLegalMovesForColor(createBoard(pieces), sideToMove).map(
+  const moves = generateLegalMovesForColor(createBoard(pieces), sideToMove).map(
     toBrowserMove,
   );
+  return applyLoneKingLevelRule(pieces, sideToMove, moves);
 }
 
 function toBrowserMove(move) {
