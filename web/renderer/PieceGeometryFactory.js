@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { ExternalKnightModel } from "./ExternalKnightModel.js";
 
 const RADIAL_SEGMENTS = 40;
+const MAX_PIECE_HEIGHT = 1.02;
+const MAX_PIECE_FOOTPRINT = 0.92;
 
 function mesh(geometry, material, y = 0) {
   const item = new THREE.Mesh(geometry, material);
@@ -45,6 +47,31 @@ function addOutline(group, color) {
     outline.userData.decorative = true;
     child.parent.add(outline);
   }
+}
+
+export function fitPieceInsideCell(group) {
+  group.position.set(0, 0, 0);
+  group.scale.setScalar(1);
+  group.updateMatrixWorld(true);
+  let bounds = new THREE.Box3().setFromObject(group);
+  const size = bounds.getSize(new THREE.Vector3());
+  if (![size.x, size.y, size.z].every((value) => Number.isFinite(value) && value > 0)) {
+    throw new Error("Piece geometry has invalid bounds");
+  }
+  const scale = Math.min(
+    MAX_PIECE_HEIGHT / size.y,
+    MAX_PIECE_FOOTPRINT / size.x,
+    MAX_PIECE_FOOTPRINT / size.z,
+  );
+  group.scale.setScalar(scale);
+  group.updateMatrixWorld(true);
+  bounds = new THREE.Box3().setFromObject(group);
+  const center = bounds.getCenter(new THREE.Vector3());
+  group.position.x -= center.x;
+  group.position.z -= center.z;
+  group.position.y -= bounds.min.y;
+  group.updateMatrixWorld(true);
+  return group;
 }
 
 function addBase(group, material) {
@@ -128,12 +155,10 @@ function createBishop(material, cutMaterial) {
       0.27,
     ),
   );
-
   const mitre = mesh(new THREE.SphereGeometry(0.27, 36, 24), material, 1.21);
   mitre.scale.set(0.88, 1.38, 0.88);
   group.add(mitre);
   group.add(mesh(new THREE.SphereGeometry(0.07, 20, 12), material, 1.55));
-
   const slash = mesh(new THREE.BoxGeometry(0.07, 0.6, 0.42), cutMaterial, 1.22);
   slash.rotation.z = 0.58;
   slash.userData.decorative = true;
@@ -156,37 +181,31 @@ function createKnightFallback(material, accentMaterial) {
       0.27,
     ),
   );
-
   const neck = mesh(new THREE.CapsuleGeometry(0.2, 0.58, 8, 18), material, 0.94);
   neck.rotation.z = -0.48;
   neck.scale.set(0.9, 1.14, 0.78);
   neck.position.x = -0.02;
   group.add(neck);
-
   const head = mesh(new THREE.SphereGeometry(0.25, 30, 20), material, 1.28);
   head.scale.set(1.18, 0.82, 0.82);
   head.position.x = 0.13;
   head.rotation.z = -0.18;
   group.add(head);
-
   const muzzle = mesh(new THREE.CapsuleGeometry(0.12, 0.3, 6, 16), material, 1.24);
   muzzle.rotation.z = Math.PI / 2 - 0.15;
   muzzle.position.x = 0.35;
   muzzle.scale.set(0.78, 1, 0.72);
   group.add(muzzle);
-
   for (const z of [-0.12, 0.12]) {
     const ear = mesh(new THREE.ConeGeometry(0.075, 0.27, 14), material, 1.56);
     ear.position.set(0.0, 1.56, z);
     ear.rotation.z = -0.14;
     group.add(ear);
-
     const eye = mesh(new THREE.SphereGeometry(0.035, 14, 10), accentMaterial, 1.36);
     eye.position.set(0.3, 1.36, z * 1.22);
     eye.userData.decorative = true;
     group.add(eye);
   }
-
   const mane = mesh(new THREE.ConeGeometry(0.19, 0.74, 6), accentMaterial, 1.08);
   mane.rotation.z = -0.52;
   mane.position.x = -0.19;
@@ -280,20 +299,24 @@ export class PieceGeometryFactory {
   create(type, color) {
     const material = this.materials[color];
     const accent = this.accents[color];
+    const outlineColor = color === "white" ? 0x202733 : 0xc8d3df;
+    if (type === "knight") {
+      const fallback = fitPieceInsideCell(createKnightFallback(material, accent));
+      addOutline(fallback, outlineColor);
+      const knight = this.externalKnight.create(color, fallback);
+      knight.name = `${color}-${type}`;
+      return knight;
+    }
     const builders = {
       pawn: () => createPawn(material),
       rook: () => createRook(material),
-      knight: () =>
-        this.externalKnight.create(color, createKnightFallback(material, accent)),
       bishop: () => createBishop(material, this.bishopCuts[color]),
       queen: () => createQueen(material, accent),
       king: () => createKing(material, accent),
     };
-    const group = builders[type]?.() ?? createPawn(material);
+    const group = fitPieceInsideCell(builders[type]?.() ?? createPawn(material));
     group.name = `${color}-${type}`;
-    if (type !== "knight") {
-      addOutline(group, color === "white" ? 0x202733 : 0xc8d3df);
-    }
+    addOutline(group, outlineColor);
     return group;
   }
 }
