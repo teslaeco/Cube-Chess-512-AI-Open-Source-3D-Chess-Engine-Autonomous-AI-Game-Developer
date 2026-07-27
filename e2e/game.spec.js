@@ -50,6 +50,27 @@ async function waitForSceneSettled(page) {
   await page.waitForTimeout(100);
 }
 
+async function waitForImportedPiece(page, id) {
+  await expect
+    .poll(
+      () =>
+        page.evaluate((pieceId) => {
+          const piece = window.__cubeChessApplication.renderer.pieceRenderer.pieces.get(pieceId);
+          return piece?.userData?.originalModelState ?? null;
+        }, id),
+      { timeout: 30_000 },
+    )
+    .toBe("ready");
+}
+
+async function selectPieceAndWaitForLegalMoves(page, id) {
+  await waitForImportedPiece(page, id);
+  await clickProjected(page, "piece", id);
+  await expect
+    .poll(() => page.locator("[data-legal]").textContent(), { timeout: 10_000 })
+    .not.toBe("0");
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto("?e2e=1");
   await expect(page.locator("canvas.game-canvas")).toBeVisible();
@@ -93,8 +114,7 @@ test("starts a local game and executes a real raycast pawn move", async ({ page 
   await page.getByTestId("start-game").click();
   await expect(page.locator("[data-start-menu]")).not.toHaveClass(/open/);
   await waitForSceneSettled(page);
-  await clickProjected(page, "piece", "white-pawn-5");
-  await expect(page.locator("[data-legal]")).not.toHaveText("0");
+  await selectPieceAndWaitForLegalMoves(page, "white-pawn-5");
   await clickProjected(page, "square", "A:e3");
   await expect(page.locator("[data-turn]")).toHaveText("Czarne");
 });
@@ -105,6 +125,7 @@ test("keeps selection while a White pawn moves from level A to B", async ({ page
   await page.locator('[data-action="isolate"]').click({ force: true });
   await page.locator('[data-action="active"]').click({ force: true });
   await waitForSceneSettled(page);
+  await waitForImportedPiece(page, "white-pawn-5");
   await clickProjected(page, "piece", "white-pawn-5");
   await expect
     .poll(() =>
@@ -141,6 +162,7 @@ test("moves a Black pawn from level A to B through the real canvas", async ({ pa
   await page.locator('[data-action="isolate"]').click({ force: true });
   await page.locator('[data-action="active"]').click({ force: true });
   await waitForSceneSettled(page);
+  await waitForImportedPiece(page, "black-pawn-5");
   await clickProjected(page, "piece", "black-pawn-5");
   await expect
     .poll(() =>
@@ -185,6 +207,8 @@ test("clicking an enemy piece on a legal target executes the capture", async ({ 
   await page.locator('[data-action="isolate"]').click({ force: true });
   await page.locator('[data-action="active"]').click({ force: true });
   await waitForSceneSettled(page);
+  await waitForImportedPiece(page, "white-pawn-5");
+  await waitForImportedPiece(page, "black-pawn-6");
   await clickProjected(page, "piece", "white-pawn-5");
   await expect
     .poll(() =>
@@ -209,7 +233,7 @@ test("persists and reloads an exact game through IndexedDB", async ({ page }) =>
   await page.locator("[data-language]").selectOption("pl");
   await page.getByTestId("start-game").click();
   await waitForSceneSettled(page);
-  await clickProjected(page, "piece", "white-pawn-1");
+  await selectPieceAndWaitForLegalMoves(page, "white-pawn-1");
   await clickProjected(page, "square", "A:a3");
   await expect(page.locator("[data-turn]")).toHaveText("Czarne");
 
