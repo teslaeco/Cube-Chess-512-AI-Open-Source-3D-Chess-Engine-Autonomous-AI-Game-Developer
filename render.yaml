@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: cube-chess-512-server
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm run server:start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: ALLOWED_ORIGINS
+        value: https://teslaeco.github.io
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
