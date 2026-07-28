@@ -1,5 +1,18 @@
 const SESSION_KEY = "cubeChessIdentity";
 
+const PROVIDERS = [
+  { id: "google", label: "Google", icon: "G", className: "auth-google" },
+  { id: "apple", label: "Apple", icon: "", className: "auth-apple" },
+  { id: "microsoft", label: "Microsoft", icon: "⊞", className: "auth-microsoft" },
+  { id: "facebook", label: "Facebook", icon: "f", className: "auth-facebook" },
+  { id: "github", label: "GitHub", icon: "◉", className: "auth-github" },
+  { id: "wechat", label: "WeChat", icon: "微", className: "auth-wechat" },
+  { id: "qq", label: "QQ", icon: "Q", className: "auth-qq" },
+  { id: "line", label: "LINE", icon: "L", className: "auth-line" },
+  { id: "phone", label: "Telefon / SMS", icon: "☎", className: "auth-phone" },
+  { id: "email", label: "E-mail", icon: "@", className: "auth-email" },
+];
+
 export function parseStoredIdentity(value) {
   try {
     const identity = value ? JSON.parse(value) : null;
@@ -43,6 +56,10 @@ function callbackIdentity() {
   return identity;
 }
 
+function providerMarkup(provider) {
+  return `<button type="button" class="auth-provider ${provider.className}" data-auth="${provider.id}"><span class="auth-provider-icon" aria-hidden="true">${provider.icon}</span><span>Zaloguj przez ${provider.label}</span></button>`;
+}
+
 export class AuthGate {
   constructor(container, onAuthenticated) {
     this.container = container;
@@ -53,18 +70,17 @@ export class AuthGate {
     this.element.setAttribute("aria-modal", "true");
     this.element.setAttribute("aria-labelledby", "auth-title");
     this.element.innerHTML = `
-      <div class="auth-card">
+      <div class="auth-card auth-card-expanded">
         <p class="auth-eyebrow">Terraforming Planet · Open Source</p>
         <div class="auth-brand"><span>512</span><div><strong>Cube Chess 512 AI</strong><small>8×8×8 · 512 pól</small></div></div>
         <h1 id="auth-title">Witaj w Cube Chess 512</h1>
         <p class="auth-intro">Zaloguj się, aby zachować znajomych, ranking i historię partii, albo rozpocznij od razu jako gość.</p>
-        <div class="auth-actions">
-          <button type="button" class="auth-provider auth-google" data-auth="google"><span aria-hidden="true">G</span>Zaloguj przez Google</button>
-          <button type="button" class="auth-provider auth-apple" data-auth="apple"><span aria-hidden="true">●</span>Zaloguj przez Apple</button>
-          <div class="auth-divider"><span>lub</span></div>
-          <button type="button" class="auth-guest" data-auth="guest">Zagraj jako gość <span aria-hidden="true">→</span></button>
+        <div class="auth-provider-grid">
+          ${PROVIDERS.map(providerMarkup).join("")}
         </div>
-        <p class="auth-note" data-auth-note>Tryb gościa działa bez konta. Logowanie Google i Apple wymaga uruchomionego publicznego serwera uwierzytelniania.</p>
+        <div class="auth-divider"><span>lub</span></div>
+        <button type="button" class="auth-guest" data-auth="guest">Zagraj jako gość <span aria-hidden="true">→</span></button>
+        <p class="auth-note" data-auth-note>Tryb gościa działa od razu. Logowanie zewnętrzne zostanie aktywowane po podłączeniu publicznego serwera uwierzytelniania.</p>
       </div>`;
     container.append(this.element);
     this.handleClick = (event) => {
@@ -88,7 +104,8 @@ export class AuthGate {
     const base = oauthBaseUrl();
     if (!base) {
       const note = this.element.querySelector("[data-auth-note]");
-      note.textContent = `Logowanie ${provider === "google" ? "Google" : "Apple"} będzie aktywne po podłączeniu adresu serwera VITE_AUTH_BASE_URL. Na razie wybierz tryb gościa.`;
+      const label = PROVIDERS.find((entry) => entry.id === provider)?.label ?? provider;
+      note.textContent = `Logowanie przez ${label} wymaga uruchomionego backendu i kluczy dostawcy. Na razie wybierz tryb gościa.`;
       note.setAttribute("role", "alert");
       return;
     }
