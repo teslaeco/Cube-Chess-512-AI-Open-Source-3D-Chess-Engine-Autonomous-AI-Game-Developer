@@ -7,32 +7,38 @@ import { createMove } from "./MoveFactory.js";
 export function generatePawnMoves(board: Board3D, piece: Piece): Move[] {
   const rankDirection = piece.color === "white" ? 1 : -1;
   // Both armies start on level A. Height progression is therefore always
-  // A -> H, independently from the classical rank direction.
+  // A -> H. Pawns never move back toward a lower level.
   const heightDirection = 1;
   const moves: Move[] = [];
 
-  const advanceVectors: readonly Vector[] = [
-    [0, rankDirection, 0],
-    [0, 0, heightDirection],
-  ];
-
-  for (const vector of advanceVectors) {
+  const addQuietMove = (vector: Vector): void => {
     const to = piece.position.tryAdd(...vector);
-    if (to && board.isEmpty(to)) {
-      moves.push(createMove(piece, to));
-    }
-  }
+    if (to && board.isEmpty(to)) moves.push(createMove(piece, to));
+  };
 
-  const middle = piece.position.tryAdd(0, rankDirection, 0);
-  const twice = piece.position.tryAdd(0, rankDirection * 2, 0);
-  if (
-    !piece.hasMoved &&
-    middle &&
-    twice &&
-    board.isEmpty(middle) &&
-    board.isEmpty(twice)
-  ) {
-    moves.push(createMove(piece, twice));
+  // Normal forward move on the current level.
+  const rankOne: Vector = [0, rankDirection, 0];
+  addQuietMove(rankOne);
+
+  // 3D forward move: one rank forward and one level higher.
+  addQuietMove([0, rankDirection, heightDirection]);
+
+  if (!piece.hasMoved) {
+    // Classical two-square opening move. The intermediate square must be free.
+    const rankMiddle = piece.position.tryAdd(...rankOne);
+    const rankTwo = piece.position.tryAdd(0, rankDirection * 2, 0);
+    if (
+      rankMiddle &&
+      rankTwo &&
+      board.isEmpty(rankMiddle) &&
+      board.isEmpty(rankTwo)
+    ) {
+      moves.push(createMove(piece, rankTwo));
+    }
+
+    // Cube Chess opening move from level A directly to level C.
+    // The pawn changes only height and still cannot move back toward A.
+    addQuietMove([0, 0, heightDirection * 2]);
   }
 
   const captureVectors: readonly Vector[] = [
