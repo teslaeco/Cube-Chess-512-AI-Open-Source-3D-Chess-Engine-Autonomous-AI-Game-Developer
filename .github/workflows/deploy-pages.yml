@@ -47,7 +47,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run Chromium interaction tests
-        run: npm run test:e2e -- --project=chromium --workers=1
+        run: npm run test:e2e -- --project=chromium-desktop --workers=1
 
       - name: Upload failure evidence
         if: failure()
