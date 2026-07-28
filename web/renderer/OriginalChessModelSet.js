@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+import { pieceCellEnvelope } from "./pieceScaleProfile.js";
 
 const MODEL_REVISION = "20260727-2";
 
@@ -7,9 +8,6 @@ export const ORIGINAL_CHESS_MODEL_URL = new URL(
   `../../assets/original-chess-models/chess.fbx?v=${MODEL_REVISION}`,
   import.meta.url,
 ).href;
-
-const MAX_HEIGHT = 0.78;
-const MAX_FOOTPRINT = 0.68;
 
 const MODEL_NAMES = Object.freeze({
   pawn: [/^Pawn(?:\.\d+)?$/i],
@@ -81,7 +79,8 @@ function addOutline(group, color) {
   }
 }
 
-export function normalizeImportedPiece(piece) {
+export function normalizeImportedPiece(piece, type = "pawn") {
+  const envelope = pieceCellEnvelope(type);
   const group = new THREE.Group();
   group.add(piece);
   piece.position.set(0, 0, 0);
@@ -94,9 +93,9 @@ export function normalizeImportedPiece(piece) {
   }
 
   const scale = Math.min(
-    MAX_HEIGHT / size.y,
-    MAX_FOOTPRINT / size.x,
-    MAX_FOOTPRINT / size.z,
+    envelope.maxHeight / size.y,
+    envelope.maxFootprint / size.x,
+    envelope.maxFootprint / size.z,
   );
   group.scale.setScalar(scale);
   group.updateMatrixWorld(true);
@@ -119,7 +118,7 @@ function preparePiece(source, material, outlineColor, type, color) {
     child.frustumCulled = false;
   });
 
-  const normalized = normalizeImportedPiece(model);
+  const normalized = normalizeImportedPiece(model, type);
   normalized.name = `${color}-${type}-original`;
   addOutline(normalized, outlineColor);
   return normalized;
