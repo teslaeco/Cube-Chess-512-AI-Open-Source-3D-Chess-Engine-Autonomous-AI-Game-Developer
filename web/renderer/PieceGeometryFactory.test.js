@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { PieceGeometryFactory } from "./PieceGeometryFactory.js";
 import { fitObjectInsideCell } from "./ExternalKnightModel.js";
+import { pieceCellEnvelope } from "./pieceScaleProfile.js";
 
 function dimensions(object) {
   object.updateMatrixWorld(true);
@@ -9,16 +10,27 @@ function dimensions(object) {
 }
 
 describe("piece cell fitting", () => {
-  it("keeps every procedural piece inside one 1.25-unit board cell", () => {
+  it("keeps every procedural piece inside its assigned 3D cell envelope", () => {
     const factory = new PieceGeometryFactory();
     for (const color of ["white", "black"]) {
       for (const type of ["pawn", "rook", "knight", "bishop", "queen", "king"]) {
         const piece = factory.create(type, color);
         const size = dimensions(piece);
-        expect(size.y, `${color} ${type} height`).toBeLessThanOrEqual(1.06);
-        expect(size.x, `${color} ${type} width`).toBeLessThanOrEqual(0.96);
-        expect(size.z, `${color} ${type} depth`).toBeLessThanOrEqual(0.96);
+        const envelope = pieceCellEnvelope(type);
+        expect(size.y, `${color} ${type} height`).toBeLessThanOrEqual(envelope.maxHeight * 1.03);
+        expect(size.x, `${color} ${type} width`).toBeLessThanOrEqual(envelope.maxFootprint * 1.03);
+        expect(size.z, `${color} ${type} depth`).toBeLessThanOrEqual(envelope.maxFootprint * 1.03);
       }
+    }
+  });
+
+  it("makes pawns visibly smaller than all major pieces", () => {
+    const factory = new PieceGeometryFactory();
+    const pawnHeight = dimensions(factory.create("pawn", "white")).y;
+    for (const type of ["rook", "knight", "bishop", "queen", "king"]) {
+      expect(dimensions(factory.create(type, "white")).y, `${type} versus pawn`).toBeGreaterThan(
+        pawnHeight * 1.2,
+      );
     }
   });
 
