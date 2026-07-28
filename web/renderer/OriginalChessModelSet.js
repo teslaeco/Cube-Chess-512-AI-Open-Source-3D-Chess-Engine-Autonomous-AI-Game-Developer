@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 
-const MODEL_PATH = `${import.meta.env.BASE_URL}assets/original-chess-models/chess.fbx?revision=20260728-stage-1-pawns`;
+const MODEL_PATH = `${import.meta.env.BASE_URL}assets/original-chess-models/chess.fbx?revision=20260728-stage-1-pawns-transform-fix`;
 const RUNTIME_BASE_URL = globalThis.location?.href ?? import.meta.url;
 
 export const ORIGINAL_CHESS_MODEL_URL = new URL(MODEL_PATH, RUNTIME_BASE_URL).href;
@@ -107,17 +107,31 @@ export function normalizeImportedPiece(piece) {
   return group;
 }
 
-function cloneWithWorldTransform(source) {
-  source.updateWorldMatrix(true, true);
+function cloneAsStandalonePiece(source) {
   const model = source.clone(true);
-  model.matrix.copy(source.matrixWorld);
-  model.matrix.decompose(model.position, model.quaternion, model.scale);
+
+  // The FBX contains an entire arranged chess scene. Its root piece objects carry
+  // scene placement, rotation and scale. Those transforms must not be copied onto
+  // a board cell instance. Keep child mesh geometry, but reset the imported scene
+  // object's transform before centering and fitting it to one Cube Chess cell.
+  model.position.set(0, 0, 0);
+  model.quaternion.identity();
+  model.scale.set(1, 1, 1);
+  model.rotation.set(0, 0, 0);
+  model.matrix.identity();
+  model.matrixWorld.identity();
   model.matrixAutoUpdate = true;
+
+  model.traverse((child) => {
+    if (!child.isMesh) return;
+    child.geometry = child.geometry.clone();
+  });
+  model.updateMatrixWorld(true);
   return model;
 }
 
 function preparePiece(source, material, outlineColor, type, color) {
-  const model = cloneWithWorldTransform(source);
+  const model = cloneAsStandalonePiece(source);
   model.name = `${color}-${type}-original-source`;
   model.traverse((child) => {
     if (!child.isMesh) return;
