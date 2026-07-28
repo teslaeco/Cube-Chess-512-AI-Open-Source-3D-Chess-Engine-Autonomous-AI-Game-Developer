@@ -84,7 +84,7 @@ describe("browser presentation data", () => {
     expect(presentation.capturedPieces.map((piece) => piece.id)).toEqual([blackPawn.id]);
   });
 
-  it("lets a black pawn move upward from A to B after White moves", () => {
+  it("lets a black pawn move forward and upward from A to B after White moves", () => {
     const presentation = new GamePresentation();
     const whitePawn = presentation.pieces.find((piece) => piece.id === "white-pawn-1");
     presentation.selectPiece(whitePawn);
@@ -94,18 +94,18 @@ describe("browser presentation data", () => {
     presentation.selectPiece(blackPawn);
     presentation.setActiveLevel(1);
 
-    expect(presentation.selectSquare(createSquareAddress(1, 6, 1))).toBe(true);
-    expect(presentation.pieces.find((piece) => piece.id === blackPawn.id).position.square3D).toBe("B:b7");
+    expect(presentation.selectSquare(createSquareAddress(1, 5, 1))).toBe(true);
+    expect(presentation.pieces.find((piece) => piece.id === blackPawn.id).position.square3D).toBe("B:b6");
   });
 
-  it("preserves pending selection while changing level and executes a vertical pawn move", () => {
+  it("preserves pending selection while changing level and executes a 3D pawn move", () => {
     const presentation = new GamePresentation();
     const pawn = presentation.pieces.find((piece) => piece.id === "white-pawn-1");
     presentation.selectPiece(pawn);
     presentation.setActiveLevel(1);
     expect(presentation.selectedPieceId).toBe(pawn.id);
-    expect(presentation.selectSquare(createSquareAddress(0, 1, 1))).toBe(true);
-    expect(presentation.pieces.find((piece) => piece.id === pawn.id).position.square3D).toBe("B:a2");
+    expect(presentation.selectSquare(createSquareAddress(0, 2, 1))).toBe(true);
+    expect(presentation.pieces.find((piece) => piece.id === pawn.id).position.square3D).toBe("B:a3");
     expect(presentation.activeLevel).toBe(1);
   });
 
@@ -167,6 +167,6 @@ describe("browser presentation data", () => {
     presentation.setLevelVisible(7, false);
     expect(presentation.levels[7].visible).toBe(false);
     presentation.showAllLevels();
-    expect(presentation.levels[7].visible).toBe(true);
+    expect(presentation.levels.every((level) => level.visible)).toBe(true);
   });
 });
