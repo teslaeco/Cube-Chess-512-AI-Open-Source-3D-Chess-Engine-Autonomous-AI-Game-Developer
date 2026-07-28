@@ -102,13 +102,12 @@ function createBishop(material, cutMaterial) {
   const slash=mesh(new THREE.BoxGeometry(0.07,0.6,0.42),cutMaterial,1.22); slash.rotation.z=0.58; slash.userData.decorative=true; group.add(slash); return group;
 }
 
-function createKnightFallback(material, accentMaterial) {
+function createKnightFallback(material) {
   const group = new THREE.Group(); addBase(group, material);
   group.add(lathe([[0.27,0],[0.23,0.14],[0.2,0.34],[0.29,0.5]],material,0.27));
   const silhouette=new THREE.Shape(); silhouette.moveTo(-0.28,0.02); silhouette.bezierCurveTo(-0.34,0.28,-0.27,0.58,-0.12,0.83); silhouette.bezierCurveTo(-0.02,1.01,0.02,1.18,-0.04,1.36); silhouette.lineTo(0.03,1.55); silhouette.lineTo(0.14,1.34); silhouette.bezierCurveTo(0.31,1.30,0.49,1.20,0.61,1.04); silhouette.bezierCurveTo(0.69,0.93,0.63,0.83,0.48,0.80); silhouette.lineTo(0.29,0.76); silhouette.bezierCurveTo(0.21,0.62,0.17,0.46,0.19,0.30); silhouette.bezierCurveTo(0.20,0.18,0.12,0.07,-0.02,0.02); silhouette.closePath();
   const body=mesh(new THREE.ExtrudeGeometry(silhouette,{depth:0.34,bevelEnabled:true,bevelSegments:4,steps:1,bevelSize:0.055,bevelThickness:0.055,curveSegments:20}),material,0.68); body.position.z=-0.17; body.rotation.y=Math.PI/2; group.add(body);
-  const eye=mesh(new THREE.SphereGeometry(0.035,16,12),accentMaterial,1.84); eye.position.set(0.17,1.84,-0.19); eye.userData.decorative=true; group.add(eye);
-  const mane=mesh(new THREE.BoxGeometry(0.12,0.72,0.3),accentMaterial,1.35); mane.position.x=-0.17; mane.rotation.z=-0.16; mane.userData.decorative=true; group.add(mane); return group;
+  return group;
 }
 
 function createQueen(material, accentMaterial) {
@@ -124,14 +123,14 @@ function createKing(material, accentMaterial) {
 export class PieceGeometryFactory {
   constructor() {
     this.materials={white:new THREE.MeshPhysicalMaterial({color:0xf2ede2,metalness:0.08,roughness:0.24,clearcoat:0.65,clearcoatRoughness:0.22}),black:new THREE.MeshPhysicalMaterial({color:0x151a22,metalness:0.34,roughness:0.2,clearcoat:0.72,clearcoatRoughness:0.18})};
-    this.accents={white:new THREE.MeshStandardMaterial({color:0xb99845,metalness:0.68,roughness:0.24}),black:new THREE.MeshStandardMaterial({color:0x7898bd,metalness:0.7,roughness:0.22})};
-    this.bishopCuts={white:new THREE.MeshStandardMaterial({color:0x171b22,roughness:0.8}),black:new THREE.MeshStandardMaterial({color:0xd7dde5,roughness:0.72})};
+    this.accents={white:new THREE.MeshStandardMaterial({color:0xb99845,metalness:0.68,roughness:0.24}),black:new THREE.MeshStandardMaterial({color:0x151a22,metalness:0.34,roughness:0.2})};
+    this.bishopCuts={white:new THREE.MeshStandardMaterial({color:0x171b22,roughness:0.8}),black:new THREE.MeshStandardMaterial({color:0x151a22,metalness:0.2,roughness:0.28})};
     this.originalModels=new OriginalChessModelSet(this.materials);
   }
 
   create(type,color) {
     const material=this.materials[color]; const accent=this.accents[color]; const outlineColor=color==="white"?0x202733:0xc8d3df;
-    const builders={pawn:()=>createPawn(material),rook:()=>createRook(material),knight:()=>createKnightFallback(material,accent),bishop:()=>createBishop(material,this.bishopCuts[color]),queen:()=>createQueen(material,accent),king:()=>createKing(material,accent)};
+    const builders={pawn:()=>createPawn(material),rook:()=>createRook(material),knight:()=>createKnightFallback(material),bishop:()=>createBishop(material,this.bishopCuts[color]),queen:()=>createQueen(material,accent),king:()=>createKing(material,accent)};
     const fallback=fitPieceInsideCell(builders[type]?.()??createPawn(material), type); addOutline(fallback,outlineColor);
     return this.originalModels.create(type,color,fallback);
   }
