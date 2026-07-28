@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 
 export const ORIGINAL_CHESS_MODEL_URL = new URL(
-  "../../assets/original-chess-models/chess.fbx?revision=20260728-fbx-only",
+  "../../assets/original-chess-models/chess.fbx?revision=20260728-fbx-only-2",
   import.meta.url,
 ).href;
 
@@ -10,16 +10,16 @@ const MAX_HEIGHT = 0.78;
 const MAX_FOOTPRINT = 0.68;
 
 const MODEL_NAMES = Object.freeze({
-  pawn: ["Pawn.000", "Pawn.001"],
-  rook: ["Rook", "Rook.003"],
-  knight: ["Knight", "Knight.001"],
-  bishop: ["bishop", "bishop.001"],
-  queen: ["queeen", "queeen.001", "queen", "queen.001"],
-  king: ["king.000", "king.001", "king"],
+  pawn: [/^pawn(?:\.\d+)?$/i],
+  rook: [/^rook(?:\.\d+)?$/i],
+  knight: [/^knight(?:\.\d+)?$/i],
+  bishop: [/^bishop(?:\.\d+)?$/i],
+  queen: [/^que+en(?:\.\d+)?$/i],
+  king: [/^king(?:\.\d+)?$/i],
 });
 
 function cleanFbxName(name) {
-  return String(name ?? "").split("\u0000")[0];
+  return String(name ?? "").split("\u0000")[0].trim();
 }
 
 function containsRenderableMesh(object) {
@@ -33,18 +33,21 @@ function containsRenderableMesh(object) {
 function worldVolume(object) {
   object.updateWorldMatrix(true, true);
   const size = new THREE.Box3().setFromObject(object).getSize(new THREE.Vector3());
+  if (![size.x, size.y, size.z].every((value) => Number.isFinite(value) && value > 0)) {
+    return 0;
+  }
   return size.x * size.y * size.z;
 }
 
 export function findImportedPiece(scene, type) {
-  const acceptedNames = MODEL_NAMES[type] ?? [];
+  const patterns = MODEL_NAMES[type] ?? [];
   const candidates = [];
 
   scene.traverse((object) => {
     const name = cleanFbxName(object.name);
-    if (acceptedNames.includes(name) && containsRenderableMesh(object)) {
-      candidates.push(object);
-    }
+    if (!patterns.some((pattern) => pattern.test(name))) return;
+    if (!containsRenderableMesh(object)) return;
+    candidates.push(object);
   });
 
   candidates.sort((a, b) => worldVolume(b) - worldVolume(a));
@@ -186,8 +189,13 @@ export class OriginalChessModelSet {
       .then((scene) => {
         const source = findImportedPiece(scene, type);
         if (!source) {
+          const availableNames = [];
+          scene.traverse((object) => {
+            const name = cleanFbxName(object.name);
+            if (name && containsRenderableMesh(object)) availableNames.push(name);
+          });
           throw new Error(
-            `The FBX scene does not contain a complete ${type} object. Expected one of: ${(MODEL_NAMES[type] ?? []).join(", ")}`,
+            `The FBX scene does not contain a complete ${type} object. Available renderable names: ${[...new Set(availableNames)].join(", ")}`,
           );
         }
 
