@@ -146,6 +146,19 @@ function createLoadingHitTarget(type, color) {
   return target;
 }
 
+function setLoadState(holder, state, error = null) {
+  holder.originalModelState = state;
+  holder.userData.originalModelState = state;
+  if (error) {
+    const message = String(error?.message ?? error);
+    holder.originalModelError = message;
+    holder.userData.originalModelError = message;
+  } else {
+    delete holder.originalModelError;
+    delete holder.userData.originalModelError;
+  }
+}
+
 export class OriginalChessModelSet {
   constructor(materials) {
     this.materials = materials;
@@ -166,7 +179,7 @@ export class OriginalChessModelSet {
   create(type, color) {
     const holder = new THREE.Group();
     holder.name = `${color}-${type}`;
-    holder.userData.originalModelState = "loading";
+    setLoadState(holder, "loading");
     holder.add(createLoadingHitTarget(type, color));
 
     this.loadScene()
@@ -187,13 +200,11 @@ export class OriginalChessModelSet {
         );
         holder.clear();
         holder.add(model);
-        holder.userData.originalModelState = "ready";
-        delete holder.userData.originalModelError;
+        setLoadState(holder, "ready");
       })
       .catch((error) => {
         holder.clear();
-        holder.userData.originalModelState = "error";
-        holder.userData.originalModelError = String(error?.message ?? error);
+        setLoadState(holder, "error", error);
         console.error(
           `Cube Chess failed to load the required original ${type} model from ${ORIGINAL_CHESS_MODEL_URL}. No procedural fallback is permitted.`,
           error,
