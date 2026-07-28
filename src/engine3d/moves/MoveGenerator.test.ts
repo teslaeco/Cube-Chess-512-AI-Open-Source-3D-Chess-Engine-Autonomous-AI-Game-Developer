@@ -136,7 +136,7 @@ describe("Cube Chess 512 pseudo-legal movement geometry", () => {
     expect(sameLevel).toHaveLength(8);
   });
 
-  it("implements the four opening pawn advances plus captures on x-y and x-z", () => {
+  it("implements four opening pawn advances plus captures on x-y and x-z", () => {
     const pawn = piece("pawn");
     const enemyForwardDiagonal = piece("pawn", 4, 4, 3, "black");
     const enemyVerticalDiagonal = piece("pawn", 4, 3, 4, "black");
@@ -147,30 +147,32 @@ describe("Cube Chess 512 pseudo-legal movement geometry", () => {
     const result = addresses(moves);
 
     expect(result).toContain("D:d5");
-    expect(result).toContain("E:d5");
+    expect(result).toContain("E:d4");
     expect(result).toContain("D:d6");
     expect(result).toContain("F:d4");
     expect(moves.find((move) => move.to.equals(enemyForwardDiagonal.position))?.kind).toBe("capture");
     expect(moves.find((move) => move.to.equals(enemyVerticalDiagonal.position))?.kind).toBe("capture");
   });
 
-  it("lets both pawn colors move forward and climb from level A to B", () => {
+  it("lets both pawn colors climb vertically from level A to B", () => {
     const whitePawn = piece("pawn", 2, 2, 0, "white");
     const blackPawn = piece("pawn", 5, 5, 0, "black");
     const board = new Board3D([whitePawn, blackPawn]);
 
-    expect(addresses(generatePseudoLegalMoves(board, whitePawn))).toContain("B:c4");
-    expect(addresses(generatePseudoLegalMoves(board, blackPawn))).toContain("B:f5");
+    expect(addresses(generatePseudoLegalMoves(board, whitePawn))).toContain("B:c3");
+    expect(addresses(generatePseudoLegalMoves(board, blackPawn))).toContain("B:f6");
   });
 
-  it("blocks the diagonal level advance, allows an upward capture, and stops at H", () => {
+  it("blocks vertical pawn advance and double rise, allows upward capture, and stops at H", () => {
     const blackPawn = piece("pawn", 3, 3, 0, "black");
-    const blocker = piece("rook", 3, 2, 1, "white");
+    const blocker = piece("rook", 3, 3, 1, "white");
     const captureTarget = piece("knight", 4, 3, 1, "white");
     const board = new Board3D([blackPawn, blocker, captureTarget]);
     const moves = generatePseudoLegalMoves(board, blackPawn);
+    const result = addresses(moves);
 
-    expect(addresses(moves)).not.toContain("B:d3");
+    expect(result).not.toContain("B:d4");
+    expect(result).not.toContain("C:d4");
     expect(moves.find((move) => move.to.equals(captureTarget.position))?.kind).toBe("capture");
 
     const pawnOnH = piece("pawn", 6, 3, 7, "black");

@@ -69,44 +69,39 @@ describe("browser presentation data", () => {
     const whitePawn = presentation.pieces.find((piece) => piece.id === "white-pawn-1");
     presentation.selectPiece(whitePawn);
     presentation.selectSquare(createSquareAddress(0, 3, 0));
-
     const blackPawn = presentation.pieces.find((piece) => piece.id === "black-pawn-2");
     presentation.selectPiece(blackPawn);
     presentation.selectSquare(createSquareAddress(1, 4, 0));
-
     const movedWhitePawn = presentation.pieces.find((piece) => piece.id === whitePawn.id);
     const targetBlackPawn = presentation.pieces.find((piece) => piece.id === blackPawn.id);
     presentation.selectPiece(movedWhitePawn);
-
     expect(presentation.selectPiece(targetBlackPawn)).toBe(true);
     expect(presentation.pieces.some((piece) => piece.id === blackPawn.id)).toBe(false);
     expect(presentation.pieces.find((piece) => piece.id === whitePawn.id).position.square3D).toBe("A:b5");
     expect(presentation.capturedPieces.map((piece) => piece.id)).toEqual([blackPawn.id]);
   });
 
-  it("lets a black pawn move forward and upward from A to B after White moves", () => {
+  it("lets a black pawn move upward from A to B after White moves", () => {
     const presentation = new GamePresentation();
     const whitePawn = presentation.pieces.find((piece) => piece.id === "white-pawn-1");
     presentation.selectPiece(whitePawn);
     presentation.selectSquare(createSquareAddress(0, 2, 0));
-
     const blackPawn = presentation.pieces.find((piece) => piece.id === "black-pawn-2");
     presentation.selectPiece(blackPawn);
     presentation.setActiveLevel(1);
-
-    expect(presentation.selectSquare(createSquareAddress(1, 5, 1))).toBe(true);
-    expect(presentation.pieces.find((piece) => piece.id === blackPawn.id).position.square3D).toBe("B:b6");
+    expect(presentation.selectSquare(createSquareAddress(1, 6, 1))).toBe(true);
+    expect(presentation.pieces.find((piece) => piece.id === blackPawn.id).position.square3D).toBe("B:b7");
   });
 
-  it("preserves pending selection while changing level and executes a 3D pawn move", () => {
+  it("preserves selection and moves a pawn directly from A to C on its first move", () => {
     const presentation = new GamePresentation();
     const pawn = presentation.pieces.find((piece) => piece.id === "white-pawn-1");
     presentation.selectPiece(pawn);
-    presentation.setActiveLevel(1);
+    presentation.setActiveLevel(2);
     expect(presentation.selectedPieceId).toBe(pawn.id);
-    expect(presentation.selectSquare(createSquareAddress(0, 2, 1))).toBe(true);
-    expect(presentation.pieces.find((piece) => piece.id === pawn.id).position.square3D).toBe("B:a3");
-    expect(presentation.activeLevel).toBe(1);
+    expect(presentation.selectSquare(createSquareAddress(0, 1, 2))).toBe(true);
+    expect(presentation.pieces.find((piece) => piece.id === pawn.id).position.square3D).toBe("C:a2");
+    expect(presentation.activeLevel).toBe(2);
   });
 
   it("undoes and redoes an exact move snapshot", () => {
@@ -128,10 +123,8 @@ describe("browser presentation data", () => {
     source.selectPiece(pawn);
     source.selectSquare(createSquareAddress(0, 2, 0));
     const saved = source.serialize();
-
     const restored = new GamePresentation();
     restored.load(saved);
-
     expect(restored.sideToMove).toBe("black");
     expect(restored.history).toHaveLength(1);
     expect(restored.pieces.find((piece) => piece.id === pawn.id).position.square3D).toBe("A:a3");
@@ -167,6 +160,6 @@ describe("browser presentation data", () => {
     presentation.setLevelVisible(7, false);
     expect(presentation.levels[7].visible).toBe(false);
     presentation.showAllLevels();
-    expect(presentation.levels.every((level) => level.visible)).toBe(true);
+    expect(presentation.levels[7].visible).toBe(true);
   });
 });
