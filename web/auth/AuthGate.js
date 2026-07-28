@@ -1,11 +1,24 @@
 const SESSION_KEY = "cubeChessIdentity";
 
-function safeParse(value) {
+export function parseStoredIdentity(value) {
   try {
-    return value ? JSON.parse(value) : null;
+    const identity = value ? JSON.parse(value) : null;
+    if (!identity || typeof identity !== "object") return null;
+    if (typeof identity.playerId !== "string" || !identity.playerId) return null;
+    if (identity.mode !== "guest" && identity.mode !== "account") return null;
+    return identity;
   } catch {
     return null;
   }
+}
+
+export function createGuestIdentity(randomUUID = () => crypto.randomUUID()) {
+  return {
+    mode: "guest",
+    provider: "guest",
+    playerId: `guest-${randomUUID()}`,
+    displayName: "Gość",
+  };
 }
 
 function oauthBaseUrl() {
@@ -61,18 +74,13 @@ export class AuthGate {
     };
     this.element.addEventListener("click", this.handleClick);
 
-    const identity = callbackIdentity() ?? safeParse(sessionStorage.getItem(SESSION_KEY));
+    const identity = callbackIdentity() ?? parseStoredIdentity(sessionStorage.getItem(SESSION_KEY));
     if (identity) this.complete(identity);
   }
 
   choose(provider) {
     if (provider === "guest") {
-      const identity = {
-        mode: "guest",
-        provider: "guest",
-        playerId: `guest-${crypto.randomUUID()}`,
-        displayName: "Gość",
-      };
+      const identity = createGuestIdentity();
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(identity));
       this.complete(identity);
       return;
