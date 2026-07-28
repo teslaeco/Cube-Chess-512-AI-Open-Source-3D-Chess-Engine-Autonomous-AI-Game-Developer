@@ -25,6 +25,10 @@ function easeInOut(value) {
     : 1 - Math.pow(-2 * value + 2, 3) / 2;
 }
 
+function updatePieceMetadata(object, kind, piece) {
+  Object.assign(object.userData, { kind, piece });
+}
+
 export class PieceRenderer {
   constructor(pieces, factory, onAnimationState = () => {}) {
     this.group = new THREE.Group();
@@ -46,7 +50,7 @@ export class PieceRenderer {
 
   createObject(piece, parent = this.boardGroup) {
     const object = this.factory.create(piece.type, piece.color);
-    object.userData = { kind: "piece", piece };
+    updatePieceMetadata(object, "piece", piece);
     parent.add(object);
     return object;
   }
@@ -122,7 +126,7 @@ export class PieceRenderer {
       if (capturedPiece) {
         this.boardGroup.remove(object);
         this.capturedGroup.add(object);
-        object.userData = { kind: "captured", piece: capturedPiece };
+        updatePieceMetadata(object, "captured", capturedPiece);
         object.scale.setScalar(0.82);
         this.removeMoveAura(object);
         this.addCaptureAura(object, capturedPiece.color);
@@ -165,13 +169,13 @@ export class PieceRenderer {
       } else if (!this.animations.has(piece.id)) {
         object.position.copy(target);
       }
-      object.userData = { kind: "piece", piece };
+      updatePieceMetadata(object, "piece", piece);
     }
 
     for (const [id, object] of this.captured) {
       const capturedPiece = nextCaptured.get(id);
       if (capturedPiece) {
-        object.userData = { kind: "captured", piece: capturedPiece };
+        updatePieceMetadata(object, "captured", capturedPiece);
         if (!this.animations.has(id)) object.position.copy(capturedPosition(capturedPiece));
       } else if (!nextIds.has(id)) {
         this.captured.delete(id);
@@ -185,7 +189,7 @@ export class PieceRenderer {
         continue;
       }
       const object = this.createObject(capturedPiece, this.capturedGroup);
-      object.userData = { kind: "captured", piece: capturedPiece };
+      updatePieceMetadata(object, "captured", capturedPiece);
       object.scale.setScalar(0.82);
       object.position.copy(capturedPosition(capturedPiece));
       this.addCaptureAura(object, capturedPiece.color);

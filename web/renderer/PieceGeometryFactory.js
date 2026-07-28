@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { OriginalChessModelSet } from "./OriginalChessModelSet.js";
 
+// ARCHIVE: the procedural builders below are intentionally retained for history,
+// comparison and possible future tooling. Production rendering does not call them.
 const RADIAL_SEGMENTS = 40;
 const MAX_PIECE_HEIGHT = 0.78;
 const MAX_PIECE_FOOTPRINT = 0.68;
@@ -127,12 +129,19 @@ export class PieceGeometryFactory {
     this.accents={white:new THREE.MeshStandardMaterial({color:0xb99845,metalness:0.68,roughness:0.24}),black:new THREE.MeshStandardMaterial({color:0x7898bd,metalness:0.7,roughness:0.22})};
     this.bishopCuts={white:new THREE.MeshStandardMaterial({color:0x171b22,roughness:0.8}),black:new THREE.MeshStandardMaterial({color:0xd7dde5,roughness:0.72})};
     this.originalModels=new OriginalChessModelSet(this.materials);
+
+    // Keep archived builders reachable for development tools without using them in game rendering.
+    this.archivedProceduralBuilders = Object.freeze({
+      pawn: () => createPawn(this.materials.white),
+      rook: () => createRook(this.materials.white),
+      knight: () => createKnightFallback(this.materials.white, this.accents.white),
+      bishop: () => createBishop(this.materials.white, this.bishopCuts.white),
+      queen: () => createQueen(this.materials.white, this.accents.white),
+      king: () => createKing(this.materials.white, this.accents.white),
+    });
   }
 
   create(type,color) {
-    const material=this.materials[color]; const accent=this.accents[color]; const outlineColor=color==="white"?0x202733:0xc8d3df;
-    const builders={pawn:()=>createPawn(material),rook:()=>createRook(material),knight:()=>createKnightFallback(material,accent),bishop:()=>createBishop(material,this.bishopCuts[color]),queen:()=>createQueen(material,accent),king:()=>createKing(material,accent)};
-    const fallback=fitPieceInsideCell(builders[type]?.()??createPawn(material)); addOutline(fallback,outlineColor);
-    return this.originalModels.create(type,color,fallback);
+    return this.originalModels.create(type,color);
   }
 }
