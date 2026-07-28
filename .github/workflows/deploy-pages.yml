@@ -53,12 +53,16 @@ jobs:
         if: github.event_name != 'pull_request'
         run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Run focused browser checks for pull requests
+      - name: Run critical FBX smoke test for pull requests
         if: github.event_name == 'pull_request'
         run: >-
           xvfb-run --auto-servernum
           --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render -noreset"
-          npx playwright test --project=chromium-desktop --project=mobile-chrome
+          npx playwright test e2e/game.spec.js
+          --project=chromium-desktop
+          --grep="starts a local game and executes a real raycast pawn move"
+          --workers=1
+          --retries=0
 
       - name: Run full browser matrix on main
         if: github.event_name != 'pull_request'
