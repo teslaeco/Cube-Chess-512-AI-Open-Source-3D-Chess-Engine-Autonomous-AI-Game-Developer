@@ -97,15 +97,42 @@ export function generatePseudoLegalMoves(position: Position, piece: Piece): Move
 function generatePawnMoves(board: Board3D, piece: Piece): Move[] {
   const direction = piece.color === "white" ? 1 : -1;
   const moves: Move[] = [];
-  const forward = {x:piece.position.x,y:piece.position.y+direction,z:piece.position.z};
-  const vertical = {x:piece.position.x,y:piece.position.y,z:piece.position.z+direction};
 
-  // Variant rule v0.1: pawn may advance one square along rank OR one level upward/downward.
-  for (const to of [forward, vertical]) {
-    if (isInsideBoard(to) && board.isEmpty(to)) moves.push({pieceId:piece.id,from:piece.position,to});
+  const addQuietMove = (to: Coord3): void => {
+    if (isInsideBoard(to) && board.isEmpty(to)) {
+      moves.push({pieceId:piece.id,from:piece.position,to});
+    }
+  };
+
+  const forwardOne = {
+    x: piece.position.x,
+    y: piece.position.y + direction,
+    z: piece.position.z,
+  };
+  addQuietMove(forwardOne);
+
+  if (!piece.hasMoved && isInsideBoard(forwardOne) && board.isEmpty(forwardOne)) {
+    addQuietMove({
+      x: piece.position.x,
+      y: piece.position.y + direction * 2,
+      z: piece.position.z,
+    });
   }
 
-  // Captures diagonally in any plane containing its forward direction.
+  addQuietMove({
+    x: piece.position.x,
+    y: piece.position.y + direction,
+    z: piece.position.z + direction,
+  });
+
+  if (!piece.hasMoved) {
+    addQuietMove({
+      x: piece.position.x,
+      y: piece.position.y,
+      z: piece.position.z + direction * 2,
+    });
+  }
+
   const captures: Coord3[] = [
     {x:piece.position.x-1,y:piece.position.y+direction,z:piece.position.z},
     {x:piece.position.x+1,y:piece.position.y+direction,z:piece.position.z},
