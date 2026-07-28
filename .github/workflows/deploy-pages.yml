@@ -45,10 +45,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install browser engines
+      - name: Install Chromium for pull request checks
+        if: github.event_name == 'pull_request'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install all browser engines for main
+        if: github.event_name != 'pull_request'
         run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Run browser interaction tests in virtual display
+      - name: Run focused browser checks for pull requests
+        if: github.event_name == 'pull_request'
+        run: >-
+          xvfb-run --auto-servernum
+          --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render -noreset"
+          npx playwright test --project=chromium-desktop --project=mobile-chrome
+
+      - name: Run full browser matrix on main
+        if: github.event_name != 'pull_request'
         run: >-
           xvfb-run --auto-servernum
           --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render -noreset"
