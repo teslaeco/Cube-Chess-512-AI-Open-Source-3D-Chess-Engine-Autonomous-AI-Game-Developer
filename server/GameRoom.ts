@@ -9,14 +9,7 @@ import {
 } from "../src/engine3d/index.js";
 
 const BACK_RANK: readonly Piece["type"][] = [
-  "rook",
-  "knight",
-  "bishop",
-  "queen",
-  "king",
-  "bishop",
-  "knight",
-  "rook",
+  "rook", "knight", "bishop", "queen", "king", "bishop", "knight", "rook",
 ];
 
 function initialPieces(): Piece[] {
@@ -46,34 +39,65 @@ export interface MoveIntent {
 export class GameRoom {
   public readonly board = new Board3D(initialPieces());
   public readonly players = new Map<PieceColor, string>();
+  public readonly ready = new Map<PieceColor, boolean>();
   public sideToMove: PieceColor = "white";
   public sequence = 0;
+  public started: boolean;
 
-  public join(playerId: string): PlayerRole {
+  public constructor(private readonly requireReady = false) {
+    this.started = !requireReady;
+  }
+
+  public join(playerId: string, preferredRole?: PieceColor): PlayerRole {
     for (const [role, existingId] of this.players) {
       if (existingId === playerId) return role;
     }
-    if (!this.players.has("white")) {
-      this.players.set("white", playerId);
-      return "white";
+    if (preferredRole && !this.players.has(preferredRole)) {
+      this.players.set(preferredRole, playerId);
+      this.ready.set(preferredRole, false);
+      return preferredRole;
     }
-    if (!this.players.has("black")) {
-      this.players.set("black", playerId);
-      return "black";
+    for (const role of ["white", "black"] as const) {
+      if (!this.players.has(role)) {
+        this.players.set(role, playerId);
+        this.ready.set(role, false);
+        return role;
+      }
+    }
+    return "spectator";
+  }
+
+  public setReady(playerId: string, value: boolean): void {
+    const role = this.roleOf(playerId);
+    if (role === "spectator") throw new Error("Spectators cannot become ready");
+    this.ready.set(role, value);
+    if (
+      this.requireReady &&
+      this.players.has("white") &&
+      this.players.has("black") &&
+      this.ready.get("white") === true &&
+      this.ready.get("black") === true
+    ) {
+      this.started = true;
+    }
+  }
+
+  public roleOf(playerId: string): PlayerRole {
+    for (const [role, existingId] of this.players) {
+      if (existingId === playerId) return role;
     }
     return "spectator";
   }
 
   public applyIntent(playerId: string, sequence: number, intent: MoveIntent): Move {
+    if (!this.started) throw new Error("Both players must be ready before the game starts");
     if (sequence !== this.sequence + 1) {
       throw new Error(`Expected sequence ${this.sequence + 1}`);
     }
     if (this.players.get(this.sideToMove) !== playerId) {
       throw new Error(`It is ${this.sideToMove}'s turn`);
     }
-    const piece = this.board
-      .getAllPieces()
-      .find((candidate) => candidate.id === intent.pieceId);
+    const piece = this.board.getAllPieces().find((candidate) => candidate.id === intent.pieceId);
     if (!piece || piece.color !== this.sideToMove) {
       throw new Error("Piece does not belong to the active player");
     }
@@ -92,6 +116,15 @@ export class GameRoom {
       sequence: this.sequence,
       sideToMove: this.sideToMove,
       status: evaluatePosition(this.board, this.sideToMove),
+      started: this.started,
+      players: {
+        white: this.players.has("white"),
+        black: this.players.has("black"),
+        ready: {
+          white: this.ready.get("white") === true,
+          black: this.ready.get("black") === true,
+        },
+      },
       pieces: this.board.getAllPieces().map((piece) => ({
         ...piece,
         position: {
