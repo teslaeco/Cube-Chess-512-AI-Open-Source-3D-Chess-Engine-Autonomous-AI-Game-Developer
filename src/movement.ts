@@ -123,8 +123,7 @@ function generatePawnMoves(board: Board3D, piece: Piece): Move[] {
     addQuietMove(forwardTwo);
   }
 
-  // Cube Chess 512 advance: one level up/down and one square forward.
-  // This is a non-capturing spatial equivalent of advancing one square.
+  // Cube Chess 512 advance: one level and one square forward.
   const forwardAndLevel = {
     x: piece.position.x,
     y: piece.position.y + direction,
@@ -132,19 +131,15 @@ function generatePawnMoves(board: Board3D, piece: Piece): Move[] {
   };
   addQuietMove(forwardAndLevel);
 
-  // Cube Chess 512 opening advance: two levels up/down, only before the pawn
-  // has moved and only when the intermediate level is empty.
-  const levelOne = {
-    x: piece.position.x,
-    y: piece.position.y,
-    z: piece.position.z + direction,
-  };
+  // Cube Chess 512 opening advance: exactly two levels on the pawn's first move.
+  // This is one atomic 3D pawn move. The pawn does not stop on the intermediate
+  // level, so only the destination must be inside the board and unoccupied.
   const levelTwo = {
     x: piece.position.x,
     y: piece.position.y,
     z: piece.position.z + direction * 2,
   };
-  if (!piece.hasMoved && isInsideBoard(levelOne) && board.isEmpty(levelOne)) {
+  if (!piece.hasMoved) {
     addQuietMove(levelTwo);
   }
 
