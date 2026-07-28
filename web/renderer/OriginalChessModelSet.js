@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 
 export const ORIGINAL_CHESS_MODEL_URL = new URL(
-  "../../assets/original-chess-models/chess.fbx?revision=20260728-fbx-only-2",
+  "../../assets/original-chess-models/chess.fbx?revision=20260728-fbx-only-3",
   import.meta.url,
 ).href;
 
@@ -133,8 +133,8 @@ function preparePiece(source, material, outlineColor, type, color) {
   return normalized;
 }
 
-function createLoadingHitTarget(type, color) {
-  const geometry = new THREE.CylinderGeometry(0.28, 0.34, 0.72, 12);
+function createInteractionHitTarget(type, color) {
+  const geometry = new THREE.CylinderGeometry(0.31, 0.37, 0.82, 16);
   const material = new THREE.MeshBasicMaterial({
     transparent: true,
     opacity: 0,
@@ -142,9 +142,9 @@ function createLoadingHitTarget(type, color) {
     colorWrite: false,
   });
   const target = new THREE.Mesh(geometry, material);
-  target.name = `${color}-${type}-loading-hit-target`;
-  target.position.y = 0.36;
-  target.userData.loadingHitTarget = true;
+  target.name = `${color}-${type}-interaction-hit-target`;
+  target.position.y = 0.41;
+  target.userData.interactionHitTarget = true;
   target.frustumCulled = false;
   return target;
 }
@@ -159,6 +159,13 @@ function setLoadState(holder, state, error = null) {
   } else {
     delete holder.originalModelError;
     delete holder.userData.originalModelError;
+  }
+}
+
+function removeVisualModels(holder) {
+  for (const child of [...holder.children]) {
+    if (child.userData.interactionHitTarget) continue;
+    holder.remove(child);
   }
 }
 
@@ -183,7 +190,7 @@ export class OriginalChessModelSet {
     const holder = new THREE.Group();
     holder.name = `${color}-${type}`;
     setLoadState(holder, "loading");
-    holder.add(createLoadingHitTarget(type, color));
+    holder.add(createInteractionHitTarget(type, color));
 
     this.loadScene()
       .then((scene) => {
@@ -206,12 +213,12 @@ export class OriginalChessModelSet {
           type,
           color,
         );
-        holder.clear();
+        removeVisualModels(holder);
         holder.add(model);
         setLoadState(holder, "ready");
       })
       .catch((error) => {
-        holder.clear();
+        removeVisualModels(holder);
         setLoadState(holder, "error", error);
         console.error(
           `Cube Chess failed to load the required original ${type} model from ${ORIGINAL_CHESS_MODEL_URL}. No procedural fallback is permitted.`,
