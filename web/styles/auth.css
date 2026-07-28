@@ -44,17 +44,21 @@
   font-weight: 700;
   cursor: pointer;
 }
-.auth-provider { display: grid; grid-template-columns: 30px 1fr 30px; align-items: center; gap: 10px; padding: 8px 14px; border: 1px solid rgba(255,255,255,.18); background: #f8fbfd; color: #111820; text-align: center; }
+.auth-provider { display: grid; grid-template-columns: 34px 1fr 34px; align-items: center; gap: 10px; padding: 8px 14px; border: 1px solid rgba(255,255,255,.18); background: #f8fbfd; color: #111820; text-align: center; }
 .auth-provider::after { content: ""; }
-.auth-provider-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; font-size: 1rem; font-weight: 900; }
-.auth-google .auth-provider-icon { color: #4285f4; }
+.auth-provider-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; color: currentColor; }
+.auth-provider-icon svg { display: block; width: 24px; height: 24px; overflow: visible; }
+.auth-google .auth-provider-icon { background: #fff; }
 .auth-apple { background: #050505; color: #fff; }
+.auth-apple .auth-provider-icon { color: #fff; }
 .auth-microsoft { background: #132b3a; color: #fff; }
-.auth-microsoft .auth-provider-icon { color: #61c8ff; }
 .auth-facebook, .auth-github, .auth-wechat, .auth-qq, .auth-line, .auth-phone, .auth-email { background: #102b3b; color: #fff; }
+.auth-github .auth-provider-icon { color: #fff; }
+.auth-phone .auth-provider-icon, .auth-email .auth-provider-icon { color: #67d9f5; }
 
 .auth-more-toggle { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding: 0 16px; border: 1px solid rgba(110,204,239,.28); background: rgba(14,43,59,.74); color: #dff7ff; }
-.auth-more-icon { font-size: 1.25rem; transition: transform .18s ease; }
+.auth-more-icon { display: grid; place-items: center; width: 24px; height: 24px; transition: transform .18s ease; }
+.auth-more-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .auth-more-toggle[aria-expanded="true"] .auth-more-icon { transform: rotate(180deg); }
 .auth-more-panel { margin-top: 10px; }
 .auth-more-panel[hidden] { display: none; }
