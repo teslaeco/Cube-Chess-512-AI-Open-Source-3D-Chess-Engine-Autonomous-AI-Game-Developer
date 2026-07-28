@@ -93,6 +93,17 @@ describe("browser presentation data", () => {
     expect(presentation.pieces.find((piece) => piece.id === blackPawn.id).position.square3D).toBe("B:b7");
   });
 
+  it("shows and executes the additional forward-up pawn move on level B", () => {
+    const presentation = new GamePresentation();
+    const pawn = presentation.pieces.find((piece) => piece.id === "white-pawn-1");
+    presentation.selectPiece(pawn);
+    expect(presentation.legalTargets.map((target) => target.square3D)).toContain("B:a3");
+    presentation.setActiveLevel(1);
+    expect(presentation.selectedPieceId).toBe(pawn.id);
+    expect(presentation.selectSquare(createSquareAddress(0, 2, 1))).toBe(true);
+    expect(presentation.pieces.find((piece) => piece.id === pawn.id).position.square3D).toBe("B:a3");
+  });
+
   it("preserves selection and moves a pawn directly from A to C on its first move", () => {
     const presentation = new GamePresentation();
     const pawn = presentation.pieces.find((piece) => piece.id === "white-pawn-1");
