@@ -97,12 +97,55 @@ export function generatePseudoLegalMoves(position: Position, piece: Piece): Move
 function generatePawnMoves(board: Board3D, piece: Piece): Move[] {
   const direction = piece.color === "white" ? 1 : -1;
   const moves: Move[] = [];
-  const forward = {x:piece.position.x,y:piece.position.y+direction,z:piece.position.z};
-  const vertical = {x:piece.position.x,y:piece.position.y,z:piece.position.z+direction};
 
-  // Variant rule v0.1: pawn may advance one square along rank OR one level upward/downward.
-  for (const to of [forward, vertical]) {
-    if (isInsideBoard(to) && board.isEmpty(to)) moves.push({pieceId:piece.id,from:piece.position,to});
+  const addQuietMove = (to: Coord3): void => {
+    if (isInsideBoard(to) && board.isEmpty(to)) {
+      moves.push({pieceId:piece.id,from:piece.position,to});
+    }
+  };
+
+  // Standard chess advance: one square forward.
+  const forwardOne = {
+    x: piece.position.x,
+    y: piece.position.y + direction,
+    z: piece.position.z,
+  };
+  addQuietMove(forwardOne);
+
+  // Standard opening advance: two squares forward, only before the pawn has moved
+  // and only when both traversed squares are empty.
+  const forwardTwo = {
+    x: piece.position.x,
+    y: piece.position.y + direction * 2,
+    z: piece.position.z,
+  };
+  if (!piece.hasMoved && isInsideBoard(forwardOne) && board.isEmpty(forwardOne)) {
+    addQuietMove(forwardTwo);
+  }
+
+  // Cube Chess 512 advance: one level up/down and one square forward.
+  // This is a non-capturing spatial equivalent of advancing one square.
+  const forwardAndLevel = {
+    x: piece.position.x,
+    y: piece.position.y + direction,
+    z: piece.position.z + direction,
+  };
+  addQuietMove(forwardAndLevel);
+
+  // Cube Chess 512 opening advance: two levels up/down, only before the pawn
+  // has moved and only when the intermediate level is empty.
+  const levelOne = {
+    x: piece.position.x,
+    y: piece.position.y,
+    z: piece.position.z + direction,
+  };
+  const levelTwo = {
+    x: piece.position.x,
+    y: piece.position.y,
+    z: piece.position.z + direction * 2,
+  };
+  if (!piece.hasMoved && isInsideBoard(levelOne) && board.isEmpty(levelOne)) {
+    addQuietMove(levelTwo);
   }
 
   // Captures diagonally in any plane containing its forward direction.
