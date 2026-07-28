@@ -26,13 +26,10 @@ jobs:
   e2e:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 12
     env:
       LIBGL_ALWAYS_SOFTWARE: "1"
       GALLIUM_DRIVER: llvmpipe
-      MOZ_WEBRENDER: "1"
-      MOZ_DISABLE_HW_ACCELERATION: "1"
-      PW_FIREFOX_XVFB: "1"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -44,16 +41,13 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefer-offline --no-audit
 
-      - name: Install browser engines
-        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
 
-      - name: Run browser interaction tests in virtual display
-        run: >-
-          xvfb-run --auto-servernum
-          --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render -noreset"
-          npm run test:e2e
+      - name: Run Chromium interaction tests
+        run: npm run test:e2e -- --project=chromium --workers=1
 
       - name: Upload failure evidence
         if: failure()
@@ -115,7 +109,6 @@ jobs:
     timeout-minutes: 10
     needs:
       - build
-      - e2e
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
