@@ -1,4 +1,5 @@
 import "./styles/main.css";
+import "./styles/auth.css";
 import { CubeChessApplication } from "./app/CubeChessApplication.js";
 import { registerServiceWorker } from "./pwa/registerServiceWorker.js";
 
