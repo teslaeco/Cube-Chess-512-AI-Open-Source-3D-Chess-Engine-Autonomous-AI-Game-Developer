@@ -1,11 +1,14 @@
 import "./styles/main.css";
 import "./styles/auth.css";
+import "./styles/global-online.css";
 import { CubeChessApplication } from "./app/CubeChessApplication.js";
 import { AuthGate } from "./auth/AuthGate.js";
+import { OnlineMenuEnhancer } from "./online/OnlineMenuEnhancer.js";
 import { registerServiceWorker } from "./pwa/registerServiceWorker.js";
 
 const root = document.querySelector("#app");
 const application = new CubeChessApplication(root);
+const onlineMenu = new OnlineMenuEnhancer(root);
 const authGate = new AuthGate(root, (identity) => {
   application.identity = identity;
   root.dataset.authMode = identity.mode;
@@ -20,6 +23,7 @@ if (import.meta.env.DEV) {
 window.addEventListener(
   "pagehide",
   () => {
+    onlineMenu.dispose();
     authGate.dispose();
     application.dispose();
   },
