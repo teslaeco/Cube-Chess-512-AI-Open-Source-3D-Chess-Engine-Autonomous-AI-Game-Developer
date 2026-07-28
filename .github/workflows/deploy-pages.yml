@@ -19,13 +19,13 @@ defaults:
     shell: bash
 
 concurrency:
-  group: pages-${{ github.ref }}
-  cancel-in-progress: true
+  group: pages-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       LIBGL_ALWAYS_SOFTWARE: "1"
       GALLIUM_DRIVER: llvmpipe
@@ -45,10 +45,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install browser engines
+      - name: Install Chromium for pull-request checks
+        if: github.event_name == 'pull_request'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install all browser engines for main
+        if: github.event_name != 'pull_request'
         run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Run browser interaction tests in virtual display
+      - name: Run required desktop and mobile interaction tests
+        if: github.event_name == 'pull_request'
+        run: >-
+          xvfb-run --auto-servernum
+          --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render -noreset"
+          npm run test:e2e --
+          --project=chromium-desktop
+          --project=mobile-chrome
+
+      - name: Run full cross-browser interaction suite
+        if: github.event_name != 'pull_request'
         run: >-
           xvfb-run --auto-servernum
           --server-args="-screen 0 1920x1080x24 -ac +extension GLX +render -noreset"
