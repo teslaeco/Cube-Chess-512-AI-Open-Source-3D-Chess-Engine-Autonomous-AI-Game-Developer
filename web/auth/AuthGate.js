@@ -1,9 +1,12 @@
 const SESSION_KEY = "cubeChessIdentity";
 
-const PROVIDERS = [
+const PRIMARY_PROVIDERS = [
   { id: "google", label: "Google", icon: "G", className: "auth-google" },
   { id: "apple", label: "Apple", icon: "", className: "auth-apple" },
   { id: "microsoft", label: "Microsoft", icon: "⊞", className: "auth-microsoft" },
+];
+
+const MORE_PROVIDERS = [
   { id: "facebook", label: "Facebook", icon: "f", className: "auth-facebook" },
   { id: "github", label: "GitHub", icon: "◉", className: "auth-github" },
   { id: "wechat", label: "WeChat", icon: "微", className: "auth-wechat" },
@@ -12,6 +15,8 @@ const PROVIDERS = [
   { id: "phone", label: "Telefon / SMS", icon: "☎", className: "auth-phone" },
   { id: "email", label: "E-mail", icon: "@", className: "auth-email" },
 ];
+
+const ALL_PROVIDERS = [...PRIMARY_PROVIDERS, ...MORE_PROVIDERS];
 
 export function parseStoredIdentity(value) {
   try {
@@ -70,13 +75,19 @@ export class AuthGate {
     this.element.setAttribute("aria-modal", "true");
     this.element.setAttribute("aria-labelledby", "auth-title");
     this.element.innerHTML = `
-      <div class="auth-card auth-card-expanded">
+      <div class="auth-card">
         <p class="auth-eyebrow">Terraforming Planet · Open Source</p>
         <div class="auth-brand"><span>512</span><div><strong>Cube Chess 512 AI</strong><small>8×8×8 · 512 pól</small></div></div>
         <h1 id="auth-title">Witaj w Cube Chess 512</h1>
         <p class="auth-intro">Zaloguj się, aby zachować znajomych, ranking i historię partii, albo rozpocznij od razu jako gość.</p>
-        <div class="auth-provider-grid">
-          ${PROVIDERS.map(providerMarkup).join("")}
+        <div class="auth-primary-list">
+          ${PRIMARY_PROVIDERS.map(providerMarkup).join("")}
+        </div>
+        <button type="button" class="auth-more-toggle" data-auth-more aria-expanded="false">
+          <span>Więcej sposobów logowania</span><span class="auth-more-icon" aria-hidden="true">⌄</span>
+        </button>
+        <div class="auth-more-panel" data-auth-more-panel hidden>
+          ${MORE_PROVIDERS.map(providerMarkup).join("")}
         </div>
         <div class="auth-divider"><span>lub</span></div>
         <button type="button" class="auth-guest" data-auth="guest">Zagraj jako gość <span aria-hidden="true">→</span></button>
@@ -84,6 +95,14 @@ export class AuthGate {
       </div>`;
     container.append(this.element);
     this.handleClick = (event) => {
+      const moreButton = event.target.closest("[data-auth-more]");
+      if (moreButton) {
+        const panel = this.element.querySelector("[data-auth-more-panel]");
+        const expanded = moreButton.getAttribute("aria-expanded") === "true";
+        moreButton.setAttribute("aria-expanded", String(!expanded));
+        panel.hidden = expanded;
+        return;
+      }
       const button = event.target.closest("[data-auth]");
       if (!button) return;
       this.choose(button.dataset.auth);
@@ -104,7 +123,7 @@ export class AuthGate {
     const base = oauthBaseUrl();
     if (!base) {
       const note = this.element.querySelector("[data-auth-note]");
-      const label = PROVIDERS.find((entry) => entry.id === provider)?.label ?? provider;
+      const label = ALL_PROVIDERS.find((entry) => entry.id === provider)?.label ?? provider;
       note.textContent = `Logowanie przez ${label} wymaga uruchomionego backendu i kluczy dostawcy. Na razie wybierz tryb gościa.`;
       note.setAttribute("role", "alert");
       return;
