@@ -6,8 +6,8 @@ import { createMove } from "./MoveFactory.js";
 
 export function generatePawnMoves(board: Board3D, piece: Piece): Move[] {
   const rankDirection = piece.color === "white" ? 1 : -1;
-  // Both armies start on level A. Height progression is therefore always
-  // A -> H. Pawns never move back toward a lower level.
+  // Both armies begin on level A. Vertical pawn progress is always A -> H,
+  // independently from the classical rank direction. Pawns never descend.
   const heightDirection = 1;
   const moves: Move[] = [];
 
@@ -16,12 +16,11 @@ export function generatePawnMoves(board: Board3D, piece: Piece): Move[] {
     if (to && board.isEmpty(to)) moves.push(createMove(piece, to));
   };
 
-  // Normal forward move on the current level.
+  // Normal one-step advances: classical forward or one level upward.
   const rankOne: Vector = [0, rankDirection, 0];
+  const heightOne: Vector = [0, 0, heightDirection];
   addQuietMove(rankOne);
-
-  // 3D forward move: one rank forward and one level higher.
-  addQuietMove([0, rankDirection, heightDirection]);
+  addQuietMove(heightOne);
 
   if (!piece.hasMoved) {
     // Classical two-square opening move. The intermediate square must be free.
@@ -36,11 +35,21 @@ export function generatePawnMoves(board: Board3D, piece: Piece): Move[] {
       moves.push(createMove(piece, rankTwo));
     }
 
-    // Cube Chess opening move from level A directly to level C.
-    // The pawn changes only height and still cannot move back toward A.
-    addQuietMove([0, 0, heightDirection * 2]);
+    // Cube Chess opening move A -> C (or the equivalent two-level rise).
+    // It is not a jump: the intermediate level must also be empty.
+    const heightMiddle = piece.position.tryAdd(...heightOne);
+    const heightTwo = piece.position.tryAdd(0, 0, heightDirection * 2);
+    if (
+      heightMiddle &&
+      heightTwo &&
+      board.isEmpty(heightMiddle) &&
+      board.isEmpty(heightTwo)
+    ) {
+      moves.push(createMove(piece, heightTwo));
+    }
   }
 
+  // Captures remain diagonal in either the rank plane or the vertical plane.
   const captureVectors: readonly Vector[] = [
     [1, rankDirection, 0],
     [-1, rankDirection, 0],
