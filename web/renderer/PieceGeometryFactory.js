@@ -1,9 +1,8 @@
 import * as THREE from "three";
 import { OriginalChessModelSet } from "./OriginalChessModelSet.js";
+import { pieceCellEnvelope } from "./pieceScaleProfile.js";
 
 const RADIAL_SEGMENTS = 40;
-const MAX_PIECE_HEIGHT = 0.78;
-const MAX_PIECE_FOOTPRINT = 0.68;
 
 function mesh(geometry, material, y = 0) {
   const item = new THREE.Mesh(geometry, material);
@@ -49,7 +48,8 @@ function addOutline(group, color) {
   }
 }
 
-export function fitPieceInsideCell(group) {
+export function fitPieceInsideCell(group, type = "pawn") {
+  const envelope = pieceCellEnvelope(type);
   group.position.set(0, 0, 0);
   group.scale.setScalar(1);
   group.updateMatrixWorld(true);
@@ -59,9 +59,9 @@ export function fitPieceInsideCell(group) {
     throw new Error("Piece geometry has invalid bounds");
   }
   const scale = Math.min(
-    MAX_PIECE_HEIGHT / size.y,
-    MAX_PIECE_FOOTPRINT / size.x,
-    MAX_PIECE_FOOTPRINT / size.z,
+    envelope.maxHeight / size.y,
+    envelope.maxFootprint / size.x,
+    envelope.maxFootprint / size.z,
   );
   group.scale.setScalar(scale);
   group.updateMatrixWorld(true);
@@ -132,7 +132,7 @@ export class PieceGeometryFactory {
   create(type,color) {
     const material=this.materials[color]; const accent=this.accents[color]; const outlineColor=color==="white"?0x202733:0xc8d3df;
     const builders={pawn:()=>createPawn(material),rook:()=>createRook(material),knight:()=>createKnightFallback(material,accent),bishop:()=>createBishop(material,this.bishopCuts[color]),queen:()=>createQueen(material,accent),king:()=>createKing(material,accent)};
-    const fallback=fitPieceInsideCell(builders[type]?.()??createPawn(material)); addOutline(fallback,outlineColor);
+    const fallback=fitPieceInsideCell(builders[type]?.()??createPawn(material), type); addOutline(fallback,outlineColor);
     return this.originalModels.create(type,color,fallback);
   }
 }
