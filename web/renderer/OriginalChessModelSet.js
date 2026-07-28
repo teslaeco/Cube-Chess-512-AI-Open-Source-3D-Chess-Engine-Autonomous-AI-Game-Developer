@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 
-export const ORIGINAL_CHESS_MODEL_URL = new URL(
-  "../../assets/original-chess-models/chess.fbx?revision=20260728-fbx-only-3",
-  import.meta.url,
-).href;
+const MODEL_PATH = `${import.meta.env.BASE_URL}assets/original-chess-models/chess.fbx?revision=20260728-stage-1-pawns`;
+const RUNTIME_BASE_URL = globalThis.location?.href ?? import.meta.url;
+
+export const ORIGINAL_CHESS_MODEL_URL = new URL(MODEL_PATH, RUNTIME_BASE_URL).href;
 
 const MAX_HEIGHT = 0.78;
 const MAX_FOOTPRINT = 0.68;
