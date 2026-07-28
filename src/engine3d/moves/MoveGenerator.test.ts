@@ -136,7 +136,7 @@ describe("Cube Chess 512 pseudo-legal movement geometry", () => {
     expect(sameLevel).toHaveLength(8);
   });
 
-  it("implements four opening pawn advances plus captures on x-y and x-z", () => {
+  it("implements five opening pawn advances plus captures on x-y and x-z", () => {
     const pawn = piece("pawn");
     const enemyForwardDiagonal = piece("pawn", 4, 4, 3, "black");
     const enemyVerticalDiagonal = piece("pawn", 4, 3, 4, "black");
@@ -148,19 +148,24 @@ describe("Cube Chess 512 pseudo-legal movement geometry", () => {
 
     expect(result).toContain("D:d5");
     expect(result).toContain("E:d4");
+    expect(result).toContain("E:d5");
     expect(result).toContain("D:d6");
     expect(result).toContain("F:d4");
     expect(moves.find((move) => move.to.equals(enemyForwardDiagonal.position))?.kind).toBe("capture");
     expect(moves.find((move) => move.to.equals(enemyVerticalDiagonal.position))?.kind).toBe("capture");
   });
 
-  it("lets both pawn colors climb vertically from level A to B", () => {
+  it("lets both pawn colors climb vertically and move forward-up from level A to B", () => {
     const whitePawn = piece("pawn", 2, 2, 0, "white");
     const blackPawn = piece("pawn", 5, 5, 0, "black");
     const board = new Board3D([whitePawn, blackPawn]);
 
-    expect(addresses(generatePseudoLegalMoves(board, whitePawn))).toContain("B:c3");
-    expect(addresses(generatePseudoLegalMoves(board, blackPawn))).toContain("B:f6");
+    const whiteMoves = addresses(generatePseudoLegalMoves(board, whitePawn));
+    const blackMoves = addresses(generatePseudoLegalMoves(board, blackPawn));
+    expect(whiteMoves).toContain("B:c3");
+    expect(whiteMoves).toContain("B:c4");
+    expect(blackMoves).toContain("B:f6");
+    expect(blackMoves).toContain("B:f5");
   });
 
   it("blocks vertical pawn advance and double rise, allows upward capture, and stops at H", () => {
@@ -173,6 +178,7 @@ describe("Cube Chess 512 pseudo-legal movement geometry", () => {
 
     expect(result).not.toContain("B:d4");
     expect(result).not.toContain("C:d4");
+    expect(result).toContain("B:d3");
     expect(moves.find((move) => move.to.equals(captureTarget.position))?.kind).toBe("capture");
 
     const pawnOnH = piece("pawn", 6, 3, 7, "black");
@@ -220,6 +226,7 @@ describe("Cube Chess 512 pseudo-legal movement geometry", () => {
     const pawn = piece("pawn", 3, 3, 3, "white", true);
     const result = addresses(generatePseudoLegalMoves(new Board3D([pawn]), pawn));
 
+    expect(result).toContain("E:d5");
     expect(result).not.toContain("D:d6");
     expect(result).not.toContain("F:d4");
   });

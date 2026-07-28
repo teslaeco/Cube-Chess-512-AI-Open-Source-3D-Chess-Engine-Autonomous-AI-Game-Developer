@@ -16,11 +16,14 @@ export function generatePawnMoves(board: Board3D, piece: Piece): Move[] {
     if (to && board.isEmpty(to)) moves.push(createMove(piece, to));
   };
 
-  // Normal one-step advances: classical forward or one level upward.
+  // Normal one-step advances in Cube Chess:
+  // classical forward, one level upward, or forward and upward together.
   const rankOne: Vector = [0, rankDirection, 0];
   const heightOne: Vector = [0, 0, heightDirection];
+  const forwardAndUp: Vector = [0, rankDirection, heightDirection];
   addQuietMove(rankOne);
   addQuietMove(heightOne);
+  addQuietMove(forwardAndUp);
 
   if (!piece.hasMoved) {
     // Classical two-square opening move. The intermediate square must be free.
