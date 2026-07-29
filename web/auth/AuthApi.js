@@ -1,9 +1,20 @@
+const SESSION_STORAGE_KEY = "cubeChessSupabaseSession";
+
 function supabaseUrl() {
   return String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
 }
 
 function supabaseAnonKey() {
   return String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
+}
+
+function authHeaders(token = supabaseAnonKey()) {
+  const anonKey = supabaseAnonKey();
+  return {
+    apikey: anonKey,
+    authorization: `Bearer ${token || anonKey}`,
+    "content-type": "application/json",
+  };
 }
 
 export function authBackendConfigured() {
@@ -25,8 +36,36 @@ async function parseResponse(response) {
   return body;
 }
 
+function persistSession(result) {
+  if (!result?.access_token || !result?.user?.id) return null;
+  const session = {
+    accessToken: result.access_token,
+    refreshToken: result.refresh_token,
+    expiresAt: result.expires_at,
+    user: result.user,
+  };
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  return session;
+}
+
+function identityFromUser(user, provider = "supabase") {
+  return {
+    mode: "account",
+    provider,
+    playerId: user.id,
+    displayName:
+      user.user_metadata?.display_name ||
+      user.user_metadata?.full_name ||
+      user.user_metadata?.name ||
+      user.email?.split("@")[0] ||
+      "Cube Chess Player",
+    email: user.email || "",
+    avatarUrl: user.user_metadata?.avatar_url || user.user_metadata?.picture || "",
+  };
+}
+
 export class AuthApi {
-  async request(path, body) {
+  async request(path, body, token = supabaseAnonKey()) {
     const base = supabaseUrl();
     const anonKey = supabaseAnonKey();
     if (!base || !anonKey) {
@@ -36,18 +75,14 @@ export class AuthApi {
     }
     const response = await fetch(`${base}/auth/v1${path}`, {
       method: "POST",
-      headers: {
-        apikey: anonKey,
-        authorization: `Bearer ${anonKey}`,
-        "content-type": "application/json",
-      },
+      headers: authHeaders(token),
       body: JSON.stringify(body),
     });
     return parseResponse(response);
   }
 
   async register(payload) {
-    const result = await this.request("/signup", {
+    return this.request("/signup", {
       email: payload.email,
       password: payload.password,
       data: {
@@ -55,7 +90,6 @@ export class AuthApi {
         accepted_terms: payload.acceptTerms === true,
       },
     });
-    return result;
   }
 
   forgotPassword(payload) {
@@ -70,27 +104,9 @@ export class AuthApi {
       email: payload.email,
       password: payload.password,
     });
-    const user = result?.user;
-    if (!user?.id || !result?.access_token) {
-      throw new Error("Supabase nie zwrócił prawidłowej sesji gracza.");
-    }
-    sessionStorage.setItem(
-      "cubeChessSupabaseSession",
-      JSON.stringify({
-        accessToken: result.access_token,
-        refreshToken: result.refresh_token,
-        expiresAt: result.expires_at,
-      }),
-    );
-    return {
-      mode: "account",
-      provider: "email",
-      playerId: user.id,
-      displayName:
-        user.user_metadata?.display_name ||
-        user.email?.split("@")[0] ||
-        "Cube Chess Player",
-    };
+    const session = persistSession(result);
+    if (!session) throw new Error("Supabase nie zwrócił prawidłowej sesji gracza.");
+    return identityFromUser(result.user, "email");
   }
 
   redirectToProvider(provider, returnTo) {
@@ -100,5 +116,68 @@ export class AuthApi {
     target.searchParams.set("provider", provider);
     target.searchParams.set("redirect_to", returnTo.split("?")[0]);
     window.location.assign(target.href);
+  }
+
+  async restoreSessionFromUrl() {
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const accessToken = hash.get("access_token");
+    const refreshToken = hash.get("refresh_token");
+    const expiresIn = Number(hash.get("expires_in") || 0);
+    if (!accessToken) return null;
+
+    const response = await fetch(`${supabaseUrl()}/auth/v1/user`, {
+      headers: authHeaders(accessToken),
+    });
+    const user = await parseResponse(response);
+    const result = {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      expires_at: expiresIn ? Math.floor(Date.now() / 1000) + expiresIn : null,
+      user,
+    };
+    persistSession(result);
+    history.replaceState({}, document.title, `${location.pathname}${location.search}`);
+    return identityFromUser(user, hash.get("provider_token") ? "oauth" : "google");
+  }
+
+  async restoreStoredSession() {
+    let stored;
+    try {
+      stored = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) || "null");
+    } catch {
+      stored = null;
+    }
+    if (!stored?.accessToken) return null;
+
+    const response = await fetch(`${supabaseUrl()}/auth/v1/user`, {
+      headers: authHeaders(stored.accessToken),
+    });
+    if (response.status === 401 && stored.refreshToken) {
+      const refreshed = await this.request("/token?grant_type=refresh_token", {
+        refresh_token: stored.refreshToken,
+      });
+      persistSession(refreshed);
+      return identityFromUser(refreshed.user, "supabase");
+    }
+    if (!response.ok) {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+    const user = await response.json();
+    return identityFromUser(user, "supabase");
+  }
+
+  async signOut() {
+    let stored = null;
+    try {
+      stored = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) || "null");
+    } catch {}
+    if (stored?.accessToken) {
+      await fetch(`${supabaseUrl()}/auth/v1/logout`, {
+        method: "POST",
+        headers: authHeaders(stored.accessToken),
+      }).catch(() => {});
+    }
+    localStorage.removeItem(SESSION_STORAGE_KEY);
   }
 }
