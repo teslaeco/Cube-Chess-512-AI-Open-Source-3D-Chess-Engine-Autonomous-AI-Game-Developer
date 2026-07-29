@@ -7,6 +7,23 @@ import { OnlineMenuEnhancer } from "./online/OnlineMenuEnhancer.js";
 import { registerServiceWorker } from "./pwa/registerServiceWorker.js";
 
 const root = document.querySelector("#app");
+
+// The real authentication dialog must remain enabled for users, but browser E2E
+// tests need a deterministic authenticated identity before they interact with the
+// menu and canvas. This branch exists only in Vite development builds and is
+// removed from the production bundle.
+if (import.meta.env.DEV && new URLSearchParams(window.location.search).get("e2e") === "1") {
+  sessionStorage.setItem(
+    "cubeChessIdentity",
+    JSON.stringify({
+      mode: "guest",
+      provider: "guest",
+      playerId: "guest-e2e",
+      displayName: "E2E Guest",
+    }),
+  );
+}
+
 const application = new CubeChessApplication(root);
 const onlineMenu = new OnlineMenuEnhancer(root);
 const authGate = new AuthGate(root, (identity) => {
