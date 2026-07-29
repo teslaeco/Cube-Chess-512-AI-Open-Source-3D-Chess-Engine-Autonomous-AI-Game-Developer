@@ -1,9 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { ROOM_INVITE_TTL_MS, RoomInvitationStore } from "./RoomInvitations.js";
+import {
+  ROOM_INVITE_TTL_MS,
+  RoomInvitationStore,
+  type RoomInviteRole,
+} from "./RoomInvitations.js";
 
 const token = "abcdefghijklmnopqrstuvwxyz012345";
 
-function createInvite(store: RoomInvitationStore, overrides: Record<string, unknown> = {}) {
+type InviteInputOverrides = Partial<{
+  inviteId: unknown;
+  roomKey: unknown;
+  invitedBy: unknown;
+  invitedPlayerId: unknown;
+  role: RoomInviteRole;
+  token: unknown;
+  now: number;
+  ttlMs: number;
+}>;
+
+function createInvite(store: RoomInvitationStore, overrides: InviteInputOverrides = {}) {
   return store.create({
     inviteId: "invite_1",
     roomKey: "ABC123",
