@@ -25,6 +25,23 @@ if (import.meta.env.DEV && new URLSearchParams(window.location.search).get("e2e"
 }
 
 const application = new CubeChessApplication(root);
+
+// Attract mode may still be animating a piece when the player presses Start.
+// Settle every active animation before the new position is synchronized so no
+// model remains suspended above the board and raycasting starts deterministically.
+const rendererStartGame = application.renderer.startGame.bind(application.renderer);
+application.renderer.startGame = (config) => {
+  const pieceRenderer = application.renderer.pieceRenderer;
+  for (const animation of pieceRenderer.animations.values()) {
+    animation.object.position.copy(animation.to);
+    pieceRenderer.removeMoveAura(animation.object);
+    pieceRenderer.setBlueHighlight(animation.object, false, 0);
+    animation.object.scale.setScalar(1);
+  }
+  pieceRenderer.animations.clear();
+  rendererStartGame(config);
+};
+
 const onlineMenu = new OnlineMenuEnhancer(root);
 const authGate = new AuthGate(root, (identity) => {
   application.identity = identity;
