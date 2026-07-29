@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MATCHMAKING_INITIAL_RATING_RANGE,
   MatchmakingQueue,
-} from "./MatchmakingQueue";
+} from "./MatchmakingQueue.js";
 
 describe("MatchmakingQueue", () => {
   it("matches compatible players and removes them atomically", () => {
