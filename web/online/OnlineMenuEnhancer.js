@@ -14,14 +14,20 @@ function multiplayerWebSocketUrl() {
 }
 
 function identity() {
-  try {
-    return JSON.parse(sessionStorage.getItem(IDENTITY_KEY) || "null");
-  } catch {
-    return null;
+  for (const storage of [localStorage, sessionStorage]) {
+    try {
+      const value = JSON.parse(storage.getItem(IDENTITY_KEY) || "null");
+      if (value) return value;
+    } catch {
+      // Ignore invalid legacy identity values and continue with the other store.
+    }
   }
+  return null;
 }
 
 function playerId() {
+  const account = identity();
+  if (account?.playerId) return account.playerId;
   let value = sessionStorage.getItem(PLAYER_ID_KEY);
   if (!value) {
     value = `guest_${crypto.randomUUID().replace(/-/g, "")}`;
@@ -41,11 +47,34 @@ function invitationToken(value) {
   }
 }
 
+function roomPlayers(state) {
+  const players = state?.players;
+  if (!players) return { white: false, black: false, readyWhite: false, readyBlack: false };
+  if (Array.isArray(players)) {
+    const white = players.find((entry) => entry.role === "white");
+    const black = players.find((entry) => entry.role === "black");
+    return {
+      white: Boolean(white),
+      black: Boolean(black),
+      readyWhite: white?.ready === true,
+      readyBlack: black?.ready === true,
+    };
+  }
+  return {
+    white: players.white === true,
+    black: players.black === true,
+    readyWhite: players.ready?.white === true,
+    readyBlack: players.ready?.black === true,
+  };
+}
+
 export class OnlineMenuEnhancer {
-  constructor(root) {
+  constructor(root, onStartGame = () => {}) {
     this.root = root;
+    this.onStartGame = onStartGame;
     this.socket = null;
     this.room = null;
+    this.latestState = null;
     this.pendingMessage = null;
     this.observer = new MutationObserver(() => this.refresh());
     this.observer.observe(root, { childList: true, subtree: true, attributes: true });
@@ -87,9 +116,15 @@ export class OnlineMenuEnhancer {
       </div>
       <div class="online-room-card" data-online-room hidden>
         <div><small>Kod pokoju</small><strong data-room-code></strong></div>
-        <div><small>Rola</small><strong data-room-role>—</strong></div>
-        <div><small>Status</small><strong data-room-status>Łączenie…</strong></div>
-        <div class="online-room-buttons"><button data-copy-invite>Kopiuj link zaproszenia</button><button data-ready-player>Gotowy</button></div>
+        <div><small>Twoja rola</small><strong data-room-role>—</strong></div>
+        <div class="online-player-slot"><small>Białe</small><strong data-player-white>Oczekiwanie na gracza</strong></div>
+        <div class="online-player-slot"><small>Czarne</small><strong data-player-black>Oczekiwanie na gracza</strong></div>
+        <div class="online-room-status"><small>Status</small><strong data-room-status>Łączenie…</strong></div>
+        <div class="online-room-buttons">
+          <button data-copy-invite>Kopiuj link zaproszenia</button>
+          <button data-ready-player>Ustaw gotowość</button>
+          <button class="online-start-game" data-start-online-game disabled>Rozpocznij grę</button>
+        </div>
       </div>
       <p class="online-server-status online" data-online-status>Publiczny serwer multiplayer jest gotowy. Utwórz pokój albo dołącz kodem i tokenem.</p>`;
     panel.prepend(lobby);
@@ -185,24 +220,46 @@ export class OnlineMenuEnhancer {
 
     if (message.type === "room-created") {
       this.room = message;
+      this.latestState = message.state || null;
       this.updateRoom(message.roomCode, message.role, "Pokój utworzony. Wyślij link drugiemu graczowi.");
+      this.updatePlayers(message.state);
       return;
     }
 
     if (message.type === "joined" || message.type === "reconnected") {
       this.room = { ...this.room, ...message };
+      this.latestState = message.state || this.latestState;
       this.updateRoom(this.room?.roomCode || this.root.querySelector("[data-online-room]")?.dataset.roomCode, message.role, "Dołączono do pokoju. Ustaw gotowość.");
+      this.updatePlayers(message.state);
       return;
     }
 
     if (message.type === "state") {
-      const players = message.state?.players || [];
-      const readyCount = players.filter((entry) => entry.ready).length;
-      const status = players.length >= 2 && readyCount >= 2
-        ? "Obaj gracze gotowi — partia może się rozpocząć."
-        : `Gracze: ${players.length}/2, gotowi: ${readyCount}/2`;
-      this.updateRoom(undefined, undefined, status);
+      this.latestState = message.state;
+      this.updatePlayers(message.state);
     }
+  }
+
+  updatePlayers(state) {
+    const card = this.root.querySelector("[data-online-room]");
+    if (!card || !state) return;
+    const players = roomPlayers(state);
+    const playerCount = Number(players.white) + Number(players.black);
+    const readyCount = Number(players.readyWhite) + Number(players.readyBlack);
+    card.querySelector("[data-player-white]").textContent = players.white
+      ? players.readyWhite ? "Gracz gotowy ✓" : "Gracz dołączył"
+      : "Oczekiwanie na gracza";
+    card.querySelector("[data-player-black]").textContent = players.black
+      ? players.readyBlack ? "Gracz gotowy ✓" : "Gracz dołączył"
+      : "Oczekiwanie na gracza";
+
+    const start = card.querySelector("[data-start-online-game]");
+    start.disabled = state.started !== true;
+    start.textContent = state.started ? "Wejdź do gry" : "Rozpocznij grę";
+    const status = state.started
+      ? "Obaj gracze są gotowi. Możesz wejść na planszę."
+      : `Gracze: ${playerCount}/2, gotowi: ${readyCount}/2`;
+    this.updateRoom(undefined, undefined, status);
   }
 
   updateRoom(code, role, status) {
@@ -226,6 +283,7 @@ export class OnlineMenuEnhancer {
   async click(event) {
     const copy = event.target.closest("[data-copy-invite]");
     const ready = event.target.closest("[data-ready-player]");
+    const start = event.target.closest("[data-start-online-game]");
     if (copy) {
       if (!this.room?.inviteToken) {
         this.setStatus("Link zaproszenia jest dostępny tylko dla twórcy pokoju.", "offline");
@@ -247,7 +305,25 @@ export class OnlineMenuEnhancer {
       }
       this.socket.send(JSON.stringify({ type: "ready", ready: isReady }));
       ready.classList.toggle("ready", isReady);
-      ready.textContent = isReady ? "Gotowy ✓" : "Gotowy";
+      ready.textContent = isReady ? "Gotowy ✓" : "Ustaw gotowość";
+    }
+    if (start) {
+      if (start.disabled || this.latestState?.started !== true) {
+        this.setStatus("Do rozpoczęcia partii potrzebnych jest dwóch gotowych graczy.", "offline");
+        return;
+      }
+      const player = identity();
+      const role = this.room?.role || "spectator";
+      this.onStartGame({
+        mode: "online",
+        role,
+        roomCode: this.room?.roomCode,
+        region: this.room?.region,
+        socket: this.socket,
+        state: this.latestState,
+        displayName: player?.displayName || "Gracz online",
+      });
+      this.setStatus("Partia online rozpoczęta.", "online");
     }
   }
 
