@@ -44,11 +44,18 @@ export function parseStoredIdentity(value) {
     if (typeof identity.playerId !== "string" || !identity.playerId) return null;
     if (identity.mode !== "guest" && identity.mode !== "account") return null;
     return identity;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export function createGuestIdentity(randomUUID = () => crypto.randomUUID()) {
-  return { mode: "guest", provider: "guest", playerId: `guest-${randomUUID()}`, displayName: "Gość" };
+  return {
+    mode: "guest",
+    provider: "guest",
+    playerId: `guest-${randomUUID()}`,
+    displayName: "Gość",
+  };
 }
 
 function providerMarkup(provider) {
@@ -56,7 +63,12 @@ function providerMarkup(provider) {
 }
 
 function accountForm(mode) {
-  const title = mode === "register" ? "Załóż konto" : mode === "reset" ? "Zresetuj hasło" : "Zaloguj e-mailem";
+  const title =
+    mode === "register"
+      ? "Załóż konto"
+      : mode === "reset"
+        ? "Zresetuj hasło"
+        : "Zaloguj e-mailem";
   return `<form class="auth-account-form" data-account-form data-mode="${mode}">
     <div class="auth-form-heading"><strong>${title}</strong><button type="button" data-account-close aria-label="Zamknij">×</button></div>
     ${mode === "register" ? `<label>Nazwa gracza<input name="displayName" required minlength="2" maxlength="40" autocomplete="nickname"></label>` : ""}
@@ -91,9 +103,10 @@ export class AuthGate {
       <div data-account-panel></div>
       <div class="auth-divider"><span>lub</span></div>
       <button type="button" class="auth-guest" data-auth="guest">Zagraj jako gość <span aria-hidden="true">→</span></button>
-      <p class="auth-note" data-auth-note>${authBackendConfigured() ? "Połączenie z serwerem kont jest skonfigurowane." : "Tryb gościa działa od razu. Rejestracja i logowanie wymagają publicznego backendu."}</p>
+      <p class="auth-note" data-auth-note>${authBackendConfigured() ? "Połączenie z Supabase Auth jest skonfigurowane." : "Tryb gościa działa od razu. Rejestracja i logowanie wymagają publicznej konfiguracji Supabase."}</p>
     </div>`;
     container.append(this.element);
+
     this.handleClick = (event) => {
       const moreButton = event.target.closest("[data-auth-more]");
       if (moreButton) {
@@ -104,8 +117,14 @@ export class AuthGate {
         return;
       }
       const account = event.target.closest("[data-account]");
-      if (account) { this.showAccountForm(account.dataset.account); return; }
-      if (event.target.closest("[data-account-close]")) { this.element.querySelector("[data-account-panel]").innerHTML = ""; return; }
+      if (account) {
+        this.showAccountForm(account.dataset.account);
+        return;
+      }
+      if (event.target.closest("[data-account-close]")) {
+        this.element.querySelector("[data-account-panel]").innerHTML = "";
+        return;
+      }
       const button = event.target.closest("[data-auth]");
       if (button) this.choose(button.dataset.auth);
     };
@@ -116,8 +135,42 @@ export class AuthGate {
     };
     this.element.addEventListener("click", this.handleClick);
     this.element.addEventListener("submit", this.handleSubmit);
-    const identity = parseStoredIdentity(sessionStorage.getItem(SESSION_KEY));
-    if (identity) this.complete(identity);
+    void this.restore();
+  }
+
+  async restore() {
+    const note = this.element.querySelector("[data-auth-note]");
+    note.textContent = "Sprawdzanie sesji…";
+    try {
+      const oauthIdentity = await this.api.restoreSessionFromUrl();
+      if (oauthIdentity) {
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify(oauthIdentity));
+        this.complete(oauthIdentity);
+        return;
+      }
+
+      const storedIdentity = parseStoredIdentity(sessionStorage.getItem(SESSION_KEY));
+      if (storedIdentity?.mode === "guest") {
+        this.complete(storedIdentity);
+        return;
+      }
+
+      const sessionIdentity = await this.api.restoreStoredSession();
+      if (sessionIdentity) {
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionIdentity));
+        this.complete(sessionIdentity);
+        return;
+      }
+
+      sessionStorage.removeItem(SESSION_KEY);
+      note.textContent = authBackendConfigured()
+        ? "Zaloguj się lub rozpocznij jako gość."
+        : "Tryb gościa działa od razu. Supabase Auth nie jest skonfigurowany.";
+    } catch (error) {
+      sessionStorage.removeItem(SESSION_KEY);
+      note.textContent = error instanceof Error ? error.message : "Nie udało się odtworzyć sesji.";
+      note.setAttribute("role", "alert");
+    }
   }
 
   showAccountForm(mode) {
@@ -146,7 +199,9 @@ export class AuthGate {
     } catch (error) {
       message.textContent = error instanceof Error ? error.message : "Nie udało się wykonać operacji.";
       message.setAttribute("role", "alert");
-    } finally { submit.disabled = false; }
+    } finally {
+      submit.disabled = false;
+    }
   }
 
   choose(provider) {
@@ -159,7 +214,7 @@ export class AuthGate {
     if (!authBackendConfigured()) {
       const note = this.element.querySelector("[data-auth-note]");
       const label = ALL_PROVIDERS.find((entry) => entry.id === provider)?.label ?? provider;
-      note.textContent = `Logowanie przez ${label} wymaga uruchomionego backendu i kluczy dostawcy. Na razie wybierz tryb gościa.`;
+      note.textContent = `Logowanie przez ${label} wymaga konfiguracji Supabase i danych dostawcy. Na razie wybierz tryb gościa.`;
       note.setAttribute("role", "alert");
       return;
     }
@@ -171,6 +226,15 @@ export class AuthGate {
     this.element.classList.add("auth-gate-hidden");
     this.element.setAttribute("aria-hidden", "true");
     this.onAuthenticated(identity);
+  }
+
+  async signOut() {
+    await this.api.signOut();
+    sessionStorage.removeItem(SESSION_KEY);
+    this.identity = null;
+    this.element.classList.remove("auth-gate-hidden");
+    this.element.removeAttribute("aria-hidden");
+    this.element.querySelector("[data-auth-note]").textContent = "Wylogowano pomyślnie.";
   }
 
   dispose() {
