@@ -37,7 +37,20 @@ application.renderer.startGame = (config) => {
   rendererStartGame(config);
 };
 
-const onlineMenu = new OnlineMenuEnhancer(root);
+const onlineMenu = new OnlineMenuEnhancer(root, (onlineGame) => {
+  const isWhite = onlineGame.role === "white";
+  application.onlineGame = onlineGame;
+  root.dataset.gameMode = "online";
+  root.dataset.onlineRole = onlineGame.role;
+  root.dataset.onlineRoom = onlineGame.roomCode || "";
+  application.startGame({
+    mode: "local",
+    humanSide: isWhite ? "white" : "black",
+    whiteName: isWhite ? onlineGame.displayName : "Gracz online",
+    blackName: isWhite ? "Gracz online" : onlineGame.displayName,
+    clockMinutes: 0,
+  });
+});
 let profileMenu;
 const authGate = new AuthGate(root, (identity) => {
   application.identity = identity;
