@@ -1,0 +1,82 @@
+.user-profile-menu {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1200;
+  width: min(22rem, calc(100vw - 2rem));
+  color: #f5f7fb;
+}
+
+.user-profile-trigger,
+.user-profile-panel {
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(10,15,24,.92);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 50px rgba(0,0,0,.36);
+}
+
+.user-profile-trigger {
+  margin-left: auto;
+  min-width: 12rem;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .65rem .8rem;
+  border-radius: 999px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.user-profile-avatar {
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg,#3456ff,#55c4ff);
+  background-size: cover;
+  background-position: center;
+  font-weight: 800;
+}
+
+.user-profile-avatar.large { width: 3.5rem; height: 3.5rem; }
+.user-profile-avatar.has-image { color: transparent; }
+.user-profile-summary { display: grid; text-align: left; min-width: 0; }
+.user-profile-summary strong,
+.user-profile-summary small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-profile-summary small,
+.user-profile-panel small { color: rgba(255,255,255,.68); }
+
+.user-profile-panel {
+  margin-top: .55rem;
+  border-radius: 1.25rem;
+  padding: 1rem;
+}
+
+.user-profile-panel header { display: flex; gap: .85rem; align-items: center; padding-bottom: .85rem; }
+.user-profile-panel header > div:last-child { display: grid; min-width: 0; }
+.user-profile-panel nav { display: grid; gap: .45rem; }
+.user-profile-panel nav button {
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.05);
+  color: inherit;
+  border-radius: .8rem;
+  padding: .75rem .85rem;
+  text-align: left;
+  cursor: pointer;
+}
+.user-profile-panel nav button:hover { background: rgba(255,255,255,.1); }
+.user-profile-panel nav button.danger { color: #ff9d9d; }
+.user-profile-details { margin-top: .9rem; padding-top: .9rem; border-top: 1px solid rgba(255,255,255,.1); }
+.user-profile-details h2 { margin: 0 0 .7rem; font-size: 1.05rem; }
+.user-profile-details dl { display: grid; gap: .55rem; margin: 0; }
+.user-profile-details dl div { display: flex; justify-content: space-between; gap: 1rem; }
+.user-profile-details dt { color: rgba(255,255,255,.68); }
+.user-profile-details dd { margin: 0; text-align: right; }
+.user-profile-details p { color: rgba(255,255,255,.65); font-size: .83rem; line-height: 1.45; }
+
+@media (max-width: 640px) {
+  .user-profile-menu { top: .6rem; right: .6rem; width: calc(100vw - 1.2rem); }
+  .user-profile-trigger { min-width: 0; }
+  .user-profile-summary small { display: none; }
+}
