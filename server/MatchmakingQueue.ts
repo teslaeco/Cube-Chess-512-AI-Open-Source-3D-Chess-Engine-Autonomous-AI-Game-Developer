@@ -109,11 +109,18 @@ export class MatchmakingQueue {
 
     for (let firstIndex = 0; firstIndex < ordered.length; firstIndex += 1) {
       const first = ordered[firstIndex];
+      if (!first) {
+        continue;
+      }
+
       let best: QueuedPlayer | null = null;
       let bestDifference = Number.POSITIVE_INFINITY;
 
       for (let secondIndex = firstIndex + 1; secondIndex < ordered.length; secondIndex += 1) {
         const candidate = ordered[secondIndex];
+        if (!candidate) {
+          continue;
+        }
         if (candidate.mode !== first.mode || candidate.timeControl !== first.timeControl) {
           continue;
         }
