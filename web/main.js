@@ -6,6 +6,11 @@ import { CubeChessApplication } from "./app/CubeChessApplication.js";
 import { AuthGate } from "./auth/AuthGate.js";
 import { UserProfileMenu } from "./auth/UserProfileMenu.js";
 import { OnlineMenuEnhancer } from "./online/OnlineMenuEnhancer.js";
+import {
+  inferAuthoritativeMove,
+  oppositeColor,
+  shouldApplyAuthoritativeState,
+} from "./online/authoritativeSync.js";
 import { registerServiceWorker } from "./pwa/registerServiceWorker.js";
 
 const root = document.querySelector("#app");
@@ -37,25 +42,6 @@ application.renderer.startGame = (config) => {
   rendererStartGame(config);
 };
 
-function opposite(color) {
-  return color === "white" ? "black" : "white";
-}
-
-function squareOf(piece) {
-  return piece?.position?.square3D || "";
-}
-
-function inferAuthoritativeMove(state) {
-  const localById = new Map(application.presentation.pieces.map((piece) => [piece.id, piece]));
-  for (const piece of state?.pieces || []) {
-    const local = localById.get(piece.id);
-    if (local && squareOf(local) !== squareOf(piece)) {
-      return { pieceId: piece.id, square3D: squareOf(piece) };
-    }
-  }
-  return null;
-}
-
 function hardSynchronizeAuthoritativeState(state) {
   const presentation = application.presentation;
   const remoteIds = new Set((state.pieces || []).map((piece) => piece.id));
@@ -63,7 +49,7 @@ function hardSynchronizeAuthoritativeState(state) {
     if (!remoteIds.has(piece.id) && !presentation.capturedPieces.some((captured) => captured.id === piece.id)) {
       presentation.capturedPieces.push({
         ...structuredClone(piece),
-        capturedBy: opposite(piece.color),
+        capturedBy: oppositeColor(piece.color),
         capturedOnMove: Math.max(1, Math.ceil(Number(state.sequence || 1) / 2)),
         captureIndex: presentation.capturedPieces.length,
       });
@@ -83,14 +69,15 @@ function hardSynchronizeAuthoritativeState(state) {
 
 function applyAuthoritativeState(state) {
   const onlineGame = application.onlineGame;
-  if (!onlineGame || state?.started !== true) return;
-  const remoteSequence = Number(state.sequence) || 0;
   const localSequence = Number(application.presentation.moveSequence) || 0;
-  if (remoteSequence <= localSequence) return;
+  if (!onlineGame || !shouldApplyAuthoritativeState(localSequence, state)) return;
+  const remoteSequence = Number(state.sequence) || 0;
 
   onlineGame.applyingRemoteState = true;
   try {
-    const move = remoteSequence === localSequence + 1 ? inferAuthoritativeMove(state) : null;
+    const move = remoteSequence === localSequence + 1
+      ? inferAuthoritativeMove(application.presentation.pieces, state)
+      : null;
     const executed = move ? application.renderer.executeAutomatedMove(move) : false;
     if (!executed || application.presentation.moveSequence !== remoteSequence) {
       hardSynchronizeAuthoritativeState(state);
