@@ -4,6 +4,7 @@ import { PieceGeometryFactory } from "./PieceGeometryFactory.js";
 import { PieceRenderer } from "./PieceRenderer.js";
 import { SceneController } from "./SceneController.js";
 import { SelectionController } from "./SelectionController.js";
+import { executeAutomatedMovePreservingLevel } from "./automatedMove.js";
 
 export class ChessRenderer {
   constructor(container, presentation, onStateChange) {
@@ -110,7 +111,7 @@ export class ChessRenderer {
   }
 
   executeAutomatedMove(move) {
-    const executed = this.presentation.executeMove(move, { allowBusy: true });
+    const executed = executeAutomatedMovePreservingLevel(this.presentation, move);
     if (executed) this.refresh();
     return executed;
   }
