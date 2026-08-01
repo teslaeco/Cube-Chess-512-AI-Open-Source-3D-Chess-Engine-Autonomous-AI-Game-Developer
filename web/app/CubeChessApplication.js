@@ -5,6 +5,8 @@ import { SaveRepository } from "../storage/SaveRepository.js";
 import { GameHud } from "../ui/GameHud.js";
 import { GamePresentation } from "./GamePresentation.js";
 
+const AI_WATCHDOG_MS = 8_000;
+
 function downloadJson(filename, payload) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
@@ -31,6 +33,7 @@ export class CubeChessApplication {
     this.aiRequestPending = false;
     this.lastAutosavedMove = 0;
     this.autosaveTimer = null;
+    this.aiWatchdogTimer = null;
     this.applyStoredAccessibility();
 
     this.hud = new GameHud(root, {
@@ -94,8 +97,14 @@ export class CubeChessApplication {
     );
   }
 
+  clearAiWatchdog() {
+    window.clearTimeout(this.aiWatchdogTimer);
+    this.aiWatchdogTimer = null;
+  }
+
   startGame(config) {
     this.attractMode.stop();
+    this.clearAiWatchdog();
     this.ai.cancel();
     this.aiRequestPending = false;
     this.renderer.startGame(config);
@@ -132,6 +141,10 @@ export class CubeChessApplication {
     }, 350);
   }
 
+  legalAiFallback() {
+    return this.presentation.getLegalMovesForSide()[0] ?? null;
+  }
+
   async requestAiMove() {
     if (this.aiRequestPending) return;
     this.aiRequestPending = true;
@@ -141,13 +154,25 @@ export class CubeChessApplication {
     const requestedGameId = this.presentation.gameId;
     const requestedSide = this.presentation.sideToMove;
     let move = null;
+    let timedOut = false;
+
     try {
-      move = await this.ai.chooseMove(this.presentation.snapshot());
+      move = await Promise.race([
+        this.ai.chooseMove(this.presentation.snapshot()),
+        new Promise((resolve) => {
+          this.aiWatchdogTimer = window.setTimeout(() => {
+            timedOut = true;
+            resolve(null);
+          }, AI_WATCHDOG_MS);
+        }),
+      ]);
     } catch (error) {
       console.error("AI worker failed; using the first legal fallback move", error);
-      move = this.presentation.getLegalMovesForSide()[0] ?? null;
+    } finally {
+      this.clearAiWatchdog();
+      this.aiRequestPending = false;
     }
-    this.aiRequestPending = false;
+
     if (
       this.presentation.gameId !== requestedGameId ||
       this.presentation.sideToMove !== requestedSide ||
@@ -155,9 +180,25 @@ export class CubeChessApplication {
     ) {
       return;
     }
+
+    if (timedOut || !move) {
+      this.ai.cancel();
+      move = this.legalAiFallback();
+    }
+
     this.presentation.setBusy(false);
-    if (move) this.renderer.executeAutomatedMove(move);
-    else this.renderer.refresh();
+    let executed = move ? this.renderer.executeAutomatedMove(move) : false;
+    if (!executed) {
+      const fallback = this.legalAiFallback();
+      if (fallback && fallback !== move) {
+        executed = this.renderer.executeAutomatedMove(fallback);
+      }
+    }
+
+    if (!executed) {
+      this.presentation.message = null;
+      this.renderer.refresh();
+    }
   }
 
   async saveGame() {
@@ -171,6 +212,7 @@ export class CubeChessApplication {
     const record = await this.saveRepository.get(id);
     if (!record) return false;
     this.attractMode.stop();
+    this.clearAiWatchdog();
     this.ai.cancel();
     this.aiRequestPending = false;
     this.renderer.loadGame(record.payload);
@@ -214,6 +256,7 @@ export class CubeChessApplication {
 
   dispose() {
     window.clearTimeout(this.autosaveTimer);
+    this.clearAiWatchdog();
     this.attractMode.dispose();
     this.ai.dispose();
     this.renderer.dispose();

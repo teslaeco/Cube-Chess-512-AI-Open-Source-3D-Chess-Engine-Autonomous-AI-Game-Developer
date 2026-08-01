@@ -7,6 +7,26 @@ export function isClickGesture(start, end, threshold = POINTER_DRAG_THRESHOLD) {
   return Math.hypot(end.clientX - start.clientX, end.clientY - start.clientY) <= threshold;
 }
 
+export function selectNearestMetadata(intersections, activeLevel, findMetadata) {
+  const seen = new Set();
+  for (const intersection of intersections) {
+    const metadata = findMetadata(intersection.object);
+    if (!metadata || metadata.kind === "grid" || metadata.kind === "captured") continue;
+
+    const key = metadata.kind === "piece"
+      ? `piece:${metadata.piece?.id ?? "unknown"}`
+      : `square:${metadata.square?.square3D ?? "unknown"}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const level = metadata.kind === "piece"
+      ? metadata.piece?.position?.z
+      : metadata.square?.z;
+    if (level === activeLevel) return metadata;
+  }
+  return null;
+}
+
 export class SelectionController {
   constructor(
     canvas,
@@ -60,24 +80,11 @@ export class SelectionController {
     );
     this.raycaster.setFromCamera(this.pointer, this.camera);
 
-    const activeLevel = this.getActiveLevel();
-    const candidates = this.raycaster
-      .intersectObjects(this.roots, true)
-      .map((candidate) => this.findMetadata(candidate.object))
-      .filter(
-        (metadata) =>
-          metadata &&
-          metadata.kind !== "grid" &&
-          metadata.kind !== "captured" &&
-          (metadata.kind === "piece"
-            ? metadata.piece.position.z === activeLevel
-            : metadata.square.z === activeLevel),
-      );
-
-    const selected =
-      candidates.find((metadata) => metadata.kind === "piece") ??
-      candidates.find((metadata) => metadata.kind === "square") ??
-      null;
+    const selected = selectNearestMetadata(
+      this.raycaster.intersectObjects(this.roots, true),
+      this.getActiveLevel(),
+      (object) => this.findMetadata(object),
+    );
     this.onSelection(selected);
   }
 

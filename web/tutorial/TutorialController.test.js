@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  TutorialController,
   classifyMove,
   loadTutorialProgress,
   pieceExplanationKey,
@@ -56,5 +57,14 @@ describe("Cube Chess 512 tutorial helpers", () => {
       complete: false,
       autoExplain: true,
     });
+  });
+
+  it("activates only in the dedicated tutorial game mode", () => {
+    const controller = Object.create(TutorialController.prototype);
+    const playing = { appState: "playing", menuOpen: false };
+    expect(controller.isTutorialState({ ...playing, gameConfig: { mode: "tutorial" } })).toBe(true);
+    expect(controller.isTutorialState({ ...playing, gameConfig: { mode: "computer" } })).toBe(false);
+    expect(controller.isTutorialState({ ...playing, gameConfig: { mode: "local" } })).toBe(false);
+    expect(controller.isTutorialState({ ...playing, menuOpen: true, gameConfig: { mode: "tutorial" } })).toBe(false);
   });
 });
