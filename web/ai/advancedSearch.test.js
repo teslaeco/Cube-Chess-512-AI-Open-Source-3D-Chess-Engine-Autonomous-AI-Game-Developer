@@ -7,7 +7,7 @@ import {
   positionKey,
 } from "./advancedSearch.js";
 
-describe("advanced hard AI", () => {
+describe("strategic hard AI", () => {
   it("creates stable position keys independent of piece array order", () => {
     const pieces = createInitialPieces();
     const forward = createBoard(pieces);
@@ -26,7 +26,7 @@ describe("advanced hard AI", () => {
     expect(Math.abs(blackScore)).toBeCloseTo(0, 10);
   });
 
-  it("returns a legal serialized move and search diagnostics", () => {
+  it("returns a legal serialized move and strategic search diagnostics", () => {
     const move = chooseAdvancedMove(createInitialPieces(), "white", {
       maxDepth: 1,
       quiescenceDepth: 0,
@@ -38,7 +38,7 @@ describe("advanced hard AI", () => {
       pieceId: expect.any(String),
       square3D: expect.any(String),
       search: {
-        engine: "advanced-alpha-beta-tt",
+        engine: "strategic-alpha-beta-tt",
         completedDepth: 1,
         nodes: expect.any(Number),
       },
@@ -46,9 +46,28 @@ describe("advanced hard AI", () => {
     expect(move.search.nodes).toBeGreaterThan(0);
   });
 
+  it("uses recent move history without losing a legal move", () => {
+    const first = chooseAdvancedMove(createInitialPieces(), "white", {
+      maxDepth: 1,
+      quiescenceDepth: 0,
+      milliseconds: 60_000,
+      now: () => 0,
+    });
+    const next = chooseAdvancedMove(createInitialPieces(), "white", {
+      maxDepth: 1,
+      quiescenceDepth: 0,
+      milliseconds: 60_000,
+      now: () => 0,
+      recentAiPieceIds: [first.pieceId, first.pieceId, first.pieceId],
+    });
+
+    expect(next?.pieceId).toEqual(expect.any(String));
+    expect(next?.square3D).toEqual(expect.any(String));
+  });
+
   it("honours cancellation without losing the legal fallback move", () => {
     const move = chooseAdvancedMove(createInitialPieces(), "white", {
-      maxDepth: 6,
+      maxDepth: 7,
       isCancelled: () => true,
       now: () => 0,
     });
