@@ -7,6 +7,16 @@ import {
   positionKey,
 } from "./advancedSearch.js";
 
+function piece(id, type, color, x, y, z, hasMoved = false) {
+  return {
+    id,
+    type,
+    color,
+    hasMoved,
+    position: { x, y, z },
+  };
+}
+
 describe("strategic hard AI", () => {
   it("creates stable position keys independent of piece array order", () => {
     const pieces = createInitialPieces();
@@ -44,6 +54,30 @@ describe("strategic hard AI", () => {
       },
     });
     expect(move.search.nodes).toBeGreaterThan(0);
+  });
+
+  it("keeps the searched tactical result authoritative over root heuristics", () => {
+    const pieces = [
+      piece("white-king", "king", "white", 7, 0, 0),
+      piece("white-queen", "queen", "white", 0, 3, 0),
+      piece("black-king", "king", "black", 7, 7, 7),
+      piece("black-rook", "rook", "black", 0, 7, 0, true),
+      piece("black-pawn", "pawn", "black", 4, 6, 0),
+    ];
+
+    const move = chooseAdvancedMove(pieces, "black", {
+      maxDepth: 2,
+      quiescenceDepth: 2,
+      milliseconds: 60_000,
+      now: () => 0,
+      recentAiPieceIds: ["black-rook", "black-rook", "black-rook"],
+    });
+
+    expect(move).toMatchObject({
+      pieceId: "black-rook",
+      capturedPieceId: "white-queen",
+      to: { x: 0, y: 3, z: 0 },
+    });
   });
 
   it("uses recent move history without losing a legal move", () => {
