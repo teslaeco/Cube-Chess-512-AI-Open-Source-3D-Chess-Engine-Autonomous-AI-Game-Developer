@@ -24,10 +24,16 @@ function phaseOf(board) {
   return Math.max(0, Math.min(1, remaining / bothSides));
 }
 
-function movementProgress(piece) {
+function pawnAdvance(piece) {
+  return piece.color === "white" ? piece.position.y : 7 - piece.position.y;
+}
+
+function movementProgress(piece, connected) {
   if (piece.type !== "pawn") return 0;
-  const forward = piece.color === "white" ? piece.position.y : 7 - piece.position.y;
-  return forward * 8 + piece.position.z * 5;
+  const forward = pawnAdvance(piece);
+  const usefulAdvance = Math.min(forward, 3) * 4 + Math.min(piece.position.z, 2) * 3;
+  const overextension = Math.max(0, forward - 3) + Math.max(0, piece.position.z - 2);
+  return usefulAdvance - (connected ? overextension * 5 : overextension * 24);
 }
 
 function pawnStructure(pieces, color) {
@@ -56,7 +62,7 @@ function pawnStructure(pieces, color) {
       }
     }
     score += connected ? 14 : -9;
-    score += movementProgress(pawn);
+    score += movementProgress(pawn, connected);
   }
   return score;
 }
@@ -107,6 +113,7 @@ function developmentScore(pieces, color, openingPhase) {
     }
     if (piece.type === "rook" && piece.hasMoved) score += 10;
   }
+  score += Math.round(developedMinor * developedMinor * 12 * openingPhase);
   return score;
 }
 
