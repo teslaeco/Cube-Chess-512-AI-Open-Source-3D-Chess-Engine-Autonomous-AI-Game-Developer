@@ -28,14 +28,7 @@ export function selectNearestMetadata(intersections, activeLevel, findMetadata) 
 }
 
 export class SelectionController {
-  constructor(
-    canvas,
-    camera,
-    roots,
-    getActiveLevel,
-    onSelection,
-    canSelect = () => true,
-  ) {
+  constructor(canvas, camera, roots, getActiveLevel, onSelection, canSelect = () => true) {
     this.canvas = canvas;
     this.camera = camera;
     this.roots = roots;
@@ -45,6 +38,7 @@ export class SelectionController {
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
     this.pointerStart = null;
+    this.pendingSelection = null;
     this.handlePointerDown = this.handlePointerDown.bind(this);
     this.handlePointerUp = this.handlePointerUp.bind(this);
     this.handlePointerCancel = this.handlePointerCancel.bind(this);
@@ -55,37 +49,49 @@ export class SelectionController {
 
   handlePointerDown(event) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
-    this.pointerStart = {
-      pointerId: event.pointerId,
-      clientX: event.clientX,
-      clientY: event.clientY,
-    };
+    this.pointerStart = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY };
   }
 
-  handlePointerUp(event) {
-    const end = {
-      pointerId: event.pointerId,
-      clientX: event.clientX,
-      clientY: event.clientY,
-    };
-    const start = this.pointerStart;
-    this.pointerStart = null;
-    if (!this.canSelect() || !isClickGesture(start, end)) return;
-
+  resolveSelection(event) {
     const rect = this.canvas.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
+    if (!rect.width || !rect.height) return null;
     this.pointer.set(
       ((event.clientX - rect.left) / rect.width) * 2 - 1,
       -((event.clientY - rect.top) / rect.height) * 2 + 1,
     );
     this.raycaster.setFromCamera(this.pointer, this.camera);
-
-    const selected = selectNearestMetadata(
+    return selectNearestMetadata(
       this.raycaster.intersectObjects(this.roots, true),
       this.getActiveLevel(),
       (object) => this.findMetadata(object),
     );
+  }
+
+  handlePointerUp(event) {
+    const end = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY };
+    const start = this.pointerStart;
+    this.pointerStart = null;
+    if (!isClickGesture(start, end)) return;
+
+    const selected = this.resolveSelection(event);
+    if (this.canSelect()) {
+      this.pendingSelection = null;
+      this.onSelection(selected);
+    } else if (selected) {
+      this.pendingSelection = selected;
+    }
+  }
+
+  flushPendingSelection() {
+    if (!this.pendingSelection || !this.canSelect()) return false;
+    const selected = this.pendingSelection;
+    this.pendingSelection = null;
     this.onSelection(selected);
+    return true;
+  }
+
+  clearPendingSelection() {
+    this.pendingSelection = null;
   }
 
   handlePointerCancel() {
@@ -100,6 +106,7 @@ export class SelectionController {
   }
 
   dispose() {
+    this.pendingSelection = null;
     this.canvas.removeEventListener("pointerdown", this.handlePointerDown);
     this.canvas.removeEventListener("pointerup", this.handlePointerUp);
     this.canvas.removeEventListener("pointercancel", this.handlePointerCancel);
