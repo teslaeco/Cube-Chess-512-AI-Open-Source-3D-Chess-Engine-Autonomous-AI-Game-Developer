@@ -157,6 +157,18 @@ export class TutorialController {
     return state?.gameConfig?.mode === "tutorial" && state.appState === "playing" && !state.menuOpen;
   }
 
+  leaveTutorialView() {
+    window.clearInterval(this.levelTourTimer);
+    this.levelTourTimer = null;
+    this.panel.hidden = true;
+    this.hiddenByPlayer = false;
+    this.dynamicMessage = "";
+    this.lastSelectedPieceId = null;
+    this.application.renderer.showAllLevels();
+    this.application.renderer.setActiveLevel(0);
+    this.application.renderer.cubeView();
+  }
+
   handleAction(event) {
     const action = event.target.closest("[data-action]")?.dataset.action;
     if (!action) return;
@@ -211,10 +223,8 @@ export class TutorialController {
     const wasActive = this.active;
     this.active = this.isTutorialState(state);
     if (!this.active) {
-      this.panel.hidden = true;
-      window.clearInterval(this.levelTourTimer);
-      this.levelTourTimer = null;
-      this.hiddenByPlayer = false;
+      if (wasActive) this.leaveTutorialView();
+      else this.panel.hidden = true;
       return;
     }
 
