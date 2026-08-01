@@ -5,12 +5,16 @@ import {
   orderMoves,
   serializeMove,
 } from "./searchEngine.js";
+import { chooseAdvancedMove } from "./advancedSearch.js";
 import { applyLoneKingLevelRule } from "../rules/LoneKingLevelRule.js";
 
 let generation = 0;
 
 function chooseMoveWithVariantRules(pieces, sideToMove, difficulty, options) {
-  const selected = chooseBestMove(pieces, sideToMove, difficulty, options);
+  const selected =
+    difficulty === "hard"
+      ? chooseAdvancedMove(pieces, sideToMove, options)
+      : chooseBestMove(pieces, sideToMove, difficulty, options);
   if (!selected) return null;
 
   const allowed = applyLoneKingLevelRule(pieces, sideToMove, [selected]);
