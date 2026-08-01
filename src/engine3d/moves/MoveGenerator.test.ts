@@ -42,7 +42,7 @@ describe("Cube Chess 512 movement geometry audit", () => {
   it("defines the ruleset sliding direction families", () => {
     expect(ROOK_DIRECTIONS).toHaveLength(6);
     expect(BISHOP_DIRECTIONS).toHaveLength(12);
-    expect(QUEEN_DIRECTIONS).toHaveLength(18);
+    expect(QUEEN_DIRECTIONS).toHaveLength(26);
     expect(KING_DIRECTIONS).toHaveLength(26);
     expect(KNIGHT_OFFSETS).toHaveLength(24);
 
@@ -130,13 +130,35 @@ describe("Cube Chess 512 movement geometry audit", () => {
   });
 
   describe("queen", () => {
-    it("combines the legal rook and bishop directions", () => {
+    it("slides along all 26 3D direction families", () => {
       const queen = piece("queen");
       expect(hasTarget(queen, 7, 3, 3)).toBe(true);
       expect(hasTarget(queen, 7, 7, 3)).toBe(true);
-      expect(hasTarget(queen, 7, 3, 7)).toBe(false);
-      expect(hasTarget(queen, 3, 7, 7)).toBe(false);
+      expect(hasTarget(queen, 7, 3, 7)).toBe(true);
+      expect(hasTarget(queen, 3, 7, 7)).toBe(true);
       expect(hasTarget(queen, 7, 7, 7)).toBe(true);
+    });
+
+    it("captures forward diagonally on the current and higher levels", () => {
+      const queen = piece("queen");
+      const sameLevel = piece("rook", 5, 5, 3, "black");
+      const forwardUp = piece("bishop", 3, 5, 5, "black");
+      const sidewaysUp = piece("knight", 5, 3, 5, "black");
+      const fullSpatial = piece("pawn", 1, 1, 1, "black");
+      const moves = movesFor(queen, [sameLevel, forwardUp, sidewaysUp, fullSpatial]);
+
+      for (const target of [sameLevel, forwardUp, sidewaysUp, fullSpatial]) {
+        expect(moves.find((move) => move.to.equals(target.position))?.kind).toBe("capture");
+      }
+    });
+
+    it("cannot jump over a captured piece on any queen ray", () => {
+      const queen = piece("queen");
+      const enemy = piece("pawn", 3, 5, 5, "black");
+      const moves = movesFor(queen, [enemy]);
+
+      expect(moves.find((move) => move.to.equals(enemy.position))?.kind).toBe("capture");
+      expect(hasTarget(queen, 3, 6, 6, [enemy])).toBe(false);
     });
   });
 
