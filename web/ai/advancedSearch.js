@@ -12,10 +12,10 @@ import {
 
 const MATE_SCORE = 10_000_000;
 const DEFAULT_LIMITS = Object.freeze({
-  maxDepth: 6,
-  quiescenceDepth: 5,
-  milliseconds: 6_000,
-  transpositionEntries: 120_000,
+  maxDepth: 7,
+  quiescenceDepth: 6,
+  milliseconds: 9_000,
+  transpositionEntries: 180_000,
 });
 
 function centerBonus(position) {
@@ -23,14 +23,113 @@ function centerBonus(position) {
     Math.abs(position.x - 3.5) +
     Math.abs(position.y - 3.5) +
     Math.abs(position.z - 3.5);
-  return Math.max(0, Math.round(30 - distance * 3));
+  return Math.max(0, Math.round(42 - distance * 4));
 }
 
 function developmentBonus(piece) {
   if (!piece.hasMoved) return 0;
-  if (piece.type === "knight" || piece.type === "bishop") return 14;
-  if (piece.type === "rook" || piece.type === "queen") return 5;
+  if (piece.type === "knight" || piece.type === "bishop") return 34;
+  if (piece.type === "pawn") return 12;
+  if (piece.type === "rook") return 8;
+  if (piece.type === "queen") return 3;
   return 0;
+}
+
+function undevelopedMinorCount(pieces, color) {
+  return pieces.filter(
+    (piece) =>
+      piece.color === color &&
+      (piece.type === "bishop" || piece.type === "knight") &&
+      !piece.hasMoved,
+  ).length;
+}
+
+function adjacentFriendlyScore(pieces, color) {
+  const king = pieces.find(
+    (piece) => piece.color === color && piece.type === "king",
+  );
+  if (!king) return 0;
+
+  let score = 0;
+  for (const piece of pieces) {
+    if (piece.color !== color || piece.id === king.id) continue;
+    const dx = Math.abs(piece.position.x - king.position.x);
+    const dy = Math.abs(piece.position.y - king.position.y);
+    const dz = Math.abs(piece.position.z - king.position.z);
+    if (Math.max(dx, dy, dz) > 1) continue;
+    score += piece.type === "pawn" ? 15 : 7;
+  }
+  return score;
+}
+
+function activityScore(board, color) {
+  const moves = generateLegalMovesForColor(board, color);
+  const activePieces = new Set(moves.map((move) => move.pieceId)).size;
+  return moves.length + activePieces * 12;
+}
+
+function capturePressure(board, color) {
+  const piecesById = new Map(
+    board.getAllPieces().map((piece) => [piece.id, piece]),
+  );
+  const threatened = new Map();
+  for (const move of generateLegalMovesForColor(board, color)) {
+    if (!move.capturedPieceId) continue;
+    const target = piecesById.get(move.capturedPieceId);
+    if (!target) continue;
+    threatened.set(
+      target.id,
+      Math.max(threatened.get(target.id) ?? 0, PIECE_VALUES[target.type] ?? 0),
+    );
+  }
+  return [...threatened.values()].reduce(
+    (sum, value) => sum + Math.round(value * 0.13),
+    0,
+  );
+}
+
+function armyScore(board, color) {
+  const pieces = board.getAllPieces();
+  let score = 0;
+  let movedUnits = 0;
+  let movedMinors = 0;
+  let movedPawns = 0;
+
+  for (const piece of pieces) {
+    if (piece.color !== color) continue;
+    score += centerBonus(piece.position) + developmentBonus(piece);
+    if (piece.hasMoved && piece.type !== "king") movedUnits += 1;
+    if (
+      piece.hasMoved &&
+      (piece.type === "bishop" || piece.type === "knight")
+    ) {
+      movedMinors += 1;
+    }
+    if (piece.hasMoved && piece.type === "pawn") movedPawns += 1;
+  }
+
+  score += movedUnits * 7;
+  score += movedMinors * 18;
+  score += Math.min(6, movedPawns) * 8;
+  score += adjacentFriendlyScore(pieces, color);
+  score += activityScore(board, color);
+  score += capturePressure(board, color);
+
+  const undeveloped = undevelopedMinorCount(pieces, color);
+  const queen = pieces.find(
+    (piece) => piece.color === color && piece.type === "queen",
+  );
+  if (queen?.hasMoved && undeveloped >= 3) score -= 110;
+
+  const movedPieceTypes = new Set(
+    pieces
+      .filter(
+        (piece) => piece.color === color && piece.hasMoved && piece.type !== "king",
+      )
+      .map((piece) => piece.type),
+  );
+  score += movedPieceTypes.size * 15;
+  return score;
 }
 
 export function positionKey(board, side) {
@@ -45,25 +144,56 @@ export function positionKey(board, side) {
 }
 
 export function evaluateAdvanced(board, perspective) {
-  let score = 0;
+  let material = 0;
   for (const piece of board.getAllPieces()) {
     const sign = piece.color === perspective ? 1 : -1;
-    const value =
-      PIECE_VALUES[piece.type] +
-      centerBonus(piece.position) +
-      developmentBonus(piece);
-    score += sign * value;
+    material += sign * PIECE_VALUES[piece.type];
   }
 
-  const ownMobility = generateLegalMovesForColor(board, perspective).length;
-  const enemyMobility = generateLegalMovesForColor(board, opposite(perspective)).length;
-  score += (ownMobility - enemyMobility) * 2;
+  const enemy = opposite(perspective);
+  let score = material;
+  score += armyScore(board, perspective) - armyScore(board, enemy);
 
-  const enemyStatus = evaluatePosition(board, opposite(perspective));
+  const enemyStatus = evaluatePosition(board, enemy);
   const ownStatus = evaluatePosition(board, perspective);
-  if (enemyStatus.inCheck) score += 45;
-  if (ownStatus.inCheck) score -= 55;
+  if (enemyStatus.inCheck) score += 22;
+  if (ownStatus.inCheck) score -= 85;
   return score;
+}
+
+function rootMoveBias(board, move, recentAiPieceIds = []) {
+  const movingPiece = board
+    .getAllPieces()
+    .find((piece) => piece.id === move.pieceId);
+  if (!movingPiece) return 0;
+
+  let bias = centerBonus(move.to ?? movingPiece.position);
+  const isTactical = Boolean(move.capturedPieceId || move.kind === "promotion");
+  const repeatCount = recentAiPieceIds.filter(
+    (pieceId) => pieceId === move.pieceId,
+  ).length;
+
+  if (!isTactical) bias -= repeatCount * 95;
+  if (!movingPiece.hasMoved) {
+    if (movingPiece.type === "bishop" || movingPiece.type === "knight") bias += 95;
+    else if (movingPiece.type === "pawn") bias += 42;
+    else if (movingPiece.type === "rook") bias += 12;
+  }
+
+  const pieces = board.getAllPieces();
+  if (
+    movingPiece.type === "queen" &&
+    undevelopedMinorCount(pieces, movingPiece.color) >= 3 &&
+    !isTactical
+  ) {
+    bias -= 135;
+  }
+  if (movingPiece.type === "king" && !isTactical) bias -= 45;
+
+  const next = board.clone();
+  next.applyMove(move);
+  bias += Math.round((armyScore(next, movingPiece.color) - armyScore(board, movingPiece.color)) * 0.7);
+  return bias;
 }
 
 function terminalScore(status, perspective, ply) {
@@ -237,7 +367,15 @@ function alphaBeta(
 
 export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
   const board = createBoard(pieces);
-  const legalMoves = orderMoves(board, generateLegalMovesForColor(board, sideToMove));
+  const recentAiPieceIds = options.recentAiPieceIds ?? [];
+  const legalMoves = orderMoves(
+    board,
+    generateLegalMovesForColor(board, sideToMove),
+  ).sort(
+    (a, b) =>
+      rootMoveBias(board, b, recentAiPieceIds) -
+      rootMoveBias(board, a, recentAiPieceIds),
+  );
   if (!legalMoves.length) return null;
 
   const now = options.now ?? (() => performance.now());
@@ -257,12 +395,17 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
   let bestMove = legalMoves[0];
   let principalVariation = bestMove;
   let completedDepth = 0;
+  let bestScore = -Infinity;
 
   for (let depth = 1; depth <= maxDepth; depth += 1) {
     let iterationBest = null;
     let iterationScore = -Infinity;
     let aborted = false;
-    const ordered = orderMoves(board, legalMoves, principalVariation);
+    const ordered = orderMoves(board, legalMoves, principalVariation).sort(
+      (a, b) =>
+        rootMoveBias(board, b, recentAiPieceIds) -
+        rootMoveBias(board, a, recentAiPieceIds),
+    );
 
     for (const move of ordered) {
       if (context.shouldStop()) {
@@ -286,23 +429,27 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
         aborted = true;
         break;
       }
-      if (result.score > iterationScore) {
-        iterationScore = result.score;
+      const strategicScore =
+        result.score + rootMoveBias(board, move, recentAiPieceIds);
+      if (strategicScore > iterationScore) {
+        iterationScore = strategicScore;
         iterationBest = move;
       }
     }
 
     if (aborted || !iterationBest) break;
     bestMove = iterationBest;
+    bestScore = iterationScore;
     principalVariation = iterationBest;
     completedDepth = depth;
   }
 
   const serialized = serializeMove(bestMove);
   serialized.search = {
-    engine: "advanced-alpha-beta-tt",
+    engine: "strategic-alpha-beta-tt",
     completedDepth,
     nodes: context.nodes,
+    score: Number.isFinite(bestScore) ? bestScore : null,
   };
   return serialized;
 }
