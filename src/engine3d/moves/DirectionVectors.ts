@@ -32,11 +32,15 @@ export const BISHOP_DIRECTIONS: readonly Vector[] = ALL_DIRECTIONS.filter(
     (x !== 0 && y !== 0 && z !== 0),
 );
 
-/** The queen combines the legal rook and bishop rays for this ruleset. */
-export const QUEEN_DIRECTIONS: readonly Vector[] = [
-  ...ROOK_DIRECTIONS,
-  ...BISHOP_DIRECTIONS,
-];
+/**
+ * The queen is the unrestricted sliding piece in Cube Chess.
+ *
+ * It keeps every classical rook and bishop ray and may transfer those rays
+ * through height, so it can slide and capture along all 26 non-zero 3D
+ * directions. Restricting bishop geometry must never remove queen-only x-z or
+ * y-z spatial diagonals.
+ */
+export const QUEEN_DIRECTIONS: readonly Vector[] = ALL_DIRECTIONS;
 
 // The king may move one square in every adjacent 3D direction.
 export const KING_DIRECTIONS: readonly Vector[] = ALL_DIRECTIONS;
