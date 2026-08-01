@@ -18,9 +18,12 @@ describe("advanced hard AI", () => {
 
   it("evaluates the initial position symmetrically", () => {
     const board = createBoard(createInitialPieces());
-    expect(evaluateAdvanced(board, "white")).toBe(
-      -evaluateAdvanced(board, "black"),
-    );
+    const whiteScore = evaluateAdvanced(board, "white");
+    const blackScore = evaluateAdvanced(board, "black");
+
+    expect(whiteScore).toBeCloseTo(-blackScore, 10);
+    expect(Math.abs(whiteScore)).toBeCloseTo(0, 10);
+    expect(Math.abs(blackScore)).toBeCloseTo(0, 10);
   });
 
   it("returns a legal serialized move and search diagnostics", () => {
