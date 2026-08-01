@@ -2,6 +2,7 @@ import "./styles/main.css";
 import "./styles/auth.css";
 import "./styles/global-online.css";
 import "./styles/profile.css";
+import "./styles/tutorial.css";
 import { CubeChessApplication } from "./app/CubeChessApplication.js";
 import { AuthGate } from "./auth/AuthGate.js";
 import { UserProfileMenu } from "./auth/UserProfileMenu.js";
@@ -12,6 +13,7 @@ import {
   shouldApplyAuthoritativeState,
 } from "./online/authoritativeSync.js";
 import { registerServiceWorker } from "./pwa/registerServiceWorker.js";
+import { TutorialController } from "./tutorial/TutorialController.js";
 
 const root = document.querySelector("#app");
 
@@ -28,6 +30,7 @@ if (import.meta.env.DEV && new URLSearchParams(window.location.search).get("e2e"
 }
 
 const application = new CubeChessApplication(root);
+const tutorial = new TutorialController(root, application);
 
 const rendererStartGame = application.renderer.startGame.bind(application.renderer);
 application.renderer.startGame = (config) => {
@@ -119,6 +122,7 @@ application.presentation.canHumanInteract = () => {
 const baseHandleStateChange = application.handleStateChange.bind(application);
 application.handleStateChange = (state) => {
   baseHandleStateChange(state);
+  tutorial.onStateChange(state);
   const onlineGame = application.onlineGame;
   const move = state.lastMove;
   if (!onlineGame || onlineGame.applyingRemoteState || !move?.sequence) return;
@@ -168,6 +172,7 @@ if (authGate.identity?.mode === "account") profileMenu.show(authGate.identity);
 
 if (import.meta.env.DEV) {
   window.__cubeChessApplication = application;
+  window.__cubeChessTutorial = tutorial;
 }
 window.addEventListener(
   "pagehide",
@@ -175,6 +180,7 @@ window.addEventListener(
     if (application.onlineGame?.socket && application.onlineSocketHandler) {
       application.onlineGame.socket.removeEventListener("message", application.onlineSocketHandler);
     }
+    tutorial.dispose();
     profileMenu.dispose();
     onlineMenu.dispose();
     authGate.dispose();
