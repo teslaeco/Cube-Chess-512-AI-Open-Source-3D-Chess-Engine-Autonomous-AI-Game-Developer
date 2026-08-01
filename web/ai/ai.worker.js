@@ -6,6 +6,7 @@ import {
   serializeMove,
 } from "./searchEngine.js";
 import { chooseAdvancedMove } from "./advancedSearch.js";
+import { chooseDiverseMove } from "./MoveDiversity.js";
 import { applyLoneKingLevelRule } from "../rules/LoneKingLevelRule.js";
 
 let generation = 0;
@@ -17,9 +18,6 @@ function chooseMoveWithVariantRules(pieces, sideToMove, difficulty, options) {
       : chooseBestMove(pieces, sideToMove, difficulty, options);
   if (!selected) return null;
 
-  const allowed = applyLoneKingLevelRule(pieces, sideToMove, [selected]);
-  if (allowed.length) return selected;
-
   const board = createBoard(pieces);
   const legal = generateLegalMovesForColor(board, sideToMove);
   const filtered = applyLoneKingLevelRule(
@@ -27,6 +25,18 @@ function chooseMoveWithVariantRules(pieces, sideToMove, difficulty, options) {
     sideToMove,
     orderMoves(board, legal),
   );
+  const selectedAllowed = applyLoneKingLevelRule(pieces, sideToMove, [selected]);
+  const validSelected = selectedAllowed.length ? selected : null;
+
+  if (difficulty === "hard" && validSelected) {
+    const alternatives = filtered.map(serializeMove);
+    return chooseDiverseMove(
+      validSelected,
+      alternatives,
+      options.recentAiPieceIds ?? [],
+    );
+  }
+  if (validSelected) return validSelected;
   return filtered.length ? serializeMove(filtered[0]) : null;
 }
 
@@ -42,7 +52,10 @@ self.addEventListener("message", (event) => {
     event.data.pieces,
     event.data.sideToMove,
     event.data.difficulty,
-    { isCancelled: () => token !== generation },
+    {
+      isCancelled: () => token !== generation,
+      recentAiPieceIds: event.data.recentAiPieceIds ?? [],
+    },
   );
   self.postMessage({ requestId: event.data.requestId, move });
 });

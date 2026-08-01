@@ -11,9 +11,7 @@ export class ChessRenderer {
     this.presentation = presentation;
     this.onStateChange = onStateChange;
     this.sceneController = new SceneController(container);
-    this.cameraController = new CameraController(
-      this.sceneController.renderer.domElement,
-    );
+    this.cameraController = new CameraController(this.sceneController.renderer.domElement);
     const state = presentation.snapshot();
     this.boardRenderer = new BoardRenderer(state.squares);
     this.pieceRenderer = new PieceRenderer(
@@ -21,10 +19,7 @@ export class ChessRenderer {
       new PieceGeometryFactory(),
       (active) => this.handleAnimationState(active),
     );
-    this.sceneController.scene.add(
-      this.boardRenderer.group,
-      this.pieceRenderer.group,
-    );
+    this.sceneController.scene.add(this.boardRenderer.group, this.pieceRenderer.group);
     this.cameraController.setBoardObject(this.boardRenderer.group);
     this.selection = new SelectionController(
       this.sceneController.renderer.domElement,
@@ -47,44 +42,32 @@ export class ChessRenderer {
 
   select(metadata) {
     if (!this.presentation.canHumanInteract()) return;
-    if (!metadata) {
-      this.presentation.clearSelection();
-    } else if (metadata.kind === "piece") {
-      this.presentation.selectPiece(metadata.piece);
-    } else if (metadata.kind === "square") {
-      this.presentation.selectSquare(metadata.square);
-    }
+    if (!metadata) this.presentation.clearSelection();
+    else if (metadata.kind === "piece") this.presentation.selectPiece(metadata.piece);
+    else if (metadata.kind === "square") this.presentation.selectSquare(metadata.square);
     this.applyPresentation(this.presentation.snapshot());
   }
 
   handleAnimationState(active) {
     this.presentation.setBusy(active);
     this.onStateChange(this.presentation.snapshot());
+    if (!active) queueMicrotask(() => this.selection.flushPendingSelection());
   }
 
   applyPresentation(state) {
     this.boardRenderer.setLevels(state.levels, state.activeLevel);
     this.boardRenderer.setHighlights(state.selectedSquare, state.legalTargets);
-    this.pieceRenderer.sync(
-      state.pieces,
-      state.capturedPieces,
-      state.lastMove,
-    );
+    this.pieceRenderer.sync(state.pieces, state.capturedPieces, state.lastMove);
     this.pieceRenderer.setSelected(state.selectedPieceId);
     this.pieceRenderer.setLevelVisibility(state.levels);
-    if (
-      state.lastMove?.sequence != null &&
-      state.lastMove.sequence !== this.lastFollowedMove
-    ) {
+    if (state.lastMove?.sequence != null && state.lastMove.sequence !== this.lastFollowedMove) {
       this.lastFollowedMove = state.lastMove.sequence;
       this.cameraController.followSquare(state.lastMove.to);
     }
     this.onStateChange(this.presentation.snapshot());
   }
 
-  refresh() {
-    this.applyPresentation(this.presentation.snapshot());
-  }
+  refresh() { this.applyPresentation(this.presentation.snapshot()); }
 
   setActiveLevel(level) {
     this.presentation.setActiveLevel(level);
@@ -93,17 +76,17 @@ export class ChessRenderer {
   }
 
   startGame(config) {
+    this.selection.clearPendingSelection();
     this.presentation.startGame(config);
     this.lastFollowedMove = null;
     this.refresh();
     this.cameraController.fitBoard(false);
   }
 
-  startLocalGame() {
-    this.startGame({ mode: "local" });
-  }
+  startLocalGame() { this.startGame({ mode: "local" }); }
 
   startDemo() {
+    this.selection.clearPendingSelection();
     this.presentation.startDemo();
     this.lastFollowedMove = null;
     this.refresh();
@@ -117,66 +100,31 @@ export class ChessRenderer {
   }
 
   newGame() {
+    this.selection.clearPendingSelection();
     this.presentation.resetGame({ appState: "playing", preserveMenu: true });
     this.refresh();
     this.cameraController.fitBoard(false);
   }
 
   loadGame(serialized) {
+    this.selection.clearPendingSelection();
     this.presentation.load(serialized);
     this.lastFollowedMove = null;
     this.refresh();
     this.cameraController.fitBoard(false);
   }
 
-  undo() {
-    if (this.presentation.undo()) this.refresh();
-  }
-
-  redo() {
-    if (this.presentation.redo()) this.refresh();
-  }
-
-  openMenu() {
-    this.presentation.openMenu();
-    this.refresh();
-  }
-
-  closeMenu() {
-    this.presentation.closeMenu();
-    this.refresh();
-  }
-
-  setLanguage(language) {
-    this.presentation.setLanguage(language);
-    this.refresh();
-  }
-
-  setBrightness(value) {
-    this.sceneController.setBrightness(value);
-  }
-
-  setFog(enabled) {
-    this.sceneController.setFog(enabled);
-  }
-
-  showAllLevels() {
-    this.presentation.showAllLevels();
-    this.refresh();
-  }
-
-  isolateActiveLevel() {
-    this.presentation.isolateActiveLevel();
-    this.refresh();
-  }
-
-  cubeView() {
-    this.cameraController.fitBoard(false);
-  }
-
-  activeLayerView() {
-    this.cameraController.activeLayerView(this.presentation.activeLevel);
-  }
+  undo() { if (this.presentation.undo()) this.refresh(); }
+  redo() { if (this.presentation.redo()) this.refresh(); }
+  openMenu() { this.presentation.openMenu(); this.refresh(); }
+  closeMenu() { this.presentation.closeMenu(); this.refresh(); }
+  setLanguage(language) { this.presentation.setLanguage(language); this.refresh(); }
+  setBrightness(value) { this.sceneController.setBrightness(value); }
+  setFog(enabled) { this.sceneController.setFog(enabled); }
+  showAllLevels() { this.presentation.showAllLevels(); this.refresh(); }
+  isolateActiveLevel() { this.presentation.isolateActiveLevel(); this.refresh(); }
+  cubeView() { this.cameraController.fitBoard(false); }
+  activeLayerView() { this.cameraController.activeLayerView(this.presentation.activeLevel); }
 
   resize() {
     const parent = this.sceneController.renderer.domElement.parentElement;
@@ -186,9 +134,7 @@ export class ChessRenderer {
     this.cameraController.resize(width, height);
   }
 
-  resetCamera() {
-    this.cameraController.reset();
-  }
+  resetCamera() { this.cameraController.reset(); }
 
   animate(time) {
     if (!this.running) return;
