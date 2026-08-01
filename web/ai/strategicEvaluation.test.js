@@ -48,6 +48,24 @@ describe("strategic 3D AI evaluation", () => {
       .toBeGreaterThan(evaluateStrategicPosition(isolated, "white"));
   });
 
+  it("prefers coordinated minor-piece development over an unsupported pawn march", () => {
+    const pawnMarch = createBoard([
+      ...kings,
+      p("wp", "pawn", "white", 3, 5, 0, true),
+      p("wn", "knight", "white", 1, 0, 0),
+      p("wb", "bishop", "white", 2, 0, 0),
+    ]);
+    const coordinated = createBoard([
+      ...kings,
+      p("wp", "pawn", "white", 3, 2, 0, true),
+      p("wn", "knight", "white", 2, 2, 1, true),
+      p("wb", "bishop", "white", 3, 3, 1, true),
+    ]);
+
+    expect(evaluateStrategicPosition(coordinated, "white"))
+      .toBeGreaterThan(evaluateStrategicPosition(pawnMarch, "white"));
+  });
+
   it("returns a legal move with v2 strategic diagnostics", () => {
     let tick = 0;
     const move = chooseAdvancedMove(
