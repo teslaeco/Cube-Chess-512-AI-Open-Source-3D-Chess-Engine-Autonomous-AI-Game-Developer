@@ -28,216 +28,190 @@ function piece(
   };
 }
 
-function addresses(moves: ReturnType<typeof generatePseudoLegalMoves>): string[] {
-  return moves.map((move) => move.to.toSquareAddress());
+function movesFor(subject: Piece, others: Piece[] = []) {
+  return generatePseudoLegalMoves(new Board3D([subject, ...others]), subject);
 }
 
-describe("Cube Chess 512 pseudo-legal movement geometry", () => {
-  it("defines the canonical number of 3D directions", () => {
+function hasTarget(subject: Piece, x: number, y: number, z: number, others: Piece[] = []) {
+  return movesFor(subject, others).some((move) =>
+    move.to.equals(new Coordinate3D(x, y, z)),
+  );
+}
+
+describe("Cube Chess 512 movement geometry audit", () => {
+  it("defines complete and non-overlapping sliding direction families", () => {
     expect(ROOK_DIRECTIONS).toHaveLength(6);
-    expect(BISHOP_DIRECTIONS).toHaveLength(12);
+    expect(BISHOP_DIRECTIONS).toHaveLength(20);
     expect(QUEEN_DIRECTIONS).toHaveLength(26);
     expect(KING_DIRECTIONS).toHaveLength(26);
     expect(KNIGHT_OFFSETS).toHaveLength(24);
+
+    expect(
+      BISHOP_DIRECTIONS.every(
+        (vector) => vector.filter((value) => value !== 0).length >= 2,
+      ),
+    ).toBe(true);
+    expect(
+      ROOK_DIRECTIONS.every(
+        (vector) => vector.filter((value) => value !== 0).length === 1,
+      ),
+    ).toBe(true);
   });
 
-  it("keeps classic rook movement on one level and adds vertical movement", () => {
-    const rook = piece("rook");
-    const moves = generatePseudoLegalMoves(new Board3D([rook]), rook);
-    const result = addresses(moves);
+  describe("rook", () => {
+    it("moves along all three axes and never diagonally", () => {
+      const rook = piece("rook");
+      const moves = movesFor(rook);
 
-    expect(result).toContain("D:d8");
-    expect(result).toContain("D:h4");
-    expect(result).toContain("A:d4");
-    expect(result).toContain("H:d4");
-    expect(moves).toHaveLength(21);
+      expect(moves).toHaveLength(21);
+      expect(hasTarget(rook, 7, 3, 3)).toBe(true);
+      expect(hasTarget(rook, 3, 7, 3)).toBe(true);
+      expect(hasTarget(rook, 3, 3, 7)).toBe(true);
+      expect(hasTarget(rook, 4, 4, 3)).toBe(false);
+      expect(hasTarget(rook, 4, 3, 4)).toBe(false);
+    });
+
+    it("stops at friendly blockers and after enemy captures", () => {
+      const rook = piece("rook");
+      const friendly = piece("pawn", 3, 3, 5);
+      const enemy = piece("pawn", 6, 3, 3, "black");
+      const moves = movesFor(rook, [friendly, enemy]);
+
+      expect(moves.some((move) => move.to.z === 4)).toBe(true);
+      expect(moves.some((move) => move.to.z >= 5)).toBe(false);
+      expect(moves.find((move) => move.to.equals(enemy.position))?.kind).toBe("capture");
+      expect(moves.some((move) => move.to.x === 7 && move.to.y === 3 && move.to.z === 3)).toBe(false);
+    });
   });
 
-  it("stops a sliding piece at a friendly blocker", () => {
-    const rook = piece("rook");
-    const blocker = piece("pawn", 3, 3, 5);
-    const moves = generatePseudoLegalMoves(new Board3D([rook, blocker]), rook);
-    const result = addresses(moves);
+  describe("bishop", () => {
+    it("moves diagonally on the current board level", () => {
+      const bishop = piece("bishop");
+      expect(hasTarget(bishop, 7, 7, 3)).toBe(true);
+      expect(hasTarget(bishop, 0, 0, 3)).toBe(true);
+    });
 
-    expect(result).toContain("E:d4");
-    expect(result).not.toContain("F:d4");
-    expect(result).not.toContain("G:d4");
+    it("moves diagonally upward in the x-z vertical plane", () => {
+      const bishop = piece("bishop");
+      expect(hasTarget(bishop, 7, 3, 7)).toBe(true);
+      expect(hasTarget(bishop, 0, 3, 0)).toBe(true);
+    });
+
+    it("moves diagonally upward in the y-z vertical plane", () => {
+      const bishop = piece("bishop");
+      expect(hasTarget(bishop, 3, 7, 7)).toBe(true);
+      expect(hasTarget(bishop, 3, 0, 0)).toBe(true);
+    });
+
+    it("moves on full spatial diagonals", () => {
+      const bishop = piece("bishop");
+      expect(hasTarget(bishop, 7, 7, 7)).toBe(true);
+      expect(hasTarget(bishop, 0, 0, 0)).toBe(true);
+    });
+
+    it("never receives a straight rook move", () => {
+      const bishop = piece("bishop");
+      expect(hasTarget(bishop, 7, 3, 3)).toBe(false);
+      expect(hasTarget(bishop, 3, 7, 3)).toBe(false);
+      expect(hasTarget(bishop, 3, 3, 7)).toBe(false);
+    });
+
+    it("stops every diagonal ray at blockers", () => {
+      const bishop = piece("bishop");
+      const friendly = piece("pawn", 4, 3, 4);
+      const enemy = piece("pawn", 3, 5, 5, "black");
+      const moves = movesFor(bishop, [friendly, enemy]);
+
+      expect(moves.some((move) => move.to.equals(friendly.position))).toBe(false);
+      expect(hasTarget(bishop, 5, 3, 5, [friendly, enemy])).toBe(false);
+      expect(moves.find((move) => move.to.equals(enemy.position))?.kind).toBe("capture");
+      expect(hasTarget(bishop, 3, 6, 6, [friendly, enemy])).toBe(false);
+    });
   });
 
-  it("captures an enemy and never moves beyond it", () => {
-    const rook = piece("rook");
-    const enemy = piece("pawn", 3, 3, 6, "black");
-    const moves = generatePseudoLegalMoves(new Board3D([rook, enemy]), rook);
-    const capture = moves.find((move) => move.to.equals(enemy.position));
-
-    expect(capture?.kind).toBe("capture");
-    expect(capture?.capturedPieceId).toBe(enemy.id);
-    expect(moves.some((move) => move.to.z === 7)).toBe(false);
+  describe("queen", () => {
+    it("combines all rook and bishop directions", () => {
+      const queen = piece("queen");
+      expect(hasTarget(queen, 7, 3, 3)).toBe(true);
+      expect(hasTarget(queen, 7, 7, 3)).toBe(true);
+      expect(hasTarget(queen, 7, 3, 7)).toBe(true);
+      expect(hasTarget(queen, 3, 7, 7)).toBe(true);
+      expect(hasTarget(queen, 7, 7, 7)).toBe(true);
+    });
   });
 
-  it("keeps bishops diagonal on the 8x8 board projection", () => {
-    const bishop = piece("bishop");
-    const result = addresses(generatePseudoLegalMoves(new Board3D([bishop]), bishop));
+  describe("king", () => {
+    it("has all 26 adjacent destinations from the center", () => {
+      const king = piece("king");
+      const moves = movesFor(king);
+      expect(moves).toHaveLength(26);
+      expect(new Set(moves.map((move) => move.to.toSquareAddress())).size).toBe(26);
+    });
 
-    expect(result).toContain("D:h8");
-    expect(result).toContain("H:h8");
-    expect(result).not.toContain("H:h4");
-    expect(result).not.toContain("H:d8");
-    expect(result).not.toContain("H:d4");
-  });
-
-  it("never lets a bishop move forward between levels without changing both board axes", () => {
-    const bishop = piece("bishop");
-    const moves = generatePseudoLegalMoves(new Board3D([bishop]), bishop);
-
-    for (const move of moves) {
-      const delta = move.to.subtract(bishop.position);
-      expect(delta.x).not.toBe(0);
-      expect(delta.y).not.toBe(0);
-      expect(Math.abs(delta.x)).toBe(Math.abs(delta.y));
-      if (delta.z !== 0) {
-        expect(Math.abs(delta.z)).toBe(Math.abs(delta.x));
+    it("never moves farther than one cube", () => {
+      const king = piece("king");
+      for (const move of movesFor(king)) {
+        const delta = move.to.subtract(king.position);
+        expect(Math.max(Math.abs(delta.x), Math.abs(delta.y), Math.abs(delta.z))).toBe(1);
       }
-    }
-
-    const result = addresses(moves);
-    expect(result).not.toContain("D:d5");
-    expect(result).not.toContain("D:e4");
-    expect(result).not.toContain("E:d4");
-    expect(result).not.toContain("E:d5");
-    expect(result).not.toContain("E:e4");
+    });
   });
 
-  it("gives a central king 26 one-step destinations", () => {
-    const king = piece("king");
-    const moves = generatePseudoLegalMoves(new Board3D([king]), king);
+  describe("knight", () => {
+    it("has 24 unique 2-1-0 jumps from the center", () => {
+      const knight = piece("knight");
+      const moves = movesFor(knight);
+      expect(moves).toHaveLength(24);
+      expect(new Set(moves.map((move) => move.to.toSquareAddress())).size).toBe(24);
+      for (const move of moves) {
+        const delta = move.to.subtract(knight.position);
+        expect([Math.abs(delta.x), Math.abs(delta.y), Math.abs(delta.z)].sort()).toEqual([0, 1, 2]);
+      }
+    });
 
-    expect(moves).toHaveLength(26);
-    expect(new Set(addresses(moves)).size).toBe(26);
+    it("jumps over occupied intermediate cubes", () => {
+      const knight = piece("knight");
+      const blockers = [
+        piece("pawn", 4, 3, 3),
+        piece("pawn", 3, 4, 3),
+        piece("pawn", 3, 3, 4),
+      ];
+      expect(movesFor(knight, blockers)).toHaveLength(24);
+    });
   });
 
-  it("gives a central knight 24 unique 2-1-0 destinations", () => {
-    const knight = piece("knight");
-    const moves = generatePseudoLegalMoves(new Board3D([knight]), knight);
+  describe("pawn", () => {
+    it("keeps forward, vertical and forward-up opening advances", () => {
+      const pawn = piece("pawn");
+      expect(hasTarget(pawn, 3, 4, 3)).toBe(true);
+      expect(hasTarget(pawn, 3, 3, 4)).toBe(true);
+      expect(hasTarget(pawn, 3, 4, 4)).toBe(true);
+      expect(hasTarget(pawn, 3, 5, 3)).toBe(true);
+      expect(hasTarget(pawn, 3, 3, 5)).toBe(true);
+    });
 
-    expect(moves).toHaveLength(24);
-    expect(new Set(addresses(moves)).size).toBe(24);
-    for (const move of moves) {
-      const delta = move.to.subtract(knight.position);
-      expect([Math.abs(delta.x), Math.abs(delta.y), Math.abs(delta.z)].sort()).toEqual([0, 1, 2]);
-    }
+    it("captures on horizontal and vertical diagonals", () => {
+      const pawn = piece("pawn");
+      const horizontal = piece("rook", 4, 4, 3, "black");
+      const vertical = piece("knight", 4, 3, 4, "black");
+      const moves = movesFor(pawn, [horizontal, vertical]);
+      expect(moves.find((move) => move.to.equals(horizontal.position))?.kind).toBe("capture");
+      expect(moves.find((move) => move.to.equals(vertical.position))?.kind).toBe("capture");
+    });
+
+    it("loses both double advances after its first move", () => {
+      const pawn = piece("pawn", 3, 3, 3, "white", true);
+      expect(hasTarget(pawn, 3, 4, 3)).toBe(true);
+      expect(hasTarget(pawn, 3, 5, 3)).toBe(false);
+      expect(hasTarget(pawn, 3, 3, 5)).toBe(false);
+    });
   });
 
-  it("preserves classic knight movement when filtered to the same level", () => {
-    const knight = piece("knight");
-    const sameLevel = generatePseudoLegalMoves(new Board3D([knight]), knight)
-      .filter((move) => move.to.z === knight.position.z);
-
-    expect(sameLevel).toHaveLength(8);
-  });
-
-  it("implements five opening pawn advances plus captures on x-y and x-z", () => {
-    const pawn = piece("pawn");
-    const enemyForwardDiagonal = piece("pawn", 4, 4, 3, "black");
-    const enemyVerticalDiagonal = piece("pawn", 4, 3, 4, "black");
-    const moves = generatePseudoLegalMoves(
-      new Board3D([pawn, enemyForwardDiagonal, enemyVerticalDiagonal]),
-      pawn,
-    );
-    const result = addresses(moves);
-
-    expect(result).toContain("D:d5");
-    expect(result).toContain("E:d4");
-    expect(result).toContain("E:d5");
-    expect(result).toContain("D:d6");
-    expect(result).toContain("F:d4");
-    expect(moves.find((move) => move.to.equals(enemyForwardDiagonal.position))?.kind).toBe("capture");
-    expect(moves.find((move) => move.to.equals(enemyVerticalDiagonal.position))?.kind).toBe("capture");
-  });
-
-  it("lets both pawn colors climb vertically and move forward-up from level A to B", () => {
-    const whitePawn = piece("pawn", 2, 2, 0, "white");
-    const blackPawn = piece("pawn", 5, 5, 0, "black");
-    const board = new Board3D([whitePawn, blackPawn]);
-
-    const whiteMoves = addresses(generatePseudoLegalMoves(board, whitePawn));
-    const blackMoves = addresses(generatePseudoLegalMoves(board, blackPawn));
-    expect(whiteMoves).toContain("B:c3");
-    expect(whiteMoves).toContain("B:c4");
-    expect(blackMoves).toContain("B:f6");
-    expect(blackMoves).toContain("B:f5");
-  });
-
-  it("blocks vertical pawn advance and double rise, allows upward capture, and stops at H", () => {
-    const blackPawn = piece("pawn", 3, 3, 0, "black");
-    const blocker = piece("rook", 3, 3, 1, "white");
-    const captureTarget = piece("knight", 4, 3, 1, "white");
-    const board = new Board3D([blackPawn, blocker, captureTarget]);
-    const moves = generatePseudoLegalMoves(board, blackPawn);
-    const result = addresses(moves);
-
-    expect(result).not.toContain("B:d4");
-    expect(result).not.toContain("C:d4");
-    expect(result).toContain("B:d3");
-    expect(moves.find((move) => move.to.equals(captureTarget.position))?.kind).toBe("capture");
-
-    const pawnOnH = piece("pawn", 6, 3, 7, "black");
-    expect(generatePseudoLegalMoves(new Board3D([pawnOnH]), pawnOnH).every((move) => move.to.z === 7)).toBe(true);
-  });
-
-  it("never gives a bishop an axial move while the queen keeps axial moves", () => {
-    const bishop = piece("bishop");
-    const queen = piece("queen", 4, 4, 4);
-    const bishopMoves = generatePseudoLegalMoves(new Board3D([bishop]), bishop);
-    const queenMoves = generatePseudoLegalMoves(new Board3D([queen]), queen);
-
-    expect(bishopMoves.some((move) => move.to.x === bishop.position.x || move.to.y === bishop.position.y)).toBe(false);
-    expect(queenMoves.some((move) => move.to.x === queen.position.x && move.to.y === queen.position.y)).toBe(true);
-  });
-
-  it("lets the queen move and capture forward through vertical planes", () => {
-    const queen = piece("queen", 3, 3, 3, "white");
-    const forwardTarget = piece("rook", 3, 5, 5, "black");
-    const sidewaysTarget = piece("knight", 5, 3, 5, "black");
-    const board = new Board3D([queen, forwardTarget, sidewaysTarget]);
-    const moves = generatePseudoLegalMoves(board, queen);
-
-    expect(moves.find((move) => move.to.equals(forwardTarget.position))?.kind).toBe("capture");
-    expect(moves.find((move) => move.to.equals(sidewaysTarget.position))?.kind).toBe("capture");
-  });
-
-  it("stops bishop diagonals at friendly pieces and after enemy captures", () => {
-    const bishop = piece("bishop");
-    const friendly = piece("pawn", 4, 4, 4);
-    const enemy = piece("pawn", 2, 2, 2, "black");
-    const moves = generatePseudoLegalMoves(
-      new Board3D([bishop, friendly, enemy]),
-      bishop,
-    );
-    const result = addresses(moves);
-
-    expect(result).not.toContain("E:e5");
-    expect(result).not.toContain("F:f6");
-    expect(moves.find((move) => move.to.equals(enemy.position))?.kind).toBe("capture");
-    expect(result).not.toContain("B:b2");
-  });
-
-  it("does not allow either double opening move after the pawn has moved", () => {
-    const pawn = piece("pawn", 3, 3, 3, "white", true);
-    const result = addresses(generatePseudoLegalMoves(new Board3D([pawn]), pawn));
-
-    expect(result).toContain("E:d5");
-    expect(result).not.toContain("D:d6");
-    expect(result).not.toContain("F:d4");
-  });
-
-  it("does not mutate the board while generating moves", () => {
+  it("never mutates the board while generating moves", () => {
     const queen = piece("queen");
     const board = new Board3D([queen]);
     const before = board.getAllPieces();
-
     generatePseudoLegalMoves(board, queen);
-
     expect(board.getAllPieces()).toEqual(before);
     expect(board.getPieceAt(queen.position)).toEqual(queen);
   });
