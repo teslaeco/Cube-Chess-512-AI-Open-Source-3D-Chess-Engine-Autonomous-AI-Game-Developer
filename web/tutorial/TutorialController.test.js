@@ -19,25 +19,42 @@ describe("Cube Chess 512 tutorial helpers", () => {
     expect(pieceExplanationKey({ type: "dragon" })).toBe("generic");
   });
 
-  it("loads versioned progress and clamps damaged step values", () => {
+  it("loads current progress and clamps damaged step values", () => {
     const storage = {
-      getItem: () => JSON.stringify({ version: 1, step: 999, autoExplain: false }),
+      getItem: () => JSON.stringify({ version: 2, step: 999, autoExplain: false }),
     };
     expect(loadTutorialProgress(storage)).toMatchObject({
-      version: 1,
+      version: 2,
       step: 4,
       autoExplain: false,
+      complete: false,
     });
   });
 
-  it("falls back safely for invalid or old stored data", () => {
-    expect(loadTutorialProgress({ getItem: () => "broken" })).toMatchObject({
-      version: 1,
-      step: 0,
-      skipped: false,
+  it("migrates version one progress without restoring the removed launcher state", () => {
+    const storage = {
+      getItem: () => JSON.stringify({ version: 1, step: 2, skipped: true, autoExplain: true }),
+    };
+    expect(loadTutorialProgress(storage)).toEqual({
+      version: 2,
+      step: 2,
       complete: false,
       autoExplain: true,
     });
-    expect(loadTutorialProgress({ getItem: () => JSON.stringify({ version: 0, step: 3 }) }).step).toBe(0);
+  });
+
+  it("falls back safely for invalid or unsupported stored data", () => {
+    expect(loadTutorialProgress({ getItem: () => "broken" })).toEqual({
+      version: 2,
+      step: 0,
+      complete: false,
+      autoExplain: true,
+    });
+    expect(loadTutorialProgress({ getItem: () => JSON.stringify({ version: 0, step: 3 }) })).toEqual({
+      version: 2,
+      step: 0,
+      complete: false,
+      autoExplain: true,
+    });
   });
 });
