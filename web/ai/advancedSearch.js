@@ -266,7 +266,11 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
         aborted = true;
         break;
       }
-      const score = result.score + strategicMoveBias(board, move, recent);
+      // Root heuristics may improve move ordering, but they must never alter
+      // the authoritative minimax result. Adding the bias here previously let
+      // a superficially attractive pawn push override a strategically superior
+      // move found by the full search.
+      const score = result.score;
       if (score > iterationScore) {
         iterationScore = score;
         iterationBest = move;
