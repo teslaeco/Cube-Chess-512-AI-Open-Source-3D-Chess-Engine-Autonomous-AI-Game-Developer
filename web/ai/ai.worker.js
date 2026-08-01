@@ -42,7 +42,10 @@ self.addEventListener("message", (event) => {
     event.data.pieces,
     event.data.sideToMove,
     event.data.difficulty,
-    { isCancelled: () => token !== generation },
+    {
+      isCancelled: () => token !== generation,
+      recentAiPieceIds: event.data.recentAiPieceIds ?? [],
+    },
   );
   self.postMessage({ requestId: event.data.requestId, move });
 });
