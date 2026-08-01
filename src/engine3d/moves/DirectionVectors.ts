@@ -15,22 +15,28 @@ export const ROOK_DIRECTIONS: readonly Vector[] = ALL_DIRECTIONS.filter(
 );
 
 /**
- * The bishop is the diagonal sliding piece in three-dimensional space.
+ * Cube Chess bishop geometry.
  *
- * A legal bishop ray changes at least two axes by the same unit step:
- * - x-y: a classic diagonal on one board level,
- * - x-z: a sideways diagonal between levels,
- * - y-z: a forward/backward diagonal between levels,
- * - x-y-z: a full spatial diagonal.
+ * The bishop keeps its classical x-y diagonal and may transfer that same
+ * diagonal through height. Therefore it may move:
+ * - on x-y diagonals while z stays unchanged,
+ * - on full x-y-z spatial diagonals.
  *
- * Axial rays are deliberately excluded because they belong to the rook.
+ * x-z and y-z rays are excluded because they turn a straight horizontal move
+ * into a diagonal merely by adding height, which is not a bishop move in this
+ * ruleset.
  */
 export const BISHOP_DIRECTIONS: readonly Vector[] = ALL_DIRECTIONS.filter(
-  (vector) => changedAxisCount(vector) >= 2,
+  ([x, y, z]) =>
+    (x !== 0 && y !== 0 && z === 0) ||
+    (x !== 0 && y !== 0 && z !== 0),
 );
 
-/** The queen combines every rook and bishop ray. */
-export const QUEEN_DIRECTIONS: readonly Vector[] = ALL_DIRECTIONS;
+/** The queen combines the legal rook and bishop rays for this ruleset. */
+export const QUEEN_DIRECTIONS: readonly Vector[] = [
+  ...ROOK_DIRECTIONS,
+  ...BISHOP_DIRECTIONS,
+];
 
 // The king may move one square in every adjacent 3D direction.
 export const KING_DIRECTIONS: readonly Vector[] = ALL_DIRECTIONS;

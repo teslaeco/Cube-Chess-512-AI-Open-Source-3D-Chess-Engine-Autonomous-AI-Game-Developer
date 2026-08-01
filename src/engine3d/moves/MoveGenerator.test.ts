@@ -39,16 +39,16 @@ function hasTarget(subject: Piece, x: number, y: number, z: number, others: Piec
 }
 
 describe("Cube Chess 512 movement geometry audit", () => {
-  it("defines complete and non-overlapping sliding direction families", () => {
+  it("defines the ruleset sliding direction families", () => {
     expect(ROOK_DIRECTIONS).toHaveLength(6);
-    expect(BISHOP_DIRECTIONS).toHaveLength(20);
-    expect(QUEEN_DIRECTIONS).toHaveLength(26);
+    expect(BISHOP_DIRECTIONS).toHaveLength(12);
+    expect(QUEEN_DIRECTIONS).toHaveLength(18);
     expect(KING_DIRECTIONS).toHaveLength(26);
     expect(KNIGHT_OFFSETS).toHaveLength(24);
 
     expect(
       BISHOP_DIRECTIONS.every(
-        (vector) => vector.filter((value) => value !== 0).length >= 2,
+        ([x, y]) => x !== 0 && y !== 0,
       ),
     ).toBe(true);
     expect(
@@ -91,19 +91,19 @@ describe("Cube Chess 512 movement geometry audit", () => {
       expect(hasTarget(bishop, 0, 0, 3)).toBe(true);
     });
 
-    it("moves diagonally upward in the x-z vertical plane", () => {
+    it("does not turn a straight x move into an x-z diagonal", () => {
       const bishop = piece("bishop");
-      expect(hasTarget(bishop, 7, 3, 7)).toBe(true);
-      expect(hasTarget(bishop, 0, 3, 0)).toBe(true);
+      expect(hasTarget(bishop, 7, 3, 7)).toBe(false);
+      expect(hasTarget(bishop, 0, 3, 0)).toBe(false);
     });
 
-    it("moves diagonally upward in the y-z vertical plane", () => {
+    it("does not turn a straight y move into a y-z diagonal", () => {
       const bishop = piece("bishop");
-      expect(hasTarget(bishop, 3, 7, 7)).toBe(true);
-      expect(hasTarget(bishop, 3, 0, 0)).toBe(true);
+      expect(hasTarget(bishop, 3, 7, 7)).toBe(false);
+      expect(hasTarget(bishop, 3, 0, 0)).toBe(false);
     });
 
-    it("moves on full spatial diagonals", () => {
+    it("transfers its classical diagonal through height on full spatial diagonals", () => {
       const bishop = piece("bishop");
       expect(hasTarget(bishop, 7, 7, 7)).toBe(true);
       expect(hasTarget(bishop, 0, 0, 0)).toBe(true);
@@ -116,26 +116,26 @@ describe("Cube Chess 512 movement geometry audit", () => {
       expect(hasTarget(bishop, 3, 3, 7)).toBe(false);
     });
 
-    it("stops every diagonal ray at blockers", () => {
+    it("stops every legal diagonal ray at blockers", () => {
       const bishop = piece("bishop");
-      const friendly = piece("pawn", 4, 3, 4);
-      const enemy = piece("pawn", 3, 5, 5, "black");
+      const friendly = piece("pawn", 4, 4, 4);
+      const enemy = piece("pawn", 5, 1, 3, "black");
       const moves = movesFor(bishop, [friendly, enemy]);
 
       expect(moves.some((move) => move.to.equals(friendly.position))).toBe(false);
-      expect(hasTarget(bishop, 5, 3, 5, [friendly, enemy])).toBe(false);
+      expect(hasTarget(bishop, 5, 5, 5, [friendly, enemy])).toBe(false);
       expect(moves.find((move) => move.to.equals(enemy.position))?.kind).toBe("capture");
-      expect(hasTarget(bishop, 3, 6, 6, [friendly, enemy])).toBe(false);
+      expect(hasTarget(bishop, 6, 0, 3, [friendly, enemy])).toBe(false);
     });
   });
 
   describe("queen", () => {
-    it("combines all rook and bishop directions", () => {
+    it("combines the legal rook and bishop directions", () => {
       const queen = piece("queen");
       expect(hasTarget(queen, 7, 3, 3)).toBe(true);
       expect(hasTarget(queen, 7, 7, 3)).toBe(true);
-      expect(hasTarget(queen, 7, 3, 7)).toBe(true);
-      expect(hasTarget(queen, 3, 7, 7)).toBe(true);
+      expect(hasTarget(queen, 7, 3, 7)).toBe(false);
+      expect(hasTarget(queen, 3, 7, 7)).toBe(false);
       expect(hasTarget(queen, 7, 7, 7)).toBe(true);
     });
   });
