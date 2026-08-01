@@ -119,13 +119,13 @@ describe("Cube Chess 512 movement geometry audit", () => {
     it("stops every legal diagonal ray at blockers", () => {
       const bishop = piece("bishop");
       const friendly = piece("pawn", 4, 4, 4);
-      const enemy = piece("pawn", 3, 5, 3, "black");
+      const enemy = piece("pawn", 5, 1, 3, "black");
       const moves = movesFor(bishop, [friendly, enemy]);
 
       expect(moves.some((move) => move.to.equals(friendly.position))).toBe(false);
       expect(hasTarget(bishop, 5, 5, 5, [friendly, enemy])).toBe(false);
       expect(moves.find((move) => move.to.equals(enemy.position))?.kind).toBe("capture");
-      expect(hasTarget(bishop, 3, 6, 3, [friendly, enemy])).toBe(false);
+      expect(hasTarget(bishop, 6, 0, 3, [friendly, enemy])).toBe(false);
     });
   });
 
