@@ -49,7 +49,7 @@ describe("hard AI worker integration", () => {
       pieceId: expect.any(String),
       square3D: expect.any(String),
       search: {
-        engine: "strategic-alpha-beta-tt",
+        engine: "strategic-3d-alpha-beta-v2",
         completedDepth: 1,
       },
     });
