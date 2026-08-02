@@ -3,6 +3,7 @@ import {
   LEGAL_PROMOTION_TYPES,
   assertPromotionType,
   chooseAIPromotion,
+  createPromotionReplacement,
   evaluatePawnPromotion,
 } from "./PawnPromotion.js";
 
@@ -61,5 +62,48 @@ describe("promotion choices", () => {
 
   it("defaults AI promotion to queen", () => {
     expect(chooseAIPromotion({}, {})).toBe("queen");
+  });
+});
+
+describe("promotion replacement state", () => {
+  it.each(LEGAL_PROMOTION_TYPES)(
+    "keeps the exchanged pawn outside the board when promoting to %s",
+    (promotedTo) => {
+      const originalPawn = {
+        id: "white-pawn-1",
+        type: "pawn",
+        color: "white",
+        position: position(4, 7, 7),
+        hasMoved: true,
+      };
+      const { retiredPawn, promotedPiece } = createPromotionReplacement(
+        originalPawn,
+        promotedTo,
+        9,
+        3,
+      );
+
+      expect(retiredPawn).toMatchObject({
+        id: "white-pawn-1",
+        type: "pawn",
+        color: "white",
+        retiredByPromotion: true,
+        captureIndex: 3,
+      });
+      expect(promotedPiece).toMatchObject({
+        id: "white-pawn-1::promoted::9",
+        type: promotedTo,
+        color: "white",
+        position: position(4, 7, 7),
+        promotedFrom: "pawn",
+        promotedFromPieceId: "white-pawn-1",
+      });
+      expect(promotedPiece.id).not.toBe(retiredPawn.id);
+    },
+  );
+
+  it("rejects replacement of a non-pawn", () => {
+    expect(() => createPromotionReplacement(piece("rook"), "queen", 1, 0))
+      .toThrow(TypeError);
   });
 });
