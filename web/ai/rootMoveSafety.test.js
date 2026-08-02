@@ -100,7 +100,7 @@ describe("hard AI root move safety", () => {
     });
   });
 
-  it("allows the narrow exception that directly supports a level-G pawn promotion", () => {
+  it("allows the narrow exception when promotion remains legal after recapture", () => {
     const board = createBoard([
       ...kings,
       piece("black-queen", "queen", "black", 0, 3, 6, true),
@@ -117,6 +117,27 @@ describe("hard AI root move safety", () => {
       reason: "supports-level-seven-promotion",
       exchangeNet: -1300,
       promotionCredit: 1300,
+    });
+  });
+
+  it("rejects the exception when the recapture gives check and stops promotion", () => {
+    const board = createBoard([
+      piece("white-king", "king", "white", 7, 0, 0),
+      piece("black-king", "king", "black", 1, 7, 6),
+      piece("black-queen", "queen", "black", 0, 3, 6, true),
+      piece("black-pawn-g", "pawn", "black", 2, 2, 6, true),
+      piece("white-pawn", "pawn", "white", 1, 3, 6, true),
+      piece("white-rook", "rook", "white", 4, 3, 6, true),
+    ]);
+    const move = findMove(board, "black", "black-queen", 1, 3, 6);
+
+    expect(move).toBeDefined();
+    expect(staticExchangeNet(board, move)).toBe(-1300);
+    expect(assessRootMoveSafety(board, move, "black")).toMatchObject({
+      safe: false,
+      reason: "uncompensated-high-value-sacrifice",
+      exchangeNet: -1300,
+      promotionCredit: 0,
     });
   });
 });
