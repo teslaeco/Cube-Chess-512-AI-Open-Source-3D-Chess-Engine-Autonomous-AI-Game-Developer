@@ -1,0 +1,52 @@
+.promotion-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, .72);
+  touch-action: none;
+}
+.promotion-overlay[hidden] { display: none; }
+.promotion-dialog {
+  width: min(520px, 100%);
+  padding: 1.25rem;
+  border: 2px solid #ffe600;
+  border-radius: 18px;
+  background: #101822;
+  color: #fff;
+  box-shadow: 0 24px 80px rgba(0,0,0,.65);
+}
+.promotion-dialog h2 { margin: 0 0 1rem; text-align: center; }
+.promotion-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.promotion-option {
+  min-height: 64px;
+  padding: .8rem 1rem;
+  border: 3px solid #ffe600;
+  border-radius: 14px;
+  background: #332f00;
+  color: #fff36a;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.promotion-option:hover,
+.promotion-option:focus-visible,
+.promotion-option--selected {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+  background: #ffe600;
+  color: #111;
+}
+.tutorial-pawn-promotion {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255,255,255,.25);
+}
+.tutorial-pawn-promotion h2 { color: #ffe600; }
+@media (max-width: 520px) {
+  .promotion-options { grid-template-columns: 1fr; }
+  .promotion-option { min-height: 58px; }
+  .promotion-dialog { max-height: calc(100vh - 2rem); overflow: auto; }
+}
