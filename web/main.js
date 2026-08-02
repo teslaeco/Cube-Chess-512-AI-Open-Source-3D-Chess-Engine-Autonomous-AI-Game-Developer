@@ -3,9 +3,11 @@ import "./styles/auth.css";
 import "./styles/global-online.css";
 import "./styles/profile.css";
 import "./styles/tutorial.css";
+import "./styles/forum.css";
 import { CubeChessApplication } from "./app/CubeChessApplication.js";
 import { AuthGate } from "./auth/AuthGate.js";
 import { UserProfileMenu } from "./auth/UserProfileMenu.js";
+import { ForumPanel } from "./forum/ForumPanel.js";
 import { OnlineMenuEnhancer } from "./online/OnlineMenuEnhancer.js";
 import {
   inferAuthoritativeMove,
@@ -160,19 +162,24 @@ const onlineMenu = new OnlineMenuEnhancer(root, (onlineGame) => {
   applyAuthoritativeState(onlineGame.state);
 });
 let profileMenu;
+let forum;
 const authGate = new AuthGate(root, (identity) => {
   application.identity = identity;
   root.dataset.authMode = identity.mode;
   root.dataset.playerId = identity.playerId;
+  forum?.setIdentity(identity);
   if (identity.mode === "account") profileMenu?.show(identity);
   else profileMenu?.hide();
 });
 profileMenu = new UserProfileMenu(root, authGate);
+forum = new ForumPanel(root, () => application.identity ?? authGate.identity);
 if (authGate.identity?.mode === "account") profileMenu.show(authGate.identity);
+forum.setIdentity(application.identity ?? authGate.identity);
 
 if (import.meta.env.DEV) {
   window.__cubeChessApplication = application;
   window.__cubeChessTutorial = tutorial;
+  window.__cubeChessForum = forum;
 }
 window.addEventListener(
   "pagehide",
@@ -180,6 +187,7 @@ window.addEventListener(
     if (application.onlineGame?.socket && application.onlineSocketHandler) {
       application.onlineGame.socket.removeEventListener("message", application.onlineSocketHandler);
     }
+    forum.dispose();
     tutorial.dispose();
     profileMenu.dispose();
     onlineMenu.dispose();
