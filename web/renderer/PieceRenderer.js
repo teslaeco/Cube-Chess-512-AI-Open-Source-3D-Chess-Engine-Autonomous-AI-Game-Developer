@@ -25,6 +25,15 @@ function easeInOut(value) {
     : 1 - Math.pow(-2 * value + 2, 3) / 2;
 }
 
+export function requiresPieceObjectReplacement(object, piece) {
+  const renderedPiece = object?.userData?.piece;
+  return Boolean(
+    object &&
+    renderedPiece &&
+    (renderedPiece.type !== piece.type || renderedPiece.color !== piece.color),
+  );
+}
+
 export class PieceRenderer {
   constructor(pieces, factory, onAnimationState = () => {}) {
     this.group = new THREE.Group();
@@ -59,6 +68,22 @@ export class PieceRenderer {
         child.material.dispose?.();
       }
     });
+  }
+
+  replaceObjectForPiece(id, object, piece, parent = this.boardGroup) {
+    const position = object.position.clone();
+    const scale = object.scale.clone();
+    const wasSelected = id === this.selectedPieceId;
+    this.animations.delete(id);
+    this.disposeObject(object);
+    const replacement = this.createObject(piece, parent);
+    replacement.position.copy(position);
+    replacement.scale.copy(scale);
+    if (wasSelected) {
+      replacement.scale.setScalar(1.1);
+      this.setBlueHighlight(replacement, true, 0.95);
+    }
+    return replacement;
   }
 
   setBlueHighlight(object, enabled, intensity = 0.95) {
@@ -151,6 +176,11 @@ export class PieceRenderer {
         this.boardGroup.add(restored);
         object = restored;
       }
+
+      if (requiresPieceObjectReplacement(object, piece)) {
+        object = this.replaceObjectForPiece(piece.id, object, piece);
+      }
+
       const existed = Boolean(object);
       if (!object) object = this.createObject(piece);
       this.pieces.set(piece.id, object);
@@ -171,8 +201,22 @@ export class PieceRenderer {
     for (const [id, object] of this.captured) {
       const capturedPiece = nextCaptured.get(id);
       if (capturedPiece) {
-        object.userData = { kind: "captured", piece: capturedPiece };
-        if (!this.animations.has(id)) object.position.copy(capturedPosition(capturedPiece));
+        let currentObject = object;
+        if (requiresPieceObjectReplacement(currentObject, capturedPiece)) {
+          currentObject = this.replaceObjectForPiece(
+            id,
+            currentObject,
+            capturedPiece,
+            this.capturedGroup,
+          );
+          currentObject.scale.setScalar(0.82);
+          this.addCaptureAura(currentObject, capturedPiece.color);
+          this.captured.set(id, currentObject);
+        }
+        currentObject.userData = { kind: "captured", piece: capturedPiece };
+        if (!this.animations.has(id)) {
+          currentObject.position.copy(capturedPosition(capturedPiece));
+        }
       } else if (!nextIds.has(id)) {
         this.captured.delete(id);
         this.animations.delete(id);
