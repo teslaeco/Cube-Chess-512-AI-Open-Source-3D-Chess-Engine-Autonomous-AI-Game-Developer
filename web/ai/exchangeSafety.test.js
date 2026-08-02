@@ -38,8 +38,10 @@ describe("exchange-safe Cube Chess strategy", () => {
       piece("black-knight", "knight", "black", 4, 5, 4, true),
     ];
 
+    // Depth one plus quiescence is sufficient: after R×P the forced Q×R
+    // recapture is a tactical continuation and must be searched immediately.
     const move = chooseAdvancedMove(pieces, "black", {
-      maxDepth: 2,
+      maxDepth: 1,
       quiescenceDepth: 2,
       milliseconds: 60_000,
       now: () => 0,
