@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateLegalMovesForColor } from "../../src/engine3d/index.ts";
+import { chooseAdvancedMove } from "./advancedSearch.js";
 import { createBoard } from "./searchEngine.js";
 import {
   assessRootMoveSafety,
@@ -50,6 +51,35 @@ describe("hard AI root move safety", () => {
       "black",
     );
     expect(filtered).not.toContainEqual(move);
+  });
+
+  it("wires the safety policy into the actual hard-AI move choice", () => {
+    const pieces = [
+      ...kings,
+      piece("black-queen", "queen", "black", 0, 4, 0, true),
+      piece("black-knight", "knight", "black", 5, 5, 5, true),
+      piece("white-pawn", "pawn", "white", 0, 3, 0, true),
+      piece("white-rook", "rook", "white", 0, 0, 0, true),
+    ];
+
+    const selected = chooseAdvancedMove(pieces, "black", {
+      maxDepth: 1,
+      quiescenceDepth: 1,
+      milliseconds: 60_000,
+      now: () => 0,
+    });
+
+    expect(selected).not.toBeNull();
+    expect(selected).not.toMatchObject({
+      pieceId: "black-queen",
+      capturedPieceId: "white-pawn",
+      to: { x: 0, y: 3, z: 0 },
+    });
+    expect(selected.search).toMatchObject({
+      policy: "team-play-root-safety-v4",
+      rejectedRootMoves: expect.any(Number),
+    });
+    expect(selected.search.rejectedRootMoves).toBeGreaterThan(0);
   });
 
   it("allows a materially winning capture even when the rook is recaptured", () => {
