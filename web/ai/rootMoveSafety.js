@@ -1,6 +1,6 @@
 import {
-  evaluatePosition,
   generateLegalMovesForColor,
+  isSquareAttacked,
 } from "../../src/engine3d/index.ts";
 import { CUBE_PIECE_VALUES, materialValue } from "./cubePieceValues.js";
 import {
@@ -114,19 +114,21 @@ export function assessRootMoveSafety(board, move, sideToMove) {
   }
 
   const next = applyMoveForSearch(board, move);
-  const status = evaluatePosition(next, opposite(sideToMove));
-  if (status.kind === "checkmate" && status.winner === sideToMove) {
-    return { safe: true, reason: "forced-mate", exchangeNet: Infinity, promotionCredit: 0 };
-  }
-
   const movedAfter = next.getPieceAt(move.to);
   if (!movedAfter) {
     return { safe: true, reason: "missing-piece", exchangeNet: 0, promotionCredit: 0 };
   }
 
-  const canBeCaptured = capturesOnSquare(next, opposite(sideToMove), move.to).length > 0;
+  const enemy = opposite(sideToMove);
+  if (!isSquareAttacked(next, movedAfter.position, enemy)) {
+    return { safe: true, reason: "not-attacked", exchangeNet: 0, promotionCredit: 0 };
+  }
+
+  // Pseudo-attacks are only a fast pre-check. Pinned pieces and checkmate may
+  // make every apparent capture illegal, so the guard confirms a legal capture.
+  const canBeCaptured = capturesOnSquare(next, enemy, move.to).length > 0;
   if (!canBeCaptured) {
-    return { safe: true, reason: "not-capturable", exchangeNet: 0, promotionCredit: 0 };
+    return { safe: true, reason: "not-legally-capturable", exchangeNet: 0, promotionCredit: 0 };
   }
 
   const exchangeNet = staticExchangeNet(board, move);
