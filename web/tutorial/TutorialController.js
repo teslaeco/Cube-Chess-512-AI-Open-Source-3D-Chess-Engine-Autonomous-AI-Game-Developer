@@ -1,5 +1,5 @@
 const STORAGE_KEY = "cubeChessTutorial";
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 3;
 const LEVEL_NAMES = "ABCDEFGH";
 
 const COPY = {
@@ -22,6 +22,8 @@ const COPY = {
     dimension: "The classical movement shape is preserved and extended into height. Use a highlighted field on another level.",
     completeTitle: "Core rule understood",
     complete: "Length, width and height are equal axes. The rules are not replaced; their geometry is extended to 3D.",
+    pawnPromotionTitle: "6. Pawn Promotion in 3D Space",
+    pawnPromotion: "On Levels 1 through 7, a pawn may be promoted according to the classical chess rule. If it reaches the opponent’s final rank on its current level, the player may replace it with a queen, rook, bishop or knight.\n\nA pawn may also advance vertically between levels. If a legal move places it on Level 8, it is promoted immediately, regardless of the rank, file or square on which it entered the highest level.\n\nDuring promotion, the available pieces are highlighted in yellow. A pawn cannot be promoted to a king or another pawn.",
     legalSame: "Legal move on the same level.",
     legalSpatial: "Legal spatial move from level {from} to level {to}.",
     capture: "Legal capture on level {to}.",
@@ -54,6 +56,8 @@ const COPY = {
     dimension: "Klasyczny kształt ruchu pozostaje bez zmian i zostaje rozszerzony o wysokość. Wybierz podświetlone pole na innym poziomie.",
     completeTitle: "Główna zasada zrozumiana",
     complete: "Długość, szerokość i wysokość są równorzędnymi osiami. Reguły nie są zastępowane, tylko rozszerzone do 3D.",
+    pawnPromotionTitle: "6. Promocja pionka w przestrzeni 3D",
+    pawnPromotion: "Na poziomach od 1 do 7 pionek może zostać promowany zgodnie z klasyczną zasadą szachową. Jeżeli dotrze do ostatniego rzędu przeciwnika na swoim aktualnym poziomie, gracz może zamienić go na hetmana, wieżę, gońca albo skoczka.\n\nPionek może również awansować pionowo pomiędzy poziomami. Jeżeli po legalnym ruchu wejdzie na poziom 8, zostaje promowany natychmiast, niezależnie od rzędu, kolumny i pola, na którym znalazł się na najwyższym poziomie.\n\nPodczas promocji dostępne figury zostaną podświetlone na żółto. Nie można promować pionka na króla ani na kolejnego pionka.",
     legalSame: "Legalny ruch na tym samym poziomie.",
     legalSpatial: "Legalny ruch przestrzenny z poziomu {from} na poziom {to}.",
     capture: "Legalne bicie na poziomie {to}.",
@@ -69,12 +73,13 @@ const COPY = {
   },
 };
 
-const STEPS = [
+export const STEPS = [
   ["boardTitle", "board"],
   ["selectTitle", "select"],
   ["selectedTitle", "selected"],
   ["dimensionTitle", "dimension"],
   ["completeTitle", "complete"],
+  ["pawnPromotionTitle", "pawnPromotion"],
 ];
 
 function interpolate(text, values = {}) {
@@ -85,7 +90,7 @@ export function loadTutorialProgress(storage = globalThis.localStorage) {
   const fallback = { version: STORAGE_VERSION, step: 0, complete: false, autoExplain: true };
   try {
     const value = JSON.parse(storage?.getItem(STORAGE_KEY) || "null");
-    if (!value || ![1, STORAGE_VERSION].includes(value.version)) return fallback;
+    if (!value || ![1, 2, STORAGE_VERSION].includes(value.version)) return fallback;
     return {
       ...fallback,
       autoExplain: value.autoExplain !== false,
@@ -175,8 +180,8 @@ export class TutorialController {
     if (action === "close") this.hiddenByPlayer = true;
     if (action === "previous") this.progress.step = Math.max(0, this.progress.step - 1);
     if (action === "next") this.progress.step = Math.min(STEPS.length - 1, this.progress.step + 1);
-    if (action === "why") this.showPieceExplanation();
-    if (action === "repeat") this.demonstrateCurrentStep();
+    if (action === "why" && this.progress.step < STEPS.length - 1) this.showPieceExplanation();
+    if (action === "repeat" && this.progress.step < STEPS.length - 1) this.demonstrateCurrentStep();
     this.save();
     this.render();
   }
@@ -270,11 +275,14 @@ export class TutorialController {
     if (this.panel.hidden) return;
 
     const [titleKey, messageKey] = STEPS[this.progress.step];
+    const promotionStep = this.progress.step === STEPS.length - 1;
+    const message = this.panel.querySelector('[data-role="message"]');
     this.panel.querySelector('[data-role="title"]').textContent = this.t("title");
     this.panel.querySelector('[data-role="progress"]').textContent = this.t("progress", { current: this.progress.step + 1, total: STEPS.length });
     this.panel.querySelector('[data-role="step-title"]').textContent = this.t(titleKey);
-    this.panel.querySelector('[data-role="message"]').textContent = this.t(messageKey);
-    this.panel.querySelector('[data-role="explanation"]').textContent = this.dynamicMessage || "";
+    message.textContent = this.t(messageKey);
+    message.style.whiteSpace = promotionStep ? "pre-line" : "";
+    this.panel.querySelector('[data-role="explanation"]').textContent = promotionStep ? "" : (this.dynamicMessage || "");
     this.panel.querySelector('[data-role="auto-label"]').textContent = this.t("auto");
     this.panel.querySelector('[data-action="auto"]').checked = this.progress.autoExplain;
     for (const action of ["previous", "next", "why", "repeat"]) {
@@ -282,6 +290,8 @@ export class TutorialController {
     }
     this.panel.querySelector('[data-action="previous"]').disabled = this.progress.step === 0;
     this.panel.querySelector('[data-action="next"]').disabled = this.progress.step === STEPS.length - 1;
+    this.panel.querySelector('[data-action="why"]').hidden = promotionStep;
+    this.panel.querySelector('[data-action="repeat"]').hidden = promotionStep;
     this.panel.querySelector('[data-action="close"]').setAttribute("aria-label", this.t("close"));
     this.panel.dataset.step = String(this.progress.step);
     this.panel.dataset.selected = state.selectedPieceId || "";
