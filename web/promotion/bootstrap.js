@@ -43,4 +43,6 @@ TutorialController.prototype.render = function renderWithPromotionSection(state)
   section.innerHTML = `<h2>${copy.title}</h2><p>${copy.levelsOneToSeven}</p><p>${copy.levelEight}</p><p>${copy.yellowSelection} ${copy.allowedPieces}</p>`;
 };
 
-await import("../main.js");
+void import("../main.js").catch((error) => {
+  console.error("Failed to start Cube Chess 512", error);
+});
