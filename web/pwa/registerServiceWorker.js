@@ -1,36 +1,47 @@
 function updateMessage() {
   return document.documentElement.lang?.startsWith("pl")
-    ? "Dostępna jest nowa wersja gry"
-    : "A new game version is available";
+    ? "Wczytuję najnowszą wersję gry"
+    : "Loading the latest game version";
+}
+
+function reloadOnceForControllerChange() {
+  const key = "cubeChessControllerReload";
+  if (sessionStorage.getItem(key) === "1") {
+    sessionStorage.removeItem(key);
+    return;
+  }
+  sessionStorage.setItem(key, "1");
+  location.reload();
 }
 
 export async function registerServiceWorker() {
   if (!("serviceWorker" in navigator) || import.meta.env.DEV) return;
+
   try {
     const registration = await navigator.serviceWorker.register("./sw.js", {
       scope: "./",
+      updateViaCache: "none",
     });
-    let reloading = false;
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (reloading) return;
-      reloading = true;
-      location.reload();
-    });
+
+    navigator.serviceWorker.addEventListener("controllerchange", reloadOnceForControllerChange);
+
+    const activateWaitingWorker = () => {
+      if (!registration.waiting) return false;
+      registration.waiting.postMessage({ type: "SKIP_WAITING" });
+      return true;
+    };
+
     registration.addEventListener("updatefound", () => {
       const worker = registration.installing;
       worker?.addEventListener("statechange", () => {
         if (worker.state !== "installed" || !navigator.serviceWorker.controller) return;
-        const button = document.createElement("button");
-        button.className = "update-toast";
-        button.textContent = `${updateMessage()} · ↻`;
-        button.addEventListener(
-          "click",
-          () => registration.waiting?.postMessage({ type: "SKIP_WAITING" }),
-          { once: true },
-        );
-        document.body.append(button);
+        document.documentElement.dataset.updateStatus = updateMessage();
+        activateWaitingWorker();
       });
     });
+
+    await registration.update();
+    activateWaitingWorker();
   } catch (error) {
     console.warn("Cube Chess offline shell could not be registered", error);
   }
