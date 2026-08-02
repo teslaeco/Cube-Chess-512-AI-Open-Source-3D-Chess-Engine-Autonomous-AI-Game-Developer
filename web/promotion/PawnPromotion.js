@@ -23,6 +23,28 @@ export function chooseAIPromotion(_gameState, _move) {
   return "queen";
 }
 
+export function createPromotionReplacement(piece, promotedTo, sequence, captureIndex) {
+  assertPromotionType(promotedTo);
+  if (!piece || piece.type !== "pawn") {
+    throw new TypeError("Only a pawn can be replaced during promotion");
+  }
+
+  const retiredPawn = {
+    ...structuredClone(piece),
+    retiredByPromotion: true,
+    captureIndex,
+  };
+  const promotedPiece = {
+    ...structuredClone(piece),
+    id: `${piece.id}::promoted::${Number(sequence) || 0}`,
+    type: promotedTo,
+    promotedFrom: "pawn",
+    promotedFromPieceId: piece.id,
+  };
+
+  return { retiredPawn, promotedPiece };
+}
+
 function finishTurn(presentation, movingColor) {
   presentation.sideToMove = movingColor === "white" ? "black" : "white";
   if (presentation.sideToMove === "white") presentation.fullMoveNumber += 1;
@@ -69,14 +91,28 @@ export function installPawnPromotion(application) {
     assertPromotionType(type);
     const pending = presentation.pendingPromotion;
     if (!pending) return false;
-    const piece = presentation.pieces.find((candidate) => candidate.id === pending.pieceId);
+    const pieceIndex = presentation.pieces.findIndex((candidate) => candidate.id === pending.pieceId);
+    const piece = presentation.pieces[pieceIndex];
     if (!piece || piece.type !== "pawn") return false;
-    piece.type = type;
+
+    const { retiredPawn, promotedPiece } = createPromotionReplacement(
+      piece,
+      type,
+      presentation.lastMove?.sequence,
+      presentation.capturedPieces.length,
+    );
+    retiredPawn.capturedBy = piece.color;
+    retiredPawn.capturedOnMove = presentation.fullMoveNumber;
+    presentation.capturedPieces.push(retiredPawn);
+    presentation.pieces[pieceIndex] = promotedPiece;
+
     presentation.lastMove = {
       ...presentation.lastMove,
       promotion: { reason: pending.reason, promotedTo: type },
       promotedTo: type,
       promotionReason: pending.reason,
+      promotedPieceId: promotedPiece.id,
+      originalPawnId: piece.id,
     };
     presentation.pendingPromotion = null;
     presentation.busy = false;
