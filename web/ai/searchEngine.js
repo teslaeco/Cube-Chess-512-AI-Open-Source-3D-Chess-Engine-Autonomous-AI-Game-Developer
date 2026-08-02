@@ -4,15 +4,9 @@ import {
   evaluatePosition,
   generateLegalMovesForColor,
 } from "../../src/engine3d/index.ts";
+import { CUBE_PIECE_VALUES } from "./cubePieceValues.js";
 
-export const PIECE_VALUES = Object.freeze({
-  pawn: 100,
-  knight: 320,
-  bishop: 340,
-  rook: 500,
-  queen: 900,
-  king: 20_000,
-});
+export const PIECE_VALUES = CUBE_PIECE_VALUES;
 
 export const DIFFICULTY_LIMITS = Object.freeze({
   easy: { maxDepth: 1, quiescenceDepth: 1, milliseconds: 120 },
@@ -39,12 +33,45 @@ export function opposite(color) {
   return color === "white" ? "black" : "white";
 }
 
+export function requiresSearchPromotion(piece, to) {
+  if (!piece || piece.type !== "pawn" || !to) return false;
+  if (to.z === 7) return true;
+  const finalRank = piece.color === "white" ? 7 : 0;
+  return to.z < 7 && to.y === finalRank;
+}
+
+export function isSearchPromotionMove(board, move) {
+  return requiresSearchPromotion(board.getPieceAt(move.from), move.to);
+}
+
+/**
+ * Applies a move to a cloned board and resolves the promotion that the real
+ * presentation layer performs immediately after the legal pawn move.
+ *
+ * Search must never analyse a pawn on a promotion square as if it were still a
+ * pawn. The production AI currently chooses a queen, so the search uses the
+ * same deterministic replacement until underpromotion becomes part of search.
+ */
+export function applyMoveForSearch(board, move, promotionType = "queen") {
+  const next = board.clone();
+  const { movedPiece } = next.applyMove(move);
+  if (!requiresSearchPromotion(movedPiece, movedPiece.position)) return next;
+
+  return new Board3D(
+    next.getAllPieces().map((piece) =>
+      piece.id === movedPiece.id ? { ...piece, type: promotionType } : piece,
+    ),
+  );
+}
+
 function positionalBonus(piece) {
+  if (piece.type === "king") return 0;
   const centerDistance =
     Math.abs(piece.position.x - 3.5) +
     Math.abs(piece.position.y - 3.5) +
     Math.abs(piece.position.z - 3.5);
-  return Math.max(0, Math.round(MAX_POSITIONAL_BONUS - centerDistance * 2));
+  const weight = piece.type === "pawn" ? 0.45 : 1;
+  return Math.max(0, Math.round((MAX_POSITIONAL_BONUS - centerDistance * 2) * weight));
 }
 
 export function evaluateBoard(board, perspective) {
@@ -70,7 +97,9 @@ function moveOrderingScore(board, move) {
     score += 100_000 + PIECE_VALUES[victim.type] * 16;
     score -= attacker ? PIECE_VALUES[attacker.type] : 0;
   }
-  if (move.kind === "promotion") score += 80_000;
+  if (isSearchPromotionMove(board, move)) {
+    score += 120_000 + PIECE_VALUES.queen - PIECE_VALUES.pawn;
+  }
 
   const centerDistance =
     Math.abs(move.to.x - 3.5) +
@@ -132,17 +161,18 @@ function quiescence(board, side, perspective, alpha, beta, depth, ply, shouldSto
     beta = Math.min(beta, standPat);
   }
 
-  const captures = orderMoves(
+  const tacticalMoves = orderMoves(
     board,
-    generateLegalMovesForColor(board, side).filter((move) => move.capturedPieceId),
+    generateLegalMovesForColor(board, side).filter(
+      (move) => move.capturedPieceId || isSearchPromotionMove(board, move),
+    ),
   );
-  if (!captures.length) return { score: standPat, aborted: false };
+  if (!tacticalMoves.length) return { score: standPat, aborted: false };
 
   let best = standPat;
-  for (const move of captures) {
+  for (const move of tacticalMoves) {
     if (shouldStop()) return { score: best, aborted: true };
-    const next = board.clone();
-    next.applyMove(move);
+    const next = applyMoveForSearch(board, move);
     const child = quiescence(
       next,
       opposite(side),
@@ -203,8 +233,7 @@ function alphaBeta(
 
   for (const move of moves) {
     if (shouldStop()) return { score: best, aborted: true };
-    const next = board.clone();
-    next.applyMove(move);
+    const next = applyMoveForSearch(board, move);
     const child = alphaBeta(
       next,
       opposite(side),
@@ -287,8 +316,7 @@ export function chooseBestMove(
         iterationAborted = true;
         break;
       }
-      const next = board.clone();
-      next.applyMove(move);
+      const next = applyMoveForSearch(board, move);
       const result = alphaBeta(
         next,
         opposite(sideToMove),

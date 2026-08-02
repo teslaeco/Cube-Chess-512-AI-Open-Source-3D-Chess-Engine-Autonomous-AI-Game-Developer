@@ -2,9 +2,18 @@ import {
   generateLegalMovesForColor,
   isSquareAttacked,
 } from "../../src/engine3d/index.ts";
-import { PIECE_VALUES, opposite } from "./searchEngine.js";
+import {
+  applyMoveForSearch,
+  PIECE_VALUES,
+  opposite,
+} from "./searchEngine.js";
 
-const NON_KING_STARTING_MATERIAL = 8 * 100 + 2 * 320 + 2 * 340 + 2 * 500 + 900;
+const NON_KING_STARTING_MATERIAL =
+  8 * PIECE_VALUES.pawn +
+  2 * PIECE_VALUES.knight +
+  2 * PIECE_VALUES.bishop +
+  2 * PIECE_VALUES.rook +
+  PIECE_VALUES.queen;
 
 function centerScore(position) {
   const distance =
@@ -14,23 +23,52 @@ function centerScore(position) {
   return Math.max(0, Math.round(54 - distance * 5));
 }
 
+function centerWeight(type) {
+  if (type === "pawn") return 0.35;
+  if (type === "rook") return 0.55;
+  if (type === "queen") return 0.65;
+  if (type === "bishop") return 0.85;
+  if (type === "knight") return 1;
+  return 0;
+}
+
 function phaseOf(board) {
   let remaining = 0;
   for (const piece of board.getAllPieces()) {
     if (piece.type === "king" || piece.type === "pawn") continue;
     remaining += PIECE_VALUES[piece.type] ?? 0;
   }
-  const bothSides = 2 * (NON_KING_STARTING_MATERIAL - 8 * 100);
+  const bothSides = 2 * (NON_KING_STARTING_MATERIAL - 8 * PIECE_VALUES.pawn);
   return Math.max(0, Math.min(1, remaining / bothSides));
 }
 
-function movementProgress(piece) {
-  if (piece.type !== "pawn") return 0;
-  const forward = piece.color === "white" ? piece.position.y : 7 - piece.position.y;
-  return forward * 8 + piece.position.z * 5;
+function pawnAdvance(piece) {
+  return piece.color === "white" ? piece.position.y : 7 - piece.position.y;
 }
 
-function pawnStructure(pieces, color) {
+function pawnPromotionDistance(piece) {
+  const finalRank = piece.color === "white" ? 7 : 0;
+  const rankDistance = Math.abs(finalRank - piece.position.y);
+  const levelDistance = 7 - piece.position.z;
+  return Math.min(rankDistance, levelDistance);
+}
+
+function movementProgress(piece, connected, defended, attacked) {
+  if (piece.type !== "pawn") return 0;
+
+  const forward = pawnAdvance(piece);
+  const height = piece.position.z;
+  const usefulAdvance = Math.min(forward, 3) * 4 + Math.min(height, 2) * 4;
+  const overextension = Math.max(0, forward - 3) + Math.max(0, height - 2);
+  let score = usefulAdvance - overextension * (connected ? 6 : 22);
+
+  if (attacked && !defended) score -= 24 + overextension * 14;
+  const promotionDistance = pawnPromotionDistance(piece);
+  if (defended && promotionDistance <= 2) score += (3 - promotionDistance) * 24;
+  return score;
+}
+
+function pawnStructure(board, pieces, color) {
   const pawns = pieces.filter((piece) => piece.color === color && piece.type === "pawn");
   const files = new Map();
   for (const pawn of pawns) {
@@ -55,8 +93,11 @@ function pawnStructure(pieces, color) {
         break;
       }
     }
+
+    const attacked = isSquareAttacked(board, pawn.position, opposite(color));
+    const defended = isSquareAttacked(board, pawn.position, color);
     score += connected ? 14 : -9;
-    score += movementProgress(pawn);
+    score += movementProgress(pawn, connected, defended, attacked);
   }
   return score;
 }
@@ -90,23 +131,27 @@ function kingSafety(board, color, openingPhase) {
 }
 
 function developmentScore(pieces, color, openingPhase) {
+  const own = pieces.filter((piece) => piece.color === color);
+  const minorPieces = own.filter(
+    (piece) => piece.type === "bishop" || piece.type === "knight",
+  );
+  const developedMinor = minorPieces.filter((piece) => piece.hasMoved).length;
   let score = 0;
-  let developedMinor = 0;
-  for (const piece of pieces) {
-    if (piece.color !== color) continue;
-    if (piece.type === "bishop" || piece.type === "knight") {
-      if (piece.hasMoved) {
-        developedMinor += 1;
-        score += 44;
-      } else {
-        score -= Math.round(28 * openingPhase);
-      }
-    }
-    if (piece.type === "queen" && piece.hasMoved && developedMinor < 2) {
-      score -= Math.round(95 * openingPhase);
-    }
-    if (piece.type === "rook" && piece.hasMoved) score += 10;
+
+  for (const piece of minorPieces) {
+    score += piece.hasMoved ? 44 : -Math.round(28 * openingPhase);
   }
+
+  const queen = own.find((piece) => piece.type === "queen");
+  if (queen?.hasMoved && developedMinor < 2) {
+    score -= Math.round(95 * openingPhase);
+  }
+
+  for (const rook of own.filter((piece) => piece.type === "rook" && piece.hasMoved)) {
+    score += developedMinor >= 2 ? 12 : -Math.round(30 * openingPhase);
+  }
+
+  score += Math.round(developedMinor * developedMinor * 12 * openingPhase);
   return score;
 }
 
@@ -114,7 +159,7 @@ function activityScore(board, color) {
   const moves = generateLegalMovesForColor(board, color);
   const active = new Set(moves.map((move) => move.pieceId)).size;
   const levels = new Set(moves.map((move) => move.to.z)).size;
-  return moves.length * 2 + active * 16 + levels * 7;
+  return moves.length + active * 18 + levels * 10;
 }
 
 function tacticalIntegrity(board, color) {
@@ -125,10 +170,35 @@ function tacticalIntegrity(board, color) {
     const attacked = isSquareAttacked(board, piece.position, enemy);
     const defended = isSquareAttacked(board, piece.position, color);
     const value = PIECE_VALUES[piece.type] ?? 0;
-    if (attacked && !defended) score -= Math.round(value * 0.72);
-    else if (attacked && defended) score -= Math.round(value * 0.12);
-    else if (defended) score += Math.round(value * 0.035);
+    if (attacked && !defended) score -= Math.round(value * 0.95);
+    else if (attacked && defended) score -= Math.round(value * 0.18);
+    else if (defended) score += Math.round(value * 0.025);
   }
+  return score;
+}
+
+function exchangeLiability(board, color) {
+  const pieces = new Map(board.getAllPieces().map((piece) => [piece.id, piece]));
+  const worstByVictim = new Map();
+
+  for (const move of generateLegalMovesForColor(board, opposite(color))) {
+    if (!move.capturedPieceId) continue;
+    const victim = pieces.get(move.capturedPieceId);
+    const attacker = pieces.get(move.pieceId);
+    if (!victim || !attacker || victim.color !== color || victim.type === "king") continue;
+
+    const victimValue = PIECE_VALUES[victim.type] ?? 0;
+    const attackerValue = PIECE_VALUES[attacker.type] ?? 0;
+    const defended = isSquareAttacked(board, victim.position, color);
+    const unfavorableDifference = Math.max(0, victimValue - attackerValue);
+    const risk = defended
+      ? Math.round(unfavorableDifference * 0.38 + victimValue * 0.06)
+      : Math.round(unfavorableDifference * 0.9 + victimValue * 0.3);
+    worstByVictim.set(victim.id, Math.max(worstByVictim.get(victim.id) ?? 0, risk));
+  }
+
+  let score = 0;
+  for (const risk of worstByVictim.values()) score -= risk;
   return score;
 }
 
@@ -140,14 +210,17 @@ function sideScore(board, color) {
   for (const piece of pieces) {
     if (piece.color !== color) continue;
     score += PIECE_VALUES[piece.type] ?? 0;
-    if (piece.type !== "king") score += centerScore(piece.position);
+    if (piece.type !== "king") {
+      score += Math.round(centerScore(piece.position) * centerWeight(piece.type));
+    }
   }
 
-  score += pawnStructure(pieces, color);
+  score += pawnStructure(board, pieces, color);
   score += developmentScore(pieces, color, openingPhase);
   score += activityScore(board, color);
   score += kingSafety(board, color, openingPhase);
   score += tacticalIntegrity(board, color);
+  score += exchangeLiability(board, color);
   return score;
 }
 
@@ -161,25 +234,31 @@ export function strategicMoveBias(board, move, recentPieceIds = []) {
   if (!moving) return 0;
 
   const before = sideScore(board, moving.color);
-  const next = board.clone();
-  next.applyMove(move);
+  const next = applyMoveForSearch(board, move);
   const after = sideScore(next, moving.color);
   let score = Math.round((after - before) * 0.5);
 
-  const tactical = Boolean(move.capturedPieceId || move.kind === "promotion");
+  const movedAfter = next.getAllPieces().find((piece) => piece.id === move.pieceId);
+  const promoted = moving.type === "pawn" && movedAfter?.type !== "pawn";
+  const tactical = Boolean(move.capturedPieceId || promoted);
   const repeats = recentPieceIds.filter((id) => id === move.pieceId).length;
   if (!tactical) score -= repeats * 26;
 
   if (move.capturedPieceId) {
     const victim = pieces.find((piece) => piece.id === move.capturedPieceId);
-    if (victim) score += (PIECE_VALUES[victim.type] ?? 0) - Math.round((PIECE_VALUES[moving.type] ?? 0) * 0.08);
+    if (victim) {
+      score += (PIECE_VALUES[victim.type] ?? 0) - Math.round((PIECE_VALUES[moving.type] ?? 0) * 0.12);
+    }
   }
 
-  const movedAfter = next.getAllPieces().find((piece) => piece.id === move.pieceId);
+  if (promoted) score += PIECE_VALUES.queen - PIECE_VALUES.pawn;
+
   if (movedAfter && movedAfter.type !== "king") {
     const attacked = isSquareAttacked(next, movedAfter.position, opposite(moving.color));
     const defended = isSquareAttacked(next, movedAfter.position, moving.color);
-    if (attacked && !defended) score -= Math.round((PIECE_VALUES[moving.type] ?? 0) * 0.85);
+    const movedValue = PIECE_VALUES[movedAfter.type] ?? 0;
+    if (attacked && !defended) score -= Math.round(movedValue * 1.05);
+    else if (attacked && defended) score -= Math.round(movedValue * 0.15);
   }
   return score;
 }

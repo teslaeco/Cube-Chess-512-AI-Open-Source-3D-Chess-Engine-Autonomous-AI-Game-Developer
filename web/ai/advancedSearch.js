@@ -3,7 +3,9 @@ import {
   generateLegalMovesForColor,
 } from "../../src/engine3d/index.ts";
 import {
+  applyMoveForSearch,
   createBoard,
+  isSearchPromotionMove,
   opposite,
   orderMoves,
   serializeMove,
@@ -71,7 +73,7 @@ function orderedMoves(board, moves, preferred = null, history = null, ply = 0) {
 }
 
 function rememberCutoff(context, move, depth, ply) {
-  if (move.capturedPieceId || move.kind === "promotion") return;
+  if (move.capturedPieceId) return;
   const key = `${move.pieceId}:${move.to.x},${move.to.y},${move.to.z}`;
   context.history.set(key, (context.history.get(key) ?? 0) + depth * depth);
   context.history.set(`killer:${ply}:${key}`, depth);
@@ -111,14 +113,13 @@ function quiescence(board, side, perspective, alpha, beta, depth, ply, context) 
   }
 
   const tactical = generateLegalMovesForColor(board, side).filter(
-    (move) => move.capturedPieceId || move.kind === "promotion",
+    (move) => move.capturedPieceId || isSearchPromotionMove(board, move),
   );
   const moves = orderedMoves(board, tactical, null, context.history, ply);
   let best = standPat;
 
   for (const move of moves) {
-    const next = board.clone();
-    next.applyMove(move);
+    const next = applyMoveForSearch(board, move);
     const child = quiescence(
       next,
       opposite(side),
@@ -179,8 +180,7 @@ function alphaBeta(board, side, perspective, depth, alpha, beta, qDepth, ply, co
   let bestMove = null;
 
   for (const move of moves) {
-    const next = board.clone();
-    next.applyMove(move);
+    const next = applyMoveForSearch(board, move);
     const child = alphaBeta(
       next,
       opposite(side),
@@ -201,7 +201,7 @@ function alphaBeta(board, side, perspective, depth, alpha, beta, qDepth, ply, co
     if (maximizing) alpha = Math.max(alpha, bestScore);
     else beta = Math.min(beta, bestScore);
     if (beta <= alpha) {
-      rememberCutoff(context, move, depth, ply);
+      if (!isSearchPromotionMove(board, move)) rememberCutoff(context, move, depth, ply);
       break;
     }
   }
@@ -249,8 +249,7 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
         aborted = true;
         break;
       }
-      const next = board.clone();
-      next.applyMove(move);
+      const next = applyMoveForSearch(board, move);
       const result = alphaBeta(
         next,
         opposite(sideToMove),
@@ -266,10 +265,8 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
         aborted = true;
         break;
       }
-      // Root heuristics may improve move ordering, but they must never alter
-      // the authoritative minimax result. Adding the bias here previously let
-      // a superficially attractive pawn push override a strategically superior
-      // move found by the full search.
+      // Root heuristics improve ordering only. They must never override the
+      // authoritative minimax result returned by the completed search.
       const score = result.score;
       if (score > iterationScore) {
         iterationScore = score;
@@ -287,6 +284,7 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
   const serialized = serializeMove(bestMove);
   serialized.search = {
     engine: "strategic-3d-alpha-beta-v2",
+    policy: "promotion-aware-exchange-safe-v3",
     completedDepth,
     nodes: context.nodes,
     score: Number.isFinite(bestScore) ? bestScore : null,
