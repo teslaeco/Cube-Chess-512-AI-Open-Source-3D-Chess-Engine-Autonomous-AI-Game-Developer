@@ -1,0 +1,23 @@
+.forum-topic-row[data-open-topic] { cursor: pointer; }
+.forum-topic-row[data-open-topic]:focus-visible { outline: 2px solid #55dff4; outline-offset: -2px; }
+.forum-topic-detail { display: grid; gap: 1rem; }
+.forum-back { justify-self: start; padding: .65rem .9rem; border: 1px solid rgba(255,255,255,.13); border-radius: .7rem; background: rgba(255,255,255,.06); color: inherit; cursor: pointer; }
+.forum-topic-card,.forum-replies { border: 1px solid rgba(255,255,255,.09); border-radius: 1rem; background: rgba(255,255,255,.025); overflow: hidden; }
+.forum-topic-card > header { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; padding: 1.25rem; border-bottom: 1px solid rgba(255,255,255,.08); }
+.forum-topic-card h1 { margin: .45rem 0 .3rem; font-size: clamp(1.45rem,3vw,2.2rem); }
+.forum-topic-card header p { margin: 0; color: rgba(255,255,255,.52); }
+.forum-topic-body { padding: 1.25rem; line-height: 1.7; overflow-wrap: anywhere; }
+.forum-owner-actions { display: flex; gap: .55rem; flex-wrap: wrap; }
+.forum-owner-actions button { padding: .6rem .8rem; border: 1px solid rgba(255,255,255,.13); border-radius: .65rem; background: rgba(255,255,255,.06); color: inherit; cursor: pointer; }
+.forum-owner-actions .danger { border-color: rgba(255,100,100,.35); color: #ffb3b3; }
+.forum-replies > h2 { margin: 0; padding: 1rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,.08); }
+.forum-reply { padding: 1rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,.075); }
+.forum-reply header { display: flex; justify-content: space-between; gap: 1rem; }
+.forum-reply small { color: rgba(255,255,255,.48); }
+.forum-reply p { margin: .65rem 0 0; line-height: 1.6; overflow-wrap: anywhere; }
+.forum-no-replies { margin: 0; padding: 1.25rem; color: rgba(255,255,255,.58); }
+.forum-reply-form { display: grid; gap: .75rem; padding: 1.25rem; }
+.forum-reply-form label { display: grid; gap: .4rem; }
+.forum-reply-form textarea { width: 100%; min-height: 120px; box-sizing: border-box; padding: .75rem; border: 1px solid rgba(255,255,255,.13); border-radius: .7rem; background: #07131c; color: inherit; font: inherit; resize: vertical; }
+.forum-reply-form button { justify-self: end; padding: .7rem 1rem; border: 0; border-radius: .65rem; background: #55dff4; color: #031019; font-weight: 800; cursor: pointer; }
+@media (max-width: 640px) { .forum-topic-card > header { flex-direction: column; } .forum-owner-actions { width: 100%; } .forum-owner-actions button { flex: 1; } .forum-reply header { flex-direction: column; gap: .25rem; } }
