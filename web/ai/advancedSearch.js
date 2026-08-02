@@ -14,6 +14,7 @@ import {
   evaluateStrategicPosition,
   strategicMoveBias,
 } from "./strategicEvaluation.js";
+import { filterRootMovesBySafety } from "./rootMoveSafety.js";
 
 const MATE_SCORE = 10_000_000;
 const DEFAULT_LIMITS = Object.freeze({
@@ -217,8 +218,14 @@ function alphaBeta(board, side, perspective, depth, alpha, beta, qDepth, ply, co
 export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
   const board = createBoard(pieces);
   const recent = options.recentAiPieceIds ?? [];
-  const legal = generateLegalMovesForColor(board, sideToMove);
-  if (!legal.length) return null;
+  const allLegal = generateLegalMovesForColor(board, sideToMove);
+  if (!allLegal.length) return null;
+
+  // Minimax still scores every retained move. This root-only policy removes
+  // moves that immediately lose a queen, rook or minor piece in a materially
+  // unsound exchange. If every move is unsafe, the full legal set is restored.
+  const legal = filterRootMovesBySafety(board, allLegal, sideToMove);
+  const rejectedRootMoves = allLegal.length - legal.length;
 
   const now = options.now ?? (() => performance.now());
   const deadline = now() + (options.milliseconds ?? DEFAULT_LIMITS.milliseconds);
@@ -284,10 +291,11 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
   const serialized = serializeMove(bestMove);
   serialized.search = {
     engine: "strategic-3d-alpha-beta-v2",
-    policy: "promotion-aware-exchange-safe-v3",
+    policy: "team-play-root-safety-v4",
     completedDepth,
     nodes: context.nodes,
     score: Number.isFinite(bestScore) ? bestScore : null,
+    rejectedRootMoves,
   };
   return serialized;
 }

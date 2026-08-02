@@ -38,8 +38,6 @@ describe("exchange-safe Cube Chess strategy", () => {
       piece("black-knight", "knight", "black", 4, 5, 4, true),
     ];
 
-    // Depth one plus quiescence is sufficient: after R×P the forced Q×R
-    // recapture is a tactical continuation and must be searched immediately.
     const move = chooseAdvancedMove(pieces, "black", {
       maxDepth: 1,
       quiescenceDepth: 2,
@@ -53,7 +51,7 @@ describe("exchange-safe Cube Chess strategy", () => {
       capturedPieceId: "white-pawn",
       to: { x: 0, y: 3, z: 0 },
     });
-    expect(move.search.policy).toBe("promotion-aware-exchange-safe-v3");
+    expect(move.search.policy).toBe("team-play-root-safety-v4");
   });
 
   it("prefers coordinated development over an unsupported pawn march", () => {
