@@ -87,11 +87,13 @@ function levelSevenPromotionCredit(board, move, color) {
   const movedAfter = board.getPieceAt(move.to);
   if (!movedAfter) return 0;
 
-  const legal = generateLegalMovesForColor(board, color);
+  const legalBeforeRecapture = generateLegalMovesForColor(board, color);
+  const supportedPawnIds = [];
+
   for (const pawn of board.getPiecesByColor(color)) {
     if (pawn.type !== "pawn" || pawn.position.z !== LEVEL_SEVEN) continue;
 
-    const promotions = legal.filter(
+    const promotions = legalBeforeRecapture.filter(
       (candidate) => candidate.pieceId === pawn.id && isSearchPromotionMove(board, candidate),
     );
     if (!promotions.length) continue;
@@ -100,11 +102,33 @@ function levelSevenPromotionCredit(board, move, color) {
     const supportsDestination = promotions.some(
       (candidate) => chebyshevDistance(movedAfter.position, candidate.to) <= 2,
     );
-    if (supportsPawn || supportsDestination) {
-      return CUBE_PIECE_VALUES.queen - CUBE_PIECE_VALUES.pawn;
-    }
+    if (supportsPawn || supportsDestination) supportedPawnIds.push(pawn.id);
   }
-  return 0;
+
+  if (!supportedPawnIds.length) return 0;
+
+  const recaptures = capturesOnSquare(board, opposite(color), move.to);
+  if (!recaptures.length) return 0;
+
+  // The exception is valid only when accepting the sacrifice cannot remove the
+  // promised immediate promotion. If even one legal recapture blocks promotion,
+  // the opponent can choose it and the material sacrifice remains unsound.
+  for (const recapture of recaptures) {
+    const afterRecapture = applyMoveForSearch(board, recapture);
+    const legalReplies = generateLegalMovesForColor(afterRecapture, color);
+    const promotionSurvives = supportedPawnIds.some((pawnId) => {
+      const pawn = afterRecapture.getAllPieces().find((piece) => piece.id === pawnId);
+      if (!pawn || pawn.type !== "pawn" || pawn.position.z !== LEVEL_SEVEN) return false;
+      return legalReplies.some(
+        (candidate) =>
+          candidate.pieceId === pawnId &&
+          isSearchPromotionMove(afterRecapture, candidate),
+      );
+    });
+    if (!promotionSurvives) return 0;
+  }
+
+  return CUBE_PIECE_VALUES.queen - CUBE_PIECE_VALUES.pawn;
 }
 
 export function assessRootMoveSafety(board, move, sideToMove) {
