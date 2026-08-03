@@ -325,6 +325,18 @@ export function analyzeTeamPlayMove(
   };
 }
 
+function quietThirdRepeat(candidate) {
+  return Boolean(
+    candidate &&
+      !candidate.team?.forcing &&
+      (candidate.team?.repeatStreak ?? 0) >= 2,
+  );
+}
+
+function quietMonopoly(candidate, field) {
+  return Boolean(candidate && !candidate.team?.forcing && candidate.team?.[field]);
+}
+
 /**
  * Alpha-Beta remains authoritative outside a narrow strategic equivalence band.
  * Within that band, moves that coordinate several pieces beat another unsupported
@@ -343,6 +355,36 @@ export function chooseTeamAwareRootCandidate(
     if (difference > 0) return candidate;
     if (difference < 0) return current;
     return candidate.team.score > current.team.score ? candidate : current;
+  }
+
+  // A quiet third consecutive move with the same piece is a team-play defect,
+  // not merely a small style penalty. When any non-repeating legal alternative
+  // exists, the repeated move cannot win the root tie-break.
+  const currentThirdRepeat = quietThirdRepeat(current);
+  const candidateThirdRepeat = quietThirdRepeat(candidate);
+  if (currentThirdRepeat !== candidateThirdRepeat) {
+    return currentThirdRepeat ? candidate : current;
+  }
+
+  // Queen monopoly gets a wider discipline window than ordinary positional
+  // variety. This still preserves a clearly superior search result, but blocks
+  // another unsupported queen excursion when a reasonable squad move exists.
+  const currentQueenMonopoly = quietMonopoly(current, "queenMonopoly");
+  const candidateQueenMonopoly = quietMonopoly(candidate, "queenMonopoly");
+  if (
+    currentQueenMonopoly !== candidateQueenMonopoly &&
+    Math.abs(difference) <= weights.rootScoreWindow * 2
+  ) {
+    return currentQueenMonopoly ? candidate : current;
+  }
+
+  const currentPieceMonopoly = quietMonopoly(current, "pieceMonopoly");
+  const candidatePieceMonopoly = quietMonopoly(candidate, "pieceMonopoly");
+  if (
+    currentPieceMonopoly !== candidatePieceMonopoly &&
+    Math.abs(difference) <= weights.rootScoreWindow
+  ) {
+    return currentPieceMonopoly ? candidate : current;
   }
 
   if (difference > weights.rootScoreWindow) return candidate;
