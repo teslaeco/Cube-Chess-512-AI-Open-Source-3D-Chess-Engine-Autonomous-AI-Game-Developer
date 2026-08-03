@@ -76,6 +76,61 @@ describe("squad team-play policy", () => {
     expect(chooseTeamAwareRootCandidate(tactical, quiet)).toBe(tactical);
   });
 
+  it("hard-vetoes a quiet third consecutive move when another piece can move", () => {
+    const repeated = {
+      move: { pieceId: "black-queen" },
+      searchScore: 260,
+      team: {
+        score: -280,
+        forcing: false,
+        repeatStreak: 2,
+        pieceMonopoly: true,
+        queenMonopoly: true,
+      },
+    };
+    const squad = {
+      move: { pieceId: "black-bishop" },
+      searchScore: 120,
+      team: {
+        score: 90,
+        forcing: false,
+        repeatStreak: 0,
+        pieceMonopoly: false,
+        queenMonopoly: false,
+      },
+    };
+
+    expect(chooseTeamAwareRootCandidate(repeated, squad)).toBe(squad);
+    expect(chooseTeamAwareRootCandidate(squad, repeated)).toBe(squad);
+  });
+
+  it("rejects a quiet queen monopoly inside the discipline window", () => {
+    const queen = {
+      move: { pieceId: "black-queen" },
+      searchScore: 250,
+      team: {
+        score: -260,
+        forcing: false,
+        repeatStreak: 0,
+        pieceMonopoly: false,
+        queenMonopoly: true,
+      },
+    };
+    const knight = {
+      move: { pieceId: "black-knight" },
+      searchScore: 80,
+      team: {
+        score: 120,
+        forcing: false,
+        repeatStreak: 0,
+        pieceMonopoly: false,
+        queenMonopoly: false,
+      },
+    };
+
+    expect(chooseTeamAwareRootCandidate(queen, knight)).toBe(knight);
+  });
+
   it("penalizes a third quiet move of the same major piece", () => {
     const board = createBoard([
       piece("white-king", "king", "white", 7, 0, 0),
