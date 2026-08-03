@@ -188,6 +188,7 @@ function chebyshevDistance(left, right) {
  */
 export function evaluateTeamCoordination(board, color, moveCache = null) {
   const pieces = board.getAllPieces();
+  const piecesById = new Map(pieces.map((piece) => [piece.id, piece]));
   const own = pieces.filter((piece) => piece.color === color);
   const ownMoves = movesFor(board, color, moveCache);
   const enemyKing = pieces.find(
@@ -240,8 +241,18 @@ export function evaluateTeamCoordination(board, color, moveCache = null) {
   }
 
   let coordinatedTargets = 0;
-  for (const attackers of attackersByTarget.values()) {
-    if (attackers.size >= 2) coordinatedTargets += 1;
+  let coordinatedTargetValue = 0;
+  for (const [targetId, attackers] of attackersByTarget.entries()) {
+    if (attackers.size < 2) continue;
+    coordinatedTargets += 1;
+
+    const target = piecesById.get(targetId);
+    const targetValue = target ? (PIECE_VALUES[target.type] ?? 0) : 0;
+    const extraAttackers = Math.max(0, attackers.size - 1);
+    coordinatedTargetValue += Math.min(
+      160,
+      28 + Math.round(targetValue * 0.08) + extraAttackers * 18,
+    );
   }
 
   let squadLevels = 0;
@@ -253,7 +264,8 @@ export function evaluateTeamCoordination(board, color, moveCache = null) {
   score += defendedMajors * 12;
   score -= isolatedMajors * 34;
   score += Math.max(0, activePieceIds.size - 1) * 12;
-  score += coordinatedTargets * 46;
+  score += coordinatedTargets * 32;
+  score += coordinatedTargetValue;
   score += squadLevels * 14;
   score += kingPressurePieces.size * 11;
   score += Math.min(72, Math.round(reachableSquares.size * 0.35));
