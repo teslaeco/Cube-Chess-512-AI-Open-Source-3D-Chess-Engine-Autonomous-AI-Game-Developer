@@ -35,3 +35,21 @@ export function normalizeDifficulty(value) {
 export function getDifficultyProfile(value) {
   return AI_DIFFICULTY_PROFILES[normalizeDifficulty(value)];
 }
+
+export function emergencyDifficultyFor(value) {
+  const difficulty = normalizeDifficulty(value);
+  if (difficulty === "hard") return "medium";
+  return "easy";
+}
+
+export function getAiRuntimePlan(value) {
+  const difficulty = normalizeDifficulty(value);
+  const primary = getDifficultyProfile(difficulty);
+  const emergencyDifficulty = emergencyDifficultyFor(difficulty);
+  return Object.freeze({
+    difficulty,
+    primary,
+    emergencyDifficulty,
+    emergency: getDifficultyProfile(emergencyDifficulty),
+  });
+}
