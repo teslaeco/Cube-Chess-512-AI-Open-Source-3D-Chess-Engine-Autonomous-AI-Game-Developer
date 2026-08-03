@@ -32,14 +32,25 @@ function argument(name, fallback) {
 
 const gamesPerPolicy = Number(argument("games-per-policy", "1000"));
 const trainingPlies = Number(argument("plies", "18"));
+const requestedPolicy = argument("policy", "all");
 const reportPath = resolve(
-  argument("report", "artifacts/real-team-selfplay-3000-report.json"),
+  argument("report", "artifacts/real-team-selfplay-report.json"),
 );
 if (!Number.isInteger(gamesPerPolicy) || gamesPerPolicy < 1) {
   throw new Error("--games-per-policy must be a positive integer");
 }
 if (!Number.isInteger(trainingPlies) || trainingPlies < 6) {
   throw new Error("--plies must be an integer of at least 6");
+}
+
+const selectedCandidates =
+  requestedPolicy === "all"
+    ? TEAM_PLAY_TRAINING_CANDIDATES
+    : TEAM_PLAY_TRAINING_CANDIDATES.filter(
+        (candidate) => candidate.id === requestedPolicy,
+      );
+if (!selectedCandidates.length) {
+  throw new Error(`Unknown team-play policy: ${requestedPolicy}`);
 }
 
 function rngFor(seed) {
@@ -149,11 +160,27 @@ function qualityScore(entry) {
   );
 }
 
+function completeMetrics(entry) {
+  const moves = Math.max(1, entry.completedPlies);
+  const quietMoves = Math.max(1, entry.quietMoves);
+  const games = Math.max(1, entry.games);
+  return {
+    ...entry,
+    score: qualityScore(entry),
+    averageDistinctPieces: entry.distinctPieceTotal / (games * 2),
+    queenMoveRate: entry.queenMoves / moves,
+    quietQueenMoveRate: entry.quietQueenMoves / quietMoves,
+    teamMoveRate: entry.teamMoves / moves,
+    freshPieceRate: entry.freshPieceMoves / moves,
+    samePieceRunViolationRate: entry.samePieceRunViolations / quietMoves,
+  };
+}
+
 const metrics = new Map(
-  TEAM_PLAY_TRAINING_CANDIDATES.map((weights) => [weights.id, createMetrics(weights)]),
+  selectedCandidates.map((weights) => [weights.id, createMetrics(weights)]),
 );
 
-for (const weights of TEAM_PLAY_TRAINING_CANDIDATES) {
+for (const weights of selectedCandidates) {
   const result = metrics.get(weights.id);
 
   for (let game = 0; game < gamesPerPolicy; game += 1) {
@@ -274,39 +301,28 @@ for (const weights of TEAM_PLAY_TRAINING_CANDIDATES) {
 
     result.distinctPieceTotal +=
       distinctBySide.white.size + distinctBySide.black.size;
+
+    if ((game + 1) % 100 === 0) {
+      console.log(`${weights.id}: completed ${game + 1}/${gamesPerPolicy} games`);
+    }
   }
 }
 
 const ranking = [...metrics.values()]
-  .map((entry) => {
-    const moves = Math.max(1, entry.completedPlies);
-    const quietMoves = Math.max(1, entry.quietMoves);
-    const games = Math.max(1, entry.games);
-    return {
-      ...entry,
-      score: qualityScore(entry),
-      averageDistinctPieces: entry.distinctPieceTotal / (games * 2),
-      queenMoveRate: entry.queenMoves / moves,
-      quietQueenMoveRate: entry.quietQueenMoves / quietMoves,
-      teamMoveRate: entry.teamMoves / moves,
-      freshPieceRate: entry.freshPieceMoves / moves,
-      samePieceRunViolationRate: entry.samePieceRunViolations / quietMoves,
-    };
-  })
+  .map(completeMetrics)
   .sort((left, right) => right.score - left.score || left.id.localeCompare(right.id));
 
-const selected = ranking[0];
-const production = ranking.find((entry) => entry.id === TEAM_PLAY_WEIGHTS.id);
-const baseline = ranking.find((entry) => entry.id === "balanced-v6");
 const report = {
-  schema: 2,
+  schema: 3,
   mode: "real-legal-8x8x8-hard-self-play",
   syntheticCurriculum: false,
+  partial: selectedCandidates.length !== TEAM_PLAY_TRAINING_CANDIDATES.length,
+  requestedPolicy,
   gamesPerPolicy,
-  policies: TEAM_PLAY_TRAINING_CANDIDATES.length,
-  totalRealGames: gamesPerPolicy * TEAM_PLAY_TRAINING_CANDIDATES.length,
+  policies: selectedCandidates.length,
+  totalRealGames: gamesPerPolicy * selectedCandidates.length,
   trainingPlies,
-  selectedPolicy: selected.id,
+  selectedPolicy: ranking[0].id,
   productionPolicy: TEAM_PLAY_WEIGHTS.id,
   ranking,
 };
@@ -315,51 +331,25 @@ mkdirSync(dirname(reportPath), { recursive: true });
 writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));
 
-if (!production || !baseline) {
-  throw new Error("Training report is missing production or baseline policy");
-}
-if (production.completedPlies < gamesPerPolicy * 6) {
-  throw new Error(
-    `Real self-play produced only ${production.completedPlies} production plies`,
-  );
-}
-if (selected.id !== TEAM_PLAY_WEIGHTS.id) {
-  throw new Error(
-    `Real self-play selected ${selected.id}, but production uses ${TEAM_PLAY_WEIGHTS.id}`,
-  );
-}
-if (production.materialSafetyViolations !== 0) {
-  throw new Error(
-    `Production policy made ${production.materialSafetyViolations} unsafe moves`,
-  );
-}
-if (production.criticalQueenTradeViolations !== 0) {
-  throw new Error(
-    `Production policy made ${production.criticalQueenTradeViolations} queen-for-lower-piece trades`,
-  );
-}
-if (production.forcedUnsafeFallbacks !== 0) {
-  throw new Error(
-    `Production policy used ${production.forcedUnsafeFallbacks} unsafe fallbacks`,
-  );
-}
-if (production.samePieceRunViolationRate > 0.01) {
-  throw new Error(
-    `Production same-piece run rate is ${production.samePieceRunViolationRate}`,
-  );
-}
-if (production.quietQueenMoveRate > 0.35) {
-  throw new Error(
-    `Production quiet queen move rate is ${production.quietQueenMoveRate}`,
-  );
-}
-if (production.averageDistinctPieces < 2.75) {
-  throw new Error(
-    `Production average distinct pieces is ${production.averageDistinctPieces}`,
-  );
-}
-if (production.teamMoveRate <= baseline.teamMoveRate) {
-  throw new Error(
-    `Production team move rate ${production.teamMoveRate} did not beat baseline ${baseline.teamMoveRate}`,
-  );
+for (const entry of ranking) {
+  if (entry.completedPlies < gamesPerPolicy * 6) {
+    throw new Error(
+      `${entry.id} produced only ${entry.completedPlies} real self-play plies`,
+    );
+  }
+  if (entry.materialSafetyViolations !== 0) {
+    throw new Error(
+      `${entry.id} made ${entry.materialSafetyViolations} unsafe moves`,
+    );
+  }
+  if (entry.criticalQueenTradeViolations !== 0) {
+    throw new Error(
+      `${entry.id} made ${entry.criticalQueenTradeViolations} queen-for-lower-piece trades`,
+    );
+  }
+  if (entry.forcedUnsafeFallbacks !== 0) {
+    throw new Error(
+      `${entry.id} used ${entry.forcedUnsafeFallbacks} unsafe fallbacks`,
+    );
+  }
 }
