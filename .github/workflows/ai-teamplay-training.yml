@@ -1,4 +1,4 @@
-name: Train Cube Chess Team Play 100K
+name: Train Cube Chess Real Team Play 3K
 
 on:
   pull_request:
@@ -6,15 +6,20 @@ on:
       - main
     paths:
       - "web/ai/**"
-      - "scripts/train-teamplay-selfplay.mjs"
+      - "web/state/initialPosition.js"
+      - "scripts/train-real-team-selfplay.mjs"
       - "package.json"
       - ".github/workflows/ai-teamplay-training.yml"
   workflow_dispatch:
     inputs:
-      games:
-        description: Number of deterministic curriculum games
+      games_per_policy:
+        description: Real legal self-play games per policy
         required: false
-        default: "100000"
+        default: "1000"
+      plies:
+        description: Maximum hard-AI plies per game
+        required: false
+        default: "18"
 
 permissions:
   contents: read
@@ -24,13 +29,13 @@ defaults:
     shell: bash
 
 concurrency:
-  group: ai-teamplay-${{ github.event.pull_request.number || github.ref }}
+  group: ai-real-teamplay-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  train-team-play:
+  train-real-team-play:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -44,25 +49,27 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit
 
-      - name: Run focused team-play engine tests
+      - name: Run material and team-play regressions
         run: >-
           npx vitest run
           web/ai/teamPlayPolicy.test.js
           web/ai/aiSelfPlaySmoke.test.js
           web/ai/finalMoveSafety.test.js
 
-      - name: Run 100000 computational team-play games
+      - name: Run 3000 real legal hard-AI games
         env:
-          TRAINING_GAMES: ${{ github.event.inputs.games || '100000' }}
+          GAMES_PER_POLICY: ${{ github.event.inputs.games_per_policy || '1000' }}
+          TRAINING_PLIES: ${{ github.event.inputs.plies || '18' }}
         run: >-
-          npm run train:teamplay --
-          --games="$TRAINING_GAMES"
-          --report=artifacts/teamplay-100k-report.json
+          npm run train:real-teamplay --
+          --games-per-policy="$GAMES_PER_POLICY"
+          --plies="$TRAINING_PLIES"
+          --report=artifacts/real-team-selfplay-3000-report.json
 
-      - name: Upload training report
+      - name: Upload real self-play report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: teamplay-training-${{ github.run_id }}
-          path: artifacts/teamplay-100k-report.json
+          name: real-teamplay-training-${{ github.run_id }}
+          path: artifacts/real-team-selfplay-3000-report.json
           if-no-files-found: warn
