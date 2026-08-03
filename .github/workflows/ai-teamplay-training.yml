@@ -55,6 +55,7 @@ jobs:
           web/ai/teamPlayPolicy.test.js
           web/ai/aiSelfPlaySmoke.test.js
           web/ai/finalMoveSafety.test.js
+          web/ai/queenTradeRegression.test.js
 
       - name: Run 3000 real legal hard-AI games
         env:
