@@ -14,7 +14,10 @@ export class AiController {
       const move = event.data.move ?? null;
       if (move?.pieceId) {
         this.recentAiPieceIds.unshift(move.pieceId);
-        this.recentAiPieceIds = this.recentAiPieceIds.slice(0, 4);
+        // A longer history lets the hard AI detect repeated single-piece plans,
+        // while the search still treats tactics, checks and promotions as
+        // authoritative exceptions.
+        this.recentAiPieceIds = this.recentAiPieceIds.slice(0, 12);
       }
       pending.resolve(move);
     });
