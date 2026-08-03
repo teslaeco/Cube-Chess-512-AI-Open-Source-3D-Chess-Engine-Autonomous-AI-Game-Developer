@@ -329,18 +329,25 @@ function quietThirdRepeat(candidate) {
   return Boolean(
     candidate &&
       !candidate.team?.forcing &&
+      !candidate.team?.tacticalCapture &&
       (candidate.team?.repeatStreak ?? 0) >= 2,
   );
 }
 
 function quietMonopoly(candidate, field) {
-  return Boolean(candidate && !candidate.team?.forcing && candidate.team?.[field]);
+  return Boolean(
+    candidate &&
+      !candidate.team?.forcing &&
+      !candidate.team?.tacticalCapture &&
+      candidate.team?.[field],
+  );
 }
 
 /**
  * Alpha-Beta remains authoritative outside a narrow strategic equivalence band.
  * Within that band, moves that coordinate several pieces beat another unsupported
- * queen excursion. Checks, mates and promotions use raw search score first.
+ * queen excursion. Checks, mates, promotions and concrete captures preserve the
+ * searched tactical result; diversity vetoes apply only to truly quiet moves.
  */
 export function chooseTeamAwareRootCandidate(
   current,
@@ -358,8 +365,8 @@ export function chooseTeamAwareRootCandidate(
   }
 
   // A quiet third consecutive move with the same piece is a team-play defect,
-  // not merely a small style penalty. When any non-repeating legal alternative
-  // exists, the repeated move cannot win the root tie-break.
+  // not merely a small style penalty. Concrete captures are not quiet and remain
+  // governed by the search score plus the normal narrow team-play tie-break.
   const currentThirdRepeat = quietThirdRepeat(current);
   const candidateThirdRepeat = quietThirdRepeat(candidate);
   if (currentThirdRepeat !== candidateThirdRepeat) {
@@ -367,8 +374,8 @@ export function chooseTeamAwareRootCandidate(
   }
 
   // Queen monopoly gets a wider discipline window than ordinary positional
-  // variety. This still preserves a clearly superior search result, but blocks
-  // another unsupported queen excursion when a reasonable squad move exists.
+  // variety, but only for quiet moves. A rook taking a free queen must never be
+  // rejected merely because that rook moved recently.
   const currentQueenMonopoly = quietMonopoly(current, "queenMonopoly");
   const candidateQueenMonopoly = quietMonopoly(candidate, "queenMonopoly");
   if (
