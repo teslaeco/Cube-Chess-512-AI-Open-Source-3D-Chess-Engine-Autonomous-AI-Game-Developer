@@ -4,6 +4,7 @@ import {
   analyzeTeamPlayMove,
   chooseTeamAwareRootCandidate,
   createTeamPlayBaseline,
+  scoreTeamPlayFeatures,
 } from "./teamPlayPolicy.js";
 import { createBoard } from "./searchEngine.js";
 
@@ -15,6 +16,24 @@ function quietMove(board, side, pieceId) {
   return generateLegalMovesForColor(board, side).find(
     (move) => move.pieceId === pieceId && !move.capturedPieceId,
   );
+}
+
+function neutralFeatures(overrides = {}) {
+  return {
+    forcing: false,
+    repeatStreak: 0,
+    switchedPiece: false,
+    newlyDefendedPartners: 0,
+    movedPieceDefended: false,
+    mutualPair: false,
+    supportsRecentPiece: false,
+    undevelopedMinor: false,
+    earlyMajorRepeat: false,
+    isolated: false,
+    activePieceDelta: 0,
+    levelCoverageDelta: 0,
+    ...overrides,
+  };
 }
 
 describe("paired team-play policy", () => {
@@ -70,5 +89,18 @@ describe("paired team-play policy", () => {
     expect(rook.score).toBeLessThan(0);
     expect(bishop.switchedPiece).toBe(true);
     expect(bishop.score).toBeGreaterThan(rook.score);
+  });
+
+  it("rewards activating partners and opening access to additional levels", () => {
+    const neutral = scoreTeamPlayFeatures(neutralFeatures());
+    const coordinated = scoreTeamPlayFeatures(
+      neutralFeatures({ activePieceDelta: 1, levelCoverageDelta: 1 }),
+    );
+    const restricted = scoreTeamPlayFeatures(
+      neutralFeatures({ activePieceDelta: -1, levelCoverageDelta: -1 }),
+    );
+
+    expect(coordinated).toBeGreaterThan(neutral);
+    expect(neutral).toBeGreaterThan(restricted);
   });
 });
