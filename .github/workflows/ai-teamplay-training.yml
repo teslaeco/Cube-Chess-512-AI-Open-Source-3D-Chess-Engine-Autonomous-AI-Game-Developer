@@ -13,14 +13,18 @@ on:
       - ".github/workflows/ai-teamplay-training.yml"
   workflow_dispatch:
     inputs:
-      games_per_policy:
-        description: Real legal self-play games per policy
+      total_games_per_policy:
+        description: Total real legal games per policy
         required: false
         default: "1000"
+      games_per_shard:
+        description: Games executed by one deterministic shard
+        required: false
+        default: "50"
       plies:
         description: Maximum hard-AI plies per game
         required: false
-        default: "18"
+        default: "10"
 
 permissions:
   contents: read
@@ -58,17 +62,39 @@ jobs:
           web/ai/finalMoveSafety.test.js
           web/ai/queenTradeRegression.test.js
 
-  train-policy:
+  train-shard:
     needs: regressions
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     strategy:
       fail-fast: false
+      max-parallel: 20
       matrix:
         policy:
           - balanced-v6
           - squad-attack-v7
           - queen-discipline-v7
+        shard:
+          - 0
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+          - 11
+          - 12
+          - 13
+          - 14
+          - 15
+          - 16
+          - 17
+          - 18
+          - 19
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -82,28 +108,33 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit
 
-      - name: Run 1000 real legal games for ${{ matrix.policy }}
+      - name: Run deterministic real-game shard
         env:
-          GAMES_PER_POLICY: ${{ github.event.inputs.games_per_policy || '1000' }}
-          TRAINING_PLIES: ${{ github.event.inputs.plies || '18' }}
+          TOTAL_GAMES_PER_POLICY: ${{ github.event.inputs.total_games_per_policy || '1000' }}
+          GAMES_PER_SHARD: ${{ github.event.inputs.games_per_shard || '50' }}
+          TRAINING_PLIES: ${{ github.event.inputs.plies || '10' }}
           POLICY: ${{ matrix.policy }}
-        run: >-
-          npm run train:real-teamplay --
-          --policy="$POLICY"
-          --games-per-policy="$GAMES_PER_POLICY"
-          --plies="$TRAINING_PLIES"
-          --report="artifacts/real-teamplay-$POLICY.json"
+          SHARD: ${{ matrix.shard }}
+        run: |
+          SEED_OFFSET=$((SHARD * GAMES_PER_SHARD))
+          npm run train:real-teamplay -- \
+            --policy="$POLICY" \
+            --games="$GAMES_PER_SHARD" \
+            --seed-offset="$SEED_OFFSET" \
+            --total-games-per-policy="$TOTAL_GAMES_PER_POLICY" \
+            --plies="$TRAINING_PLIES" \
+            --report="artifacts/real-teamplay-$POLICY-shard-$SHARD.json"
 
-      - name: Upload policy report
+      - name: Upload shard report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: real-teamplay-shard-${{ matrix.policy }}-${{ github.run_id }}
-          path: artifacts/real-teamplay-${{ matrix.policy }}.json
+          name: real-teamplay-shard-${{ matrix.policy }}-${{ matrix.shard }}-${{ github.run_id }}
+          path: artifacts/real-teamplay-${{ matrix.policy }}-shard-${{ matrix.shard }}.json
           if-no-files-found: error
 
   aggregate:
-    needs: train-policy
+    needs: train-shard
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -119,7 +150,7 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit
 
-      - name: Download all policy reports
+      - name: Download all 60 shard reports
         uses: actions/download-artifact@v4
         with:
           pattern: real-teamplay-shard-*-${{ github.run_id }}
