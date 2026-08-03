@@ -1,0 +1,67 @@
+name: Train Cube Chess Team Play 100K
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "web/ai/**"
+      - "scripts/train-teamplay-selfplay.mjs"
+      - "package.json"
+      - ".github/workflows/ai-teamplay-training.yml"
+  workflow_dispatch:
+    inputs:
+      games:
+        description: Number of deterministic curriculum games
+        required: false
+        default: "100000"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ai-teamplay-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  train-team-play:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Run focused team-play engine tests
+        run: >-
+          npx vitest run
+          web/ai/teamPlayPolicy.test.js
+          web/ai/aiSelfPlaySmoke.test.js
+          web/ai/finalMoveSafety.test.js
+
+      - name: Run 100000 computational team-play games
+        env:
+          TRAINING_GAMES: ${{ github.event.inputs.games || '100000' }}
+        run: >-
+          npm run train:teamplay --
+          --games="$TRAINING_GAMES"
+          --report=artifacts/teamplay-100k-report.json
+
+      - name: Upload training report
+        uses: actions/upload-artifact@v4
+        with:
+          name: teamplay-training-${{ github.run_id }}
+          path: artifacts/teamplay-100k-report.json
+          if-no-files-found: error
