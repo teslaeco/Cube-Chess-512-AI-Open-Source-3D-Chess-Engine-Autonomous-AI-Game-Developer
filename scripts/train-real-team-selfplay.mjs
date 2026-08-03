@@ -14,6 +14,7 @@ import {
 import {
   applyMoveForSearch,
   createBoard,
+  isSearchPromotionMove,
   opposite,
   orderMoves,
 } from "../web/ai/searchEngine.js";
@@ -70,6 +71,10 @@ function pieceById(board, id) {
   return board.getAllPieces().find((piece) => piece.id === id) ?? null;
 }
 
+function terminalKind(kind) {
+  return kind === "checkmate" || kind === "stalemate";
+}
+
 function createMetrics(weights) {
   return {
     id: weights.id,
@@ -100,9 +105,10 @@ function safeSeededOpening(pieces, side, seed) {
   for (let ply = 0; ply < openingPlies; ply += 1) {
     const board = createBoard(currentPieces);
     const status = evaluatePosition(board, currentSide);
-    if (status.kind !== "ongoing" && status.kind !== "check") break;
+    if (terminalKind(status.kind)) break;
 
     const legal = generateLegalMovesForColor(board, currentSide);
+    if (!legal.length) break;
     const safe = filterMovesByFinalSafety(board, legal, currentSide);
     const source = safe.length ? safe : legal;
     const nonQueen = source.filter(
@@ -171,8 +177,9 @@ for (const weights of TEAM_PLAY_TRAINING_CANDIDATES) {
         result.draws += 1;
         break;
       }
-      if (status.kind !== "ongoing" && status.kind !== "check") break;
 
+      const legal = generateLegalMovesForColor(board, side);
+      if (!legal.length) break;
       const selected = chooseMoveWithVariantRules(
         pieces,
         side,
@@ -187,9 +194,10 @@ for (const weights of TEAM_PLAY_TRAINING_CANDIDATES) {
           teamPlayWeights: weights,
         },
       );
-      if (!selected) break;
+      if (!selected) {
+        throw new Error(`${weights.id} returned no move in game ${game}`);
+      }
 
-      const legal = generateLegalMovesForColor(board, side);
       const move = findMatchingLegalMove(legal, selected);
       if (!move) {
         throw new Error(`${weights.id} returned a non-legal move in game ${game}`);
@@ -198,7 +206,14 @@ for (const weights of TEAM_PLAY_TRAINING_CANDIDATES) {
       const moving = board.getPieceAt(move.from);
       const captured = pieceById(board, move.capturedPieceId);
       const assessment = assessImmediateMaterialSafety(board, move, side);
-      const quiet = !move.capturedPieceId && selected.search?.finalSafetyReason !== "immediate-checkmate";
+      const next = applyMoveForSearch(board, move);
+      const afterStatus = evaluatePosition(next, opposite(side));
+      const quiet = Boolean(
+        !move.capturedPieceId &&
+          !isSearchPromotionMove(board, move) &&
+          afterStatus.kind !== "check" &&
+          afterStatus.kind !== "checkmate",
+      );
       if (!assessment.safe) result.materialSafetyViolations += 1;
       if (selected.search?.forcedUnsafeFallback) result.forcedUnsafeFallbacks += 1;
 
@@ -228,7 +243,6 @@ for (const weights of TEAM_PLAY_TRAINING_CANDIDATES) {
       }
       if (selected.search?.teamPlayFreshPiece) result.freshPieceMoves += 1;
 
-      const next = applyMoveForSearch(board, move);
       const previousMover = opposite(side);
       const pending = pendingQueenBySide[previousMover];
       if (pending) {
@@ -285,7 +299,7 @@ const selected = ranking[0];
 const production = ranking.find((entry) => entry.id === TEAM_PLAY_WEIGHTS.id);
 const baseline = ranking.find((entry) => entry.id === "balanced-v6");
 const report = {
-  schema: 1,
+  schema: 2,
   mode: "real-legal-8x8x8-hard-self-play",
   syntheticCurriculum: false,
   gamesPerPolicy,
@@ -303,6 +317,11 @@ console.log(JSON.stringify(report, null, 2));
 
 if (!production || !baseline) {
   throw new Error("Training report is missing production or baseline policy");
+}
+if (production.completedPlies < gamesPerPolicy * 6) {
+  throw new Error(
+    `Real self-play produced only ${production.completedPlies} production plies`,
+  );
 }
 if (selected.id !== TEAM_PLAY_WEIGHTS.id) {
   throw new Error(
