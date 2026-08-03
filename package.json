@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:watch": "vitest",
+    "train:teamplay": "node scripts/train-teamplay-selfplay.mjs",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json",
     "smoke:dist": "node scripts/smoke-dist.mjs",
     "server:dev": "tsx watch server/index.ts",
