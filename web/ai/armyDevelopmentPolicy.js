@@ -1,6 +1,5 @@
 import {
   evaluatePosition,
-  generateLegalMovesForColor,
   isSquareAttacked,
 } from "../../src/engine3d/index.ts";
 import {
@@ -14,12 +13,6 @@ const NON_KING_TYPES = new Set(["pawn", "knight", "bishop", "rook", "queen"]);
 function numericCount(counts, pieceId) {
   const value = Number(counts?.[pieceId] ?? 0);
   return Number.isFinite(value) && value > 0 ? value : 0;
-}
-
-function activePieceIds(board, color) {
-  return new Set(
-    generateLegalMovesForColor(board, color).map((move) => move.pieceId),
-  );
 }
 
 function roleSet(board, color, usageCounts) {
@@ -60,7 +53,6 @@ export function createArmyDevelopmentBaseline(
     usedRoles: roleSet(board, color, usageCounts),
     totalUsage,
     leastUsage,
-    activePieceIds: activePieceIds(board, color),
     developedMinorCount: own.filter(
       (piece) =>
         (piece.type === "bishop" || piece.type === "knight") && piece.hasMoved,
@@ -103,16 +95,15 @@ export function analyzeArmyDevelopmentMove(
   const activatesFreshUnit = lifetimeUseCount === 0;
   const underusedUnit = lifetimeUseCount <= resolved.leastUsage;
   const newRole = !resolved.usedRoles.has(moving.type);
-  const afterActive = activePieceIds(next, moving.color);
-  const activePieceDelta = afterActive.size - resolved.activePieceIds.size;
   const movedPieceDefended = Boolean(
     movedAfter &&
       movedAfter.type !== "king" &&
       isSquareAttacked(next, movedAfter.position, moving.color),
   );
-  const broadensArmy = Boolean(
-    activatesFreshUnit || newRole || activePieceDelta > 0,
-  );
+  // Active-piece and level deltas already come from analyzeTeamPlayMove and are
+  // retained by combineTeamAndArmyAnalysis. Recomputing all legal moves here
+  // doubled root-evaluation work on the 512-cell board.
+  const broadensArmy = Boolean(activatesFreshUnit || newRole);
 
   const averageUsage =
     resolved.usedPieceCount > 0
@@ -131,7 +122,6 @@ export function analyzeArmyDevelopmentMove(
   if (activatesFreshUnit) score += 110;
   if (underusedUnit && !activatesFreshUnit) score += 34;
   if (newRole) score += 42;
-  if (activePieceDelta > 0) score += Math.min(90, activePieceDelta * 28);
   if (movedPieceDefended) score += 24;
   if (!moving.hasMoved && (moving.type === "knight" || moving.type === "bishop")) {
     score += 72;
@@ -153,7 +143,6 @@ export function analyzeArmyDevelopmentMove(
     activatesFreshUnit,
     underusedUnit,
     newRole,
-    activePieceDelta,
     broadensArmy,
     queenArmyImbalance,
     lifetimeUseCount,
@@ -167,11 +156,11 @@ export function combineTeamAndArmyAnalysis(team, army) {
   return {
     ...team,
     ...army,
-    // Existing root discipline already gives a wider comparison window to
-    // quiet queen monopolies. Expose whole-army imbalance through that same
-    // tactical-safe path instead of adding a second contradictory selector.
     queenMonopoly: Boolean(team?.queenMonopoly || army?.queenArmyImbalance),
     freshPiece: Boolean(team?.freshPiece || army?.activatesFreshUnit),
+    broadensArmy: Boolean(
+      army?.broadensArmy || Number(team?.activePieceDelta ?? 0) > 0,
+    ),
     score: Number(team?.score ?? 0) + Number(army?.score ?? 0),
     teamScore: Number(team?.score ?? 0),
     armyScore: Number(army?.score ?? 0),
