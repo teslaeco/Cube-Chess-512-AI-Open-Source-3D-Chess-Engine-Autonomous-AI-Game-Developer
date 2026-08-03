@@ -12,7 +12,6 @@ import {
 const GUARDED_TYPES = new Set(["queen", "rook", "bishop", "knight"]);
 const MAX_EXCHANGE_DEPTH = 6;
 const UNSOUND_MARGIN = 180;
-const QUEEN_EXCHANGE_MARGIN = 75;
 const LEVEL_SEVEN = 6;
 
 function sameSquare(left, right) {
@@ -173,20 +172,35 @@ export function assessRootMoveSafety(board, move, sideToMove) {
       captured &&
       materialValue(captured) < materialValue(moving),
   );
-  const requiredMargin = queenForLowerPiece
-    ? -QUEEN_EXCHANGE_MARGIN
-    : -UNSOUND_MARGIN;
-  if (exchangeNet >= requiredMargin) {
+
+  // Release-blocking invariant: if the opponent can legally take the queen on
+  // the next move, capturing a lower-value piece is never accepted as a sound
+  // exchange. A speculative later recapture or a promotion bonus must not
+  // reclassify the immediate queen loss as safe. The only exception is an
+  // immediate checkmate, handled above before legal recaptures are examined.
+  if (queenForLowerPiece) {
+    return {
+      safe: false,
+      reason: "queen-for-lower-piece-critical-blunder",
+      exchangeNet,
+      promotionCredit: 0,
+      movingPieceType: moving.type,
+      capturedPieceType: captured?.type ?? null,
+      legalRecaptureCount: legalRecaptures.length,
+    };
+  }
+
+  if (exchangeNet >= -UNSOUND_MARGIN) {
     return {
       safe: true,
-      reason: queenForLowerPiece ? "compensated-queen-exchange" : "sound-exchange",
+      reason: "sound-exchange",
       exchangeNet,
       promotionCredit: 0,
     };
   }
 
   const promotionCredit = levelSevenPromotionCredit(next, move, sideToMove);
-  if (promotionCredit > 0 && exchangeNet + promotionCredit >= requiredMargin) {
+  if (promotionCredit > 0 && exchangeNet + promotionCredit >= -UNSOUND_MARGIN) {
     return {
       safe: true,
       reason: "supports-level-seven-promotion",
@@ -197,9 +211,7 @@ export function assessRootMoveSafety(board, move, sideToMove) {
 
   return {
     safe: false,
-    reason: queenForLowerPiece
-      ? "queen-for-lower-piece-critical-blunder"
-      : "uncompensated-high-value-sacrifice",
+    reason: "uncompensated-high-value-sacrifice",
     exchangeNet,
     promotionCredit,
     movingPieceType: moving.type,
