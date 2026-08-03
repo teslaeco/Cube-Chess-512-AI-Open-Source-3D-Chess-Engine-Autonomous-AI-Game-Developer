@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { chooseAdvancedMove } from "./advancedSearch.js";
 import { createBoard } from "./searchEngine.js";
-import { evaluateStrategicPosition } from "./strategicEvaluation.js";
+import {
+  evaluateStrategicPosition,
+  evaluateTeamCoordination,
+} from "./strategicEvaluation.js";
 
 function p(id, type, color, x, y, z, hasMoved = false) {
   return { id, type, color, position: { x, y, z }, hasMoved };
@@ -46,6 +49,24 @@ describe("strategic 3D AI evaluation", () => {
 
     expect(evaluateStrategicPosition(connected, "white"))
       .toBeGreaterThan(evaluateStrategicPosition(isolated, "white"));
+  });
+
+  it("scores a multi-piece attack higher than an isolated attack", () => {
+    const coordinated = createBoard([
+      ...kings,
+      p("wr", "rook", "white", 0, 3, 3, true),
+      p("wb", "bishop", "white", 1, 0, 0, true),
+      p("bq", "queen", "black", 4, 3, 3, true),
+    ]);
+    const isolated = createBoard([
+      ...kings,
+      p("wr", "rook", "white", 0, 3, 3, true),
+      p("wb", "bishop", "white", 1, 0, 1, true),
+      p("bq", "queen", "black", 4, 3, 3, true),
+    ]);
+
+    expect(evaluateTeamCoordination(coordinated, "white"))
+      .toBeGreaterThan(evaluateTeamCoordination(isolated, "white"));
   });
 
   it("returns a legal move with v3 strategic diagnostics", () => {

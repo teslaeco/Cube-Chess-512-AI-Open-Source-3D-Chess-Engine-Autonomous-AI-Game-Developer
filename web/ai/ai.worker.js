@@ -6,6 +6,7 @@ import {
   serializeMove,
 } from "./searchEngine.js";
 import { chooseAdvancedMove } from "./advancedSearch.js";
+import { chooseCompletedRootBaseline } from "./classicalRootBaseline.js";
 import { applyLoneKingLevelRule } from "../rules/LoneKingLevelRule.js";
 import {
   assessImmediateMaterialSafety,
@@ -46,6 +47,38 @@ function attachRuntimeSafetyDiagnostics(
       finalSafetyRecaptures: assessment.recaptureCount ?? 0,
       finalSafetyCapturedPieceType: assessment.capturedPieceType ?? null,
       finalSafetyExposedPieceType: assessment.exposedPieceType ?? null,
+    },
+  };
+}
+
+function chooseHardMove(pieces, sideToMove, options = {}) {
+  const baseline = chooseCompletedRootBaseline(pieces, sideToMove, options);
+  const advanced = chooseAdvancedMove(pieces, sideToMove, options);
+  if (!advanced) return baseline;
+
+  const completedDepth = advanced.search?.completedDepth ?? 0;
+  if (completedDepth > 0) {
+    return {
+      ...advanced,
+      search: {
+        ...(advanced.search ?? {}),
+        baselineCompleted: Boolean(baseline?.search?.baselineCompleted),
+        baselineCandidateCount:
+          baseline?.search?.baselineCandidateCount ?? null,
+        resultSource: "completed-alpha-beta",
+      },
+    };
+  }
+
+  if (!baseline) return advanced;
+  return {
+    ...baseline,
+    search: {
+      ...(baseline.search ?? {}),
+      advancedEngine: advanced.search?.engine ?? null,
+      advancedCompletedDepth: completedDepth,
+      advancedNodes: advanced.search?.nodes ?? 0,
+      advancedAbortedBeforeCompletedDepth: true,
     },
   };
 }
@@ -138,7 +171,7 @@ export function enforceFinalWorkerSafety(
 
   let replacement = null;
   if (difficulty === "hard") {
-    replacement = chooseAdvancedMove(pieces, sideToMove, {
+    replacement = chooseHardMove(pieces, sideToMove, {
       ...options,
       allowedRootMoveIds: safeMoves.map(moveIdentity),
     });
@@ -169,7 +202,7 @@ export function chooseMoveWithVariantRules(
 ) {
   const selected =
     difficulty === "hard"
-      ? chooseAdvancedMove(pieces, sideToMove, options)
+      ? chooseHardMove(pieces, sideToMove, options)
       : chooseBestMove(pieces, sideToMove, difficulty, options);
   if (!selected) return null;
 

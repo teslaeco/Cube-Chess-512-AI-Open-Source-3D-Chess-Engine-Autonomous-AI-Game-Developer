@@ -42,6 +42,17 @@ function phaseOf(board) {
   return Math.max(0, Math.min(1, remaining / bothSides));
 }
 
+function buildMoveCache(board) {
+  return {
+    white: generateLegalMovesForColor(board, "white"),
+    black: generateLegalMovesForColor(board, "black"),
+  };
+}
+
+function movesFor(board, color, moveCache) {
+  return moveCache?.[color] ?? generateLegalMovesForColor(board, color);
+}
+
 function pawnAdvance(piece) {
   return piece.color === "white" ? piece.position.y : 7 - piece.position.y;
 }
@@ -102,7 +113,7 @@ function pawnStructure(board, pieces, color) {
   return score;
 }
 
-function kingSafety(board, color, openingPhase) {
+function kingSafety(board, color, openingPhase, moveCache) {
   const pieces = board.getAllPieces();
   const king = pieces.find((piece) => piece.color === color && piece.type === "king");
   if (!king) return -100_000;
@@ -118,7 +129,7 @@ function kingSafety(board, color, openingPhase) {
     if (piece.color === color) shield += piece.type === "pawn" ? 20 : 8;
   }
 
-  const enemyMoves = generateLegalMovesForColor(board, opposite(color));
+  const enemyMoves = movesFor(board, opposite(color), moveCache);
   for (const move of enemyMoves) {
     const dx = Math.abs(move.to.x - king.position.x);
     const dy = Math.abs(move.to.y - king.position.y);
@@ -155,11 +166,110 @@ function developmentScore(pieces, color, openingPhase) {
   return score;
 }
 
-function activityScore(board, color) {
-  const moves = generateLegalMovesForColor(board, color);
+function activityScore(board, color, moveCache) {
+  const moves = movesFor(board, color, moveCache);
   const active = new Set(moves.map((move) => move.pieceId)).size;
   const levels = new Set(moves.map((move) => move.to.z)).size;
   return moves.length + active * 18 + levels * 10;
+}
+
+function chebyshevDistance(left, right) {
+  return Math.max(
+    Math.abs(left.x - right.x),
+    Math.abs(left.y - right.y),
+    Math.abs(left.z - right.z),
+  );
+}
+
+/**
+ * Symmetric cooperation score used inside every Alpha-Beta leaf evaluation.
+ * Root-level diversity remains a tie-break, but the search itself now values a
+ * network of active, defended pieces that control several levels together.
+ */
+export function evaluateTeamCoordination(board, color, moveCache = null) {
+  const pieces = board.getAllPieces();
+  const piecesById = new Map(pieces.map((piece) => [piece.id, piece]));
+  const own = pieces.filter((piece) => piece.color === color);
+  const ownMoves = movesFor(board, color, moveCache);
+  const enemyKing = pieces.find(
+    (piece) => piece.color === opposite(color) && piece.type === "king",
+  );
+
+  const activePieceIds = new Set();
+  const reachableSquares = new Set();
+  const activeByLevel = new Map();
+  const attackersByTarget = new Map();
+  const kingPressurePieces = new Set();
+
+  for (const move of ownMoves) {
+    activePieceIds.add(move.pieceId);
+    reachableSquares.add(`${move.to.x},${move.to.y},${move.to.z}`);
+    let levelPieces = activeByLevel.get(move.to.z);
+    if (!levelPieces) {
+      levelPieces = new Set();
+      activeByLevel.set(move.to.z, levelPieces);
+    }
+    levelPieces.add(move.pieceId);
+
+    if (move.capturedPieceId) {
+      let attackers = attackersByTarget.get(move.capturedPieceId);
+      if (!attackers) {
+        attackers = new Set();
+        attackersByTarget.set(move.capturedPieceId, attackers);
+      }
+      attackers.add(move.pieceId);
+    }
+
+    if (enemyKing && chebyshevDistance(move.to, enemyKing.position) <= 2) {
+      kingPressurePieces.add(move.pieceId);
+    }
+  }
+
+  let score = 0;
+  let defendedPieces = 0;
+  let defendedMajors = 0;
+  let isolatedMajors = 0;
+  for (const piece of own) {
+    if (piece.type === "king") continue;
+    const defended = isSquareAttacked(board, piece.position, color);
+    if (defended) {
+      defendedPieces += 1;
+      if (piece.type === "queen" || piece.type === "rook") defendedMajors += 1;
+    } else if (piece.type === "queen" || piece.type === "rook") {
+      isolatedMajors += 1;
+    }
+  }
+
+  let coordinatedTargets = 0;
+  let coordinatedTargetValue = 0;
+  for (const [targetId, attackers] of attackersByTarget.entries()) {
+    if (attackers.size < 2) continue;
+    coordinatedTargets += 1;
+
+    const target = piecesById.get(targetId);
+    const targetValue = target ? (PIECE_VALUES[target.type] ?? 0) : 0;
+    const extraAttackers = Math.max(0, attackers.size - 1);
+    coordinatedTargetValue += Math.min(
+      160,
+      28 + Math.round(targetValue * 0.08) + extraAttackers * 18,
+    );
+  }
+
+  let squadLevels = 0;
+  for (const levelPieces of activeByLevel.values()) {
+    if (levelPieces.size >= 2) squadLevels += 1;
+  }
+
+  score += defendedPieces * 9;
+  score += defendedMajors * 12;
+  score -= isolatedMajors * 34;
+  score += Math.max(0, activePieceIds.size - 1) * 12;
+  score += coordinatedTargets * 32;
+  score += coordinatedTargetValue;
+  score += squadLevels * 14;
+  score += kingPressurePieces.size * 11;
+  score += Math.min(72, Math.round(reachableSquares.size * 0.35));
+  return score;
 }
 
 function tacticalIntegrity(board, color) {
@@ -177,11 +287,11 @@ function tacticalIntegrity(board, color) {
   return score;
 }
 
-function exchangeLiability(board, color) {
+function exchangeLiability(board, color, moveCache) {
   const pieces = new Map(board.getAllPieces().map((piece) => [piece.id, piece]));
   const worstByVictim = new Map();
 
-  for (const move of generateLegalMovesForColor(board, opposite(color))) {
+  for (const move of movesFor(board, opposite(color), moveCache)) {
     if (!move.capturedPieceId) continue;
     const victim = pieces.get(move.capturedPieceId);
     const attacker = pieces.get(move.pieceId);
@@ -202,7 +312,7 @@ function exchangeLiability(board, color) {
   return score;
 }
 
-function sideScore(board, color) {
+function sideScore(board, color, moveCache = null) {
   const pieces = board.getAllPieces();
   const openingPhase = phaseOf(board);
   let score = 0;
@@ -217,15 +327,20 @@ function sideScore(board, color) {
 
   score += pawnStructure(board, pieces, color);
   score += developmentScore(pieces, color, openingPhase);
-  score += activityScore(board, color);
-  score += kingSafety(board, color, openingPhase);
+  score += activityScore(board, color, moveCache);
+  score += evaluateTeamCoordination(board, color, moveCache);
+  score += kingSafety(board, color, openingPhase, moveCache);
   score += tacticalIntegrity(board, color);
-  score += exchangeLiability(board, color);
+  score += exchangeLiability(board, color, moveCache);
   return score;
 }
 
 export function evaluateStrategicPosition(board, perspective) {
-  return sideScore(board, perspective) - sideScore(board, opposite(perspective));
+  const moveCache = buildMoveCache(board);
+  return (
+    sideScore(board, perspective, moveCache) -
+    sideScore(board, opposite(perspective), moveCache)
+  );
 }
 
 export function strategicMoveBias(board, move, recentPieceIds = []) {
@@ -233,9 +348,9 @@ export function strategicMoveBias(board, move, recentPieceIds = []) {
   const moving = pieces.find((piece) => piece.id === move.pieceId);
   if (!moving) return 0;
 
-  const before = sideScore(board, moving.color);
+  const before = sideScore(board, moving.color, buildMoveCache(board));
   const next = applyMoveForSearch(board, move);
-  const after = sideScore(next, moving.color);
+  const after = sideScore(next, moving.color, buildMoveCache(next));
   let score = Math.round((after - before) * 0.5);
 
   const movedAfter = next.getAllPieces().find((piece) => piece.id === move.pieceId);
