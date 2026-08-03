@@ -21,6 +21,11 @@ import {
   chooseTeamAwareRootCandidate,
   createTeamPlayBaseline,
 } from "./teamPlayPolicy.js";
+import {
+  analyzeArmyDevelopmentMove,
+  combineTeamAndArmyAnalysis,
+  createArmyDevelopmentBaseline,
+} from "./armyDevelopmentPolicy.js";
 import { TEAM_PLAY_WEIGHTS } from "./teamPlayWeights.js";
 
 const MATE_SCORE = 10_000_000;
@@ -222,9 +227,37 @@ function alphaBeta(board, side, perspective, depth, alpha, beta, qDepth, ply, co
   return { score: bestScore, aborted: false };
 }
 
+function emptyRootAnalysis() {
+  return {
+    score: 0,
+    teamScore: 0,
+    armyScore: 0,
+    forcing: false,
+    tacticalCapture: false,
+    repeatStreak: 0,
+    historyUseCount: 0,
+    switchedPiece: false,
+    freshPiece: false,
+    mutualPair: false,
+    supportsRecentPiece: false,
+    newlyDefendedPartners: 0,
+    coordinatedTargetDelta: 0,
+    movedPieceJointAttack: false,
+    queenMonopoly: false,
+    activatesFreshUnit: false,
+    newRole: false,
+    broadensArmy: false,
+    queenArmyImbalance: false,
+    lifetimeUseCount: 0,
+    usedPieceCount: 0,
+    armySize: 0,
+  };
+}
+
 export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
   const board = createBoard(pieces);
   const recent = options.recentAiPieceIds ?? [];
+  const usageCounts = options.aiUsageCounts ?? {};
   const teamPlayWeights = options.teamPlayWeights ?? TEAM_PLAY_WEIGHTS;
   const allLegal = generateLegalMovesForColor(board, sideToMove);
   if (!allLegal.length) return null;
@@ -238,17 +271,28 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
   const legal = filterRootMovesBySafety(board, scopedLegal, sideToMove);
   const rejectedRootMoves = allLegal.length - legal.length;
   const teamBaseline = createTeamPlayBaseline(board, sideToMove, recent);
+  const armyBaseline = createArmyDevelopmentBaseline(
+    board,
+    sideToMove,
+    usageCounts,
+  );
   const teamByMoveId = new Map(
-    legal.map((move) => [
-      moveIdentity(move),
-      analyzeTeamPlayMove(
+    legal.map((move) => {
+      const team = analyzeTeamPlayMove(
         board,
         move,
         recent,
         teamPlayWeights,
         teamBaseline,
-      ),
-    ]),
+      );
+      const army = analyzeArmyDevelopmentMove(
+        board,
+        move,
+        usageCounts,
+        armyBaseline,
+      );
+      return [moveIdentity(move), combineTeamAndArmyAnalysis(team, army)];
+    }),
   );
 
   const now = options.now ?? (() => performance.now());
@@ -265,20 +309,7 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
 
   let bestMove = orderMoves(board, legal)[0];
   let bestScore = -Infinity;
-  let bestTeam = teamByMoveId.get(moveIdentity(bestMove)) ?? {
-    score: 0,
-    forcing: false,
-    repeatStreak: 0,
-    historyUseCount: 0,
-    switchedPiece: false,
-    freshPiece: false,
-    mutualPair: false,
-    supportsRecentPiece: false,
-    newlyDefendedPartners: 0,
-    coordinatedTargetDelta: 0,
-    movedPieceJointAttack: false,
-    queenMonopoly: false,
-  };
+  let bestTeam = teamByMoveId.get(moveIdentity(bestMove)) ?? emptyRootAnalysis();
   let completedDepth = 0;
   let principalVariation = bestMove;
 
@@ -320,10 +351,7 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
       const candidate = {
         move,
         searchScore: result.score,
-        team: teamByMoveId.get(moveIdentity(move)) ?? {
-          score: 0,
-          forcing: false,
-        },
+        team: teamByMoveId.get(moveIdentity(move)) ?? emptyRootAnalysis(),
       };
       iterationChoice = chooseTeamAwareRootCandidate(
         iterationChoice,
@@ -342,7 +370,7 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
 
   const serialized = serializeMove(bestMove);
   serialized.search = {
-    engine: "strategic-3d-alpha-beta-v3",
+    engine: "strategic-3d-alpha-beta-v4-army",
     policy: "runtime-blunder-veto-v7",
     teamPlayPolicy: teamPlayWeights.id,
     completedDepth,
@@ -351,7 +379,16 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
     rejectedRootMoves,
     restrictedRootMoves: allowedRootMoveIds.size ? scopedLegal.length : null,
     recentHistoryLength: recent.length,
-    teamPlayScore: bestTeam.score,
+    armyUsageEntries: Object.keys(usageCounts).length,
+    teamPlayScore: bestTeam.teamScore ?? bestTeam.score,
+    armyDevelopmentScore: bestTeam.armyScore ?? 0,
+    armyUsedPieceCount: bestTeam.usedPieceCount ?? 0,
+    armySize: bestTeam.armySize ?? 0,
+    armyActivatesFreshUnit: Boolean(bestTeam.activatesFreshUnit),
+    armyNewRole: Boolean(bestTeam.newRole),
+    armyBroadens: Boolean(bestTeam.broadensArmy),
+    armyQueenImbalance: Boolean(bestTeam.queenArmyImbalance),
+    armyLifetimeUseCount: bestTeam.lifetimeUseCount ?? 0,
     teamPlayRepeatStreak: bestTeam.repeatStreak ?? 0,
     teamPlayHistoryUseCount: bestTeam.historyUseCount ?? 0,
     teamPlaySwitchedPiece: Boolean(bestTeam.switchedPiece),
