@@ -1,5 +1,6 @@
 import {
   evaluatePosition,
+  generateLegalMovesForColor,
   isSquareAttacked,
 } from "../../src/engine3d/index.ts";
 import {
@@ -39,8 +40,35 @@ function defendedPieceIds(board, color) {
   return defended;
 }
 
+function activityProfile(board, color) {
+  const moves = generateLegalMovesForColor(board, color);
+  return {
+    activePieceCount: new Set(moves.map((move) => move.pieceId)).size,
+    levelCoverageCount: new Set(moves.map((move) => move.to.z)).size,
+  };
+}
+
+function emptyAnalysis() {
+  return {
+    score: 0,
+    forcing: false,
+    repeatStreak: 0,
+    switchedPiece: false,
+    newlyDefendedPartners: 0,
+    movedPieceDefended: false,
+    mutualPair: false,
+    supportsRecentPiece: false,
+    undevelopedMinor: false,
+    earlyMajorRepeat: false,
+    isolated: false,
+    activePieceDelta: 0,
+    levelCoverageDelta: 0,
+  };
+}
+
 export function createTeamPlayBaseline(board, sideToMove, recentPieceIds = []) {
   const own = board.getPiecesByColor(sideToMove);
+  const activity = activityProfile(board, sideToMove);
   return {
     defendedPieceIds: defendedPieceIds(board, sideToMove),
     developedMinorCount: own.filter(
@@ -48,6 +76,8 @@ export function createTeamPlayBaseline(board, sideToMove, recentPieceIds = []) {
         (piece.type === "bishop" || piece.type === "knight") && piece.hasMoved,
     ).length,
     recentPieceId: recentPieceIds[0] ?? null,
+    activePieceCount: activity.activePieceCount,
+    levelCoverageCount: activity.levelCoverageCount,
   };
 }
 
@@ -55,21 +85,27 @@ export function scoreTeamPlayFeatures(
   features,
   weights = TEAM_PLAY_WEIGHTS,
 ) {
+  const repeatStreak = features.repeatStreak ?? 0;
   let repetitionPenalty =
-    features.repeatStreak * weights.repeatLinearPenalty +
-    features.repeatStreak * features.repeatStreak * weights.repeatQuadraticPenalty;
+    repeatStreak * weights.repeatLinearPenalty +
+    repeatStreak * repeatStreak * weights.repeatQuadraticPenalty;
   if (features.forcing) repetitionPenalty *= weights.tacticalRepeatMultiplier;
 
   let score = -repetitionPenalty;
   if (features.switchedPiece) score += weights.switchPieceBonus;
   score +=
-    features.newlyDefendedPartners * weights.newlyDefendedPartnerBonus;
+    (features.newlyDefendedPartners ?? 0) *
+    weights.newlyDefendedPartnerBonus;
   if (features.movedPieceDefended) score += weights.movedPieceDefendedBonus;
   if (features.mutualPair) score += weights.mutualPairBonus;
   if (features.supportsRecentPiece) score += weights.supportsRecentPieceBonus;
   if (features.undevelopedMinor) score += weights.undevelopedMinorBonus;
   if (features.earlyMajorRepeat) score -= weights.earlyMajorRepeatPenalty;
   if (features.isolated) score -= weights.isolatedMovePenalty;
+  score +=
+    (features.activePieceDelta ?? 0) * weights.activePieceDeltaBonus;
+  score +=
+    (features.levelCoverageDelta ?? 0) * weights.levelCoverageDeltaBonus;
 
   return Math.round(clamp(score, -weights.maxTeamBias, weights.maxTeamBias));
 }
@@ -82,35 +118,13 @@ export function analyzeTeamPlayMove(
   baseline = null,
 ) {
   const moving = board.getPieceAt(move.from);
-  if (!moving) {
-    return {
-      score: 0,
-      forcing: false,
-      repeatStreak: 0,
-      switchedPiece: false,
-      newlyDefendedPartners: 0,
-      mutualPair: false,
-      supportsRecentPiece: false,
-      isolated: false,
-    };
-  }
+  if (!moving) return emptyAnalysis();
 
   const resolvedBaseline =
     baseline ?? createTeamPlayBaseline(board, moving.color, recentPieceIds);
   const next = applyMoveForSearch(board, move);
   const movedAfter = next.getAllPieces().find((piece) => piece.id === moving.id);
-  if (!movedAfter) {
-    return {
-      score: 0,
-      forcing: false,
-      repeatStreak: 0,
-      switchedPiece: false,
-      newlyDefendedPartners: 0,
-      mutualPair: false,
-      supportsRecentPiece: false,
-      isolated: false,
-    };
-  }
+  if (!movedAfter) return emptyAnalysis();
 
   const enemy = opposite(moving.color);
   const status = evaluatePosition(next, enemy);
@@ -158,11 +172,24 @@ export function analyzeTeamPlayMove(
       recentAfter &&
       afterDefended.has(recentAfter.id),
   );
+  const afterActivity = activityProfile(next, moving.color);
+  const activePieceDelta = clamp(
+    afterActivity.activePieceCount - resolvedBaseline.activePieceCount,
+    -4,
+    4,
+  );
+  const levelCoverageDelta = clamp(
+    afterActivity.levelCoverageCount - resolvedBaseline.levelCoverageCount,
+    -4,
+    4,
+  );
   const isolated = Boolean(
     !forcing &&
       !movedPieceDefended &&
       newlyDefendedPartners === 0 &&
-      !supportsRecentPiece,
+      !supportsRecentPiece &&
+      activePieceDelta <= 0 &&
+      levelCoverageDelta <= 0,
   );
   const undevelopedMinor = Boolean(
     !moving.hasMoved &&
@@ -186,6 +213,8 @@ export function analyzeTeamPlayMove(
     undevelopedMinor,
     earlyMajorRepeat,
     isolated,
+    activePieceDelta,
+    levelCoverageDelta,
   };
 
   return {
