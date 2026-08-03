@@ -68,7 +68,7 @@ describe("hard AI self-play smoke", () => {
         );
         expect(selected).not.toBeNull();
         expect(selected.search.forcedUnsafeFallback).toBe(false);
-        expect(selected.search.teamPlayPolicy).toBe("paired-coordination-v6");
+        expect(selected.search.teamPlayPolicy).toBe("mobility-heavy-v6");
 
         const legal = generateLegalMovesForColor(board, side);
         const move = findMatchingLegalMove(legal, selected);
