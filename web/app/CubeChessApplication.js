@@ -1,11 +1,10 @@
 import { AiController } from "../ai/AiController.js";
+import { getAiRuntimePlan } from "../ai/difficultyProfiles.js";
 import { AttractModeController } from "../demo/AttractModeController.js";
 import { ChessRenderer } from "../renderer/ChessRenderer.js";
 import { SaveRepository } from "../storage/SaveRepository.js";
 import { GameHud } from "../ui/GameHud.js";
 import { GamePresentation } from "./GamePresentation.js";
-
-const AI_WATCHDOG_MS = 8_000;
 
 function downloadJson(filename, payload) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -145,6 +144,29 @@ export class CubeChessApplication {
     return this.presentation.getLegalMovesForSide()[0] ?? null;
   }
 
+  async requestAiAttempt(snapshot, difficulty, profile) {
+    let timedOut = false;
+    try {
+      const move = await Promise.race([
+        this.ai.chooseMove(snapshot, {
+          difficulty,
+          searchMilliseconds: profile.searchMilliseconds,
+        }),
+        new Promise((resolve) => {
+          this.aiWatchdogTimer = window.setTimeout(() => {
+            timedOut = true;
+            resolve(null);
+          }, profile.watchdogMilliseconds);
+        }),
+      ]);
+      return { move, timedOut, error: null };
+    } catch (error) {
+      return { move: null, timedOut: false, error };
+    } finally {
+      this.clearAiWatchdog();
+    }
+  }
+
   async requestAiMove() {
     if (this.aiRequestPending) return;
     this.aiRequestPending = true;
@@ -153,21 +175,36 @@ export class CubeChessApplication {
     this.renderer.refresh();
     const requestedGameId = this.presentation.gameId;
     const requestedSide = this.presentation.sideToMove;
+    const snapshot = this.presentation.snapshot();
+    const runtimePlan = getAiRuntimePlan(snapshot.gameConfig.difficulty);
     let move = null;
-    let timedOut = false;
 
     try {
-      move = await Promise.race([
-        this.ai.chooseMove(this.presentation.snapshot()),
-        new Promise((resolve) => {
-          this.aiWatchdogTimer = window.setTimeout(() => {
-            timedOut = true;
-            resolve(null);
-          }, AI_WATCHDOG_MS);
-        }),
-      ]);
-    } catch (error) {
-      console.error("AI worker failed; using the first legal fallback move", error);
+      const primary = await this.requestAiAttempt(
+        snapshot,
+        runtimePlan.difficulty,
+        runtimePlan.primary,
+      );
+      move = primary.move;
+      if (primary.error) {
+        console.error("Primary AI worker attempt failed", primary.error);
+      }
+
+      if (!move) {
+        // Terminate the timed-out computation instead of accepting a late stale
+        // result. Preserve the army history, then run a bounded lower-cost engine
+        // on the same position. This is still a searched move, not legalMoves[0].
+        this.ai.restartWorker({ preserveHistory: true });
+        const emergency = await this.requestAiAttempt(
+          snapshot,
+          runtimePlan.emergencyDifficulty,
+          runtimePlan.emergency,
+        );
+        move = emergency.move;
+        if (emergency.error) {
+          console.error("Emergency AI worker attempt failed", emergency.error);
+        }
+      }
     } finally {
       this.clearAiWatchdog();
       this.aiRequestPending = false;
@@ -181,10 +218,10 @@ export class CubeChessApplication {
       return;
     }
 
-    if (timedOut || !move) {
-      this.ai.cancel();
-      move = this.legalAiFallback();
-    }
+    // Only two independent Worker failures may reach this last-resort legal
+    // fallback. A normal hard timeout can no longer turn directly into the first
+    // legal move, which was the production cause of hard appearing weaker.
+    if (!move) move = this.legalAiFallback();
 
     this.presentation.setBusy(false);
     let executed = move ? this.renderer.executeAutomatedMove(move) : false;
