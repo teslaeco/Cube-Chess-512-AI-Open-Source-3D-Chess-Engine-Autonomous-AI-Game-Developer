@@ -60,8 +60,9 @@ jobs:
           --report=artifacts/teamplay-100k-report.json
 
       - name: Upload training report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: teamplay-training-${{ github.run_id }}
           path: artifacts/teamplay-100k-report.json
-          if-no-files-found: error
+          if-no-files-found: warn
