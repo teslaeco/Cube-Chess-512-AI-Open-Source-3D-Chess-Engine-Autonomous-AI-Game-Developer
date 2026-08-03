@@ -61,19 +61,34 @@ describe("squad team-play policy", () => {
     expect(chooseTeamAwareRootCandidate(current, candidate)).toBe(candidate);
   });
 
-  it("never replaces a clearly superior tactical result with cosmetic variety", () => {
+  it("never replaces a winning queen capture with cosmetic variety", () => {
     const tactical = {
       move: { pieceId: "black-rook", capturedPieceId: "white-queen" },
       searchScore: 900,
-      team: { score: -180, forcing: false },
+      team: {
+        score: -180,
+        forcing: false,
+        tacticalCapture: true,
+        repeatStreak: 2,
+        pieceMonopoly: true,
+        queenMonopoly: false,
+      },
     };
     const quiet = {
       move: { pieceId: "black-knight" },
       searchScore: 180,
-      team: { score: 260, forcing: false },
+      team: {
+        score: 260,
+        forcing: false,
+        tacticalCapture: false,
+        repeatStreak: 0,
+        pieceMonopoly: false,
+        queenMonopoly: false,
+      },
     };
 
     expect(chooseTeamAwareRootCandidate(tactical, quiet)).toBe(tactical);
+    expect(chooseTeamAwareRootCandidate(quiet, tactical)).toBe(tactical);
   });
 
   it("hard-vetoes a quiet third consecutive move when another piece can move", () => {
@@ -83,6 +98,7 @@ describe("squad team-play policy", () => {
       team: {
         score: -280,
         forcing: false,
+        tacticalCapture: false,
         repeatStreak: 2,
         pieceMonopoly: true,
         queenMonopoly: true,
@@ -94,6 +110,7 @@ describe("squad team-play policy", () => {
       team: {
         score: 90,
         forcing: false,
+        tacticalCapture: false,
         repeatStreak: 0,
         pieceMonopoly: false,
         queenMonopoly: false,
@@ -111,6 +128,7 @@ describe("squad team-play policy", () => {
       team: {
         score: -260,
         forcing: false,
+        tacticalCapture: false,
         repeatStreak: 0,
         pieceMonopoly: false,
         queenMonopoly: true,
@@ -122,6 +140,7 @@ describe("squad team-play policy", () => {
       team: {
         score: 120,
         forcing: false,
+        tacticalCapture: false,
         repeatStreak: 0,
         pieceMonopoly: false,
         queenMonopoly: false,
