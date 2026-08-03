@@ -66,7 +66,9 @@ const QUEEN_DISCIPLINE_V7 = Object.freeze({
   movedPieceJointAttackBonus: 46,
 });
 
-export const TEAM_PLAY_WEIGHTS = SQUAD_ATTACK_V7;
+// The deterministic 3,000-rollout gate selected queen-discipline-v7 over
+// squad-attack-v7. Promote the measured winner rather than weakening the gate.
+export const TEAM_PLAY_WEIGHTS = QUEEN_DISCIPLINE_V7;
 
 export const TEAM_PLAY_TRAINING_CANDIDATES = Object.freeze([
   LEGACY_BALANCED_V6,
