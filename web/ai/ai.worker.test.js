@@ -52,7 +52,7 @@ describe("hard AI worker integration", () => {
     });
   });
 
-  it("returns a legal hard move with final runtime safety diagnostics", () => {
+  it("returns a legal hard move with authoritative routing diagnostics", () => {
     const selected = chooseMoveWithVariantRules(
       createInitialPieces(),
       "black",
@@ -69,13 +69,36 @@ describe("hard AI worker integration", () => {
       pieceId: expect.any(String),
       square3D: expect.any(String),
       search: {
-        engine: "strategic-3d-alpha-beta-v3",
+        engine: "strategic-3d-alpha-beta-v4-army",
         completedDepth: 1,
         policy: "runtime-blunder-veto-v7",
         runtimeSafetyPolicy: "final-worker-static-exchange-gate-v2",
+        requestedDifficulty: "hard",
+        resolvedDifficulty: "hard",
+        difficultyEngine: "classical-3d-advanced",
+        searchBudgetMilliseconds: 60_000,
         safetyVetoApplied: false,
       },
     });
+  });
+
+  it("does not reverse easy, medium and hard labels", () => {
+    const pieces = createInitialPieces();
+    for (const difficulty of ["easy", "medium", "hard"]) {
+      const selected = chooseMoveWithVariantRules(
+        pieces,
+        "black",
+        difficulty,
+        {
+          maxDepth: 1,
+          quiescenceDepth: 0,
+          milliseconds: 60_000,
+          now: () => 0,
+        },
+      );
+      expect(selected.search.requestedDifficulty).toBe(difficulty);
+      expect(selected.search.resolvedDifficulty).toBe(difficulty);
+    }
   });
 
   it("vetoes an unsafe searched queen capture and returns a safe replacement", () => {
@@ -111,6 +134,7 @@ describe("hard AI worker integration", () => {
     expect(selected.search).toMatchObject({
       policy: "runtime-blunder-veto-v7",
       runtimeSafetyPolicy: "final-worker-static-exchange-gate-v2",
+      resolvedDifficulty: "hard",
       safetyVetoApplied: true,
       forcedUnsafeFallback: false,
     });
@@ -140,6 +164,10 @@ describe("hard AI worker integration", () => {
       capturedPieceId: "white-pawn",
       to: { x: 0, y: 3, z: 0 },
     });
-    expect(selected.search.safetyVetoApplied).toBe(true);
+    expect(selected.search).toMatchObject({
+      resolvedDifficulty: "easy",
+      difficultyEngine: "classical-basic",
+      safetyVetoApplied: true,
+    });
   });
 });
