@@ -41,14 +41,18 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit
 
-      - name: Run material and team-play regressions
+      - name: Run material, routing and whole-army regressions
         run: >-
           npx vitest run
+          web/ai/difficultyProfiles.test.js
+          web/ai/runtimeExecution.test.js
+          web/ai/armyDevelopmentPolicy.test.js
           web/ai/teamPlayPolicy.test.js
           web/ai/aiSelfPlaySmoke.test.js
           web/ai/finalMoveSafety.test.js
           web/ai/queenTradeRegression.test.js
           web/ai/rootMoveSafety.test.js
+          web/ai/ai.worker.test.js
 
   train-shard:
     needs: regressions
