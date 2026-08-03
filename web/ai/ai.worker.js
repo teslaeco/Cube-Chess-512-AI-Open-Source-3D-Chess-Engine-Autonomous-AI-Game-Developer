@@ -7,8 +7,121 @@ import {
 } from "./searchEngine.js";
 import { chooseAdvancedMove } from "./advancedSearch.js";
 import { applyLoneKingLevelRule } from "../rules/LoneKingLevelRule.js";
+import {
+  assessImmediateMaterialSafety,
+  filterMovesByFinalSafety,
+  findMatchingLegalMove,
+  moveIdentity,
+} from "./finalMoveSafety.js";
 
 let generation = 0;
+
+function attachRuntimeSafetyDiagnostics(
+  serialized,
+  {
+    assessment,
+    vetoApplied,
+    vetoedMove = null,
+    safeCandidateCount,
+    forcedUnsafeFallback = false,
+  },
+) {
+  return {
+    ...serialized,
+    search: {
+      ...(serialized.search ?? {}),
+      policy: "runtime-blunder-veto-v5",
+      runtimeSafetyPolicy: "final-worker-material-gate-v1",
+      safetyVetoApplied: vetoApplied,
+      vetoedMove,
+      safeCandidateCount,
+      forcedUnsafeFallback,
+      finalSafetyReason: assessment.reason,
+      finalSafetyMaterialNet: Number.isFinite(assessment.materialNet)
+        ? assessment.materialNet
+        : null,
+      finalSafetyRecaptures: assessment.recaptureCount ?? 0,
+    },
+  };
+}
+
+/**
+ * Last authoritative AI boundary before a move is posted to the game.
+ *
+ * Search, difficulty selection and variant fallbacks are not trusted to preserve
+ * material safety on their own. Every returned move is reconstructed from the
+ * current legal move list and checked again here.
+ */
+export function enforceFinalWorkerSafety(
+  pieces,
+  sideToMove,
+  difficulty,
+  selected,
+  options = {},
+) {
+  const board = createBoard(pieces);
+  const legal = generateLegalMovesForColor(board, sideToMove);
+  const variantLegal = applyLoneKingLevelRule(
+    pieces,
+    sideToMove,
+    orderMoves(board, legal),
+  );
+  if (!variantLegal.length) return null;
+
+  const selectedLegal = findMatchingLegalMove(variantLegal, selected);
+  const candidate = selectedLegal ?? variantLegal[0];
+  const assessment = assessImmediateMaterialSafety(board, candidate, sideToMove);
+
+  if (assessment.safe) {
+    const serialized = selectedLegal ? selected : serializeMove(candidate);
+    return attachRuntimeSafetyDiagnostics(serialized, {
+      assessment,
+      vetoApplied: false,
+      safeCandidateCount: filterMovesByFinalSafety(
+        board,
+        variantLegal,
+        sideToMove,
+      ).length,
+    });
+  }
+
+  const safeMoves = filterMovesByFinalSafety(board, variantLegal, sideToMove);
+  if (!safeMoves.length) {
+    // Forced positions must still progress. This is explicit in diagnostics and
+    // can be found by self-play/regression tooling instead of silently hiding it.
+    return attachRuntimeSafetyDiagnostics(serializeMove(candidate), {
+      assessment,
+      vetoApplied: true,
+      vetoedMove: moveIdentity(candidate),
+      safeCandidateCount: 0,
+      forcedUnsafeFallback: true,
+    });
+  }
+
+  let replacement = null;
+  if (difficulty === "hard") {
+    replacement = chooseAdvancedMove(pieces, sideToMove, {
+      ...options,
+      allowedRootMoveIds: safeMoves.map(moveIdentity),
+    });
+  }
+
+  const replacementLegal = findMatchingLegalMove(safeMoves, replacement);
+  const finalMove = replacementLegal ?? orderMoves(board, safeMoves)[0];
+  const finalSerialized = replacementLegal ? replacement : serializeMove(finalMove);
+  const finalAssessment = assessImmediateMaterialSafety(
+    board,
+    finalMove,
+    sideToMove,
+  );
+
+  return attachRuntimeSafetyDiagnostics(finalSerialized, {
+    assessment: finalAssessment,
+    vetoApplied: true,
+    vetoedMove: moveIdentity(candidate),
+    safeCandidateCount: safeMoves.length,
+  });
+}
 
 export function chooseMoveWithVariantRules(
   pieces,
@@ -22,24 +135,13 @@ export function chooseMoveWithVariantRules(
       : chooseBestMove(pieces, sideToMove, difficulty, options);
   if (!selected) return null;
 
-  const board = createBoard(pieces);
-  const legal = generateLegalMovesForColor(board, sideToMove);
-  const filtered = applyLoneKingLevelRule(
+  return enforceFinalWorkerSafety(
     pieces,
     sideToMove,
-    orderMoves(board, legal),
+    difficulty,
+    selected,
+    options,
   );
-  const selectedAllowed = applyLoneKingLevelRule(pieces, sideToMove, [selected]);
-
-  // The searched hard-AI move is authoritative. Never replace a completed
-  // alpha-beta result with the first move of another piece merely to create
-  // cosmetic variety. Repetition is handled inside the strategic evaluation,
-  // where tactics, material and king safety can override it correctly.
-  if (selectedAllowed.length) return selected;
-
-  // Variant rules may invalidate a move after search. In that exceptional
-  // case return a deterministic legal fallback rather than an illegal move.
-  return filtered.length ? serializeMove(filtered[0]) : null;
 }
 
 if (typeof self !== "undefined") {
