@@ -4,12 +4,10 @@ import {
   evaluatePosition,
   generateLegalMovesForColor,
 } from "../src/engine3d/index.ts";
-import { chooseMoveWithVariantRules } from "../web/ai/ai.worker.js";
 import { materialValue } from "../web/ai/cubePieceValues.js";
 import {
   assessImmediateMaterialSafety,
   filterMovesByFinalSafety,
-  findMatchingLegalMove,
 } from "../web/ai/finalMoveSafety.js";
 import {
   applyMoveForSearch,
@@ -18,6 +16,15 @@ import {
   opposite,
   orderMoves,
 } from "../web/ai/searchEngine.js";
+import {
+  evaluateStrategicPosition,
+  strategicMoveBias,
+} from "../web/ai/strategicEvaluation.js";
+import {
+  analyzeTeamPlayMove,
+  chooseTeamAwareRootCandidate,
+  createTeamPlayBaseline,
+} from "../web/ai/teamPlayPolicy.js";
 import {
   TEAM_PLAY_TRAINING_CANDIDATES,
   TEAM_PLAY_WEIGHTS,
@@ -34,6 +41,7 @@ const gamesInShard = Number(argument("games", "50"));
 const seedOffset = Number(argument("seed-offset", "0"));
 const totalGamesPerPolicy = Number(argument("total-games-per-policy", "1000"));
 const trainingPlies = Number(argument("plies", "10"));
+const rootCandidateLimit = Number(argument("root-candidates", "16"));
 const requestedPolicy = argument("policy", "");
 const reportPath = resolve(
   argument("report", "artifacts/real-team-selfplay-shard.json"),
@@ -53,6 +61,9 @@ if (seedOffset + gamesInShard > totalGamesPerPolicy) {
 }
 if (!Number.isInteger(trainingPlies) || trainingPlies < 6) {
   throw new Error("--plies must be an integer of at least 6");
+}
+if (!Number.isInteger(rootCandidateLimit) || rootCandidateLimit < 8) {
+  throw new Error("--root-candidates must be an integer of at least 8");
 }
 
 const weights = TEAM_PLAY_TRAINING_CANDIDATES.find(
@@ -142,6 +153,100 @@ function safeSeededOpening(pieces, side, globalGameIndex) {
   return { pieces: currentPieces, side: currentSide };
 }
 
+/**
+ * Build a bounded but diverse root set from real legal moves. The first half
+ * preserves the engine's tactical ordering; the second half guarantees that
+ * alternative pieces can compete with the queen. Every selected move remains
+ * legal and passes the production material-safety gate.
+ */
+function selectDiverseSafeCandidates(board, legal, sideToMove, limit) {
+  const safe = filterMovesByFinalSafety(board, legal, sideToMove);
+  if (!safe.length) return [];
+
+  const ordered = orderMoves(board, safe);
+  const selected = [];
+  const selectedKeys = new Set();
+  const representedPieces = new Set();
+  const tacticalSlots = Math.max(4, Math.floor(limit / 2));
+
+  function add(move) {
+    const key = `${move.pieceId}:${move.from.x},${move.from.y},${move.from.z}:${move.to.x},${move.to.y},${move.to.z}`;
+    if (selectedKeys.has(key) || selected.length >= limit) return;
+    selected.push(move);
+    selectedKeys.add(key);
+    representedPieces.add(move.pieceId);
+  }
+
+  for (const move of ordered.slice(0, tacticalSlots)) add(move);
+  for (const move of ordered) {
+    if (!representedPieces.has(move.pieceId)) add(move);
+    if (selected.length >= limit) break;
+  }
+  for (const move of ordered) {
+    add(move);
+    if (selected.length >= limit) break;
+  }
+  return selected;
+}
+
+/**
+ * Fast training selector for real-board policy rollouts.
+ *
+ * This is intentionally not presented as a full-depth Alpha-Beta game. It uses
+ * real Board3D states, real legal moves, production exchange safety, production
+ * strategic evaluation and the exact production team-play feature scorer. The
+ * bounded root set makes thousands of reproducible rollouts practical in CI.
+ */
+function choosePolicyRolloutMove(board, sideToMove, recentPieceIds) {
+  const legal = generateLegalMovesForColor(board, sideToMove);
+  const candidates = selectDiverseSafeCandidates(
+    board,
+    legal,
+    sideToMove,
+    rootCandidateLimit,
+  );
+  if (!candidates.length) return null;
+
+  const baseline = createTeamPlayBaseline(
+    board,
+    sideToMove,
+    recentPieceIds,
+  );
+  let choice = null;
+
+  for (const move of candidates) {
+    const team = analyzeTeamPlayMove(
+      board,
+      move,
+      recentPieceIds,
+      weights,
+      baseline,
+    );
+    const next = applyMoveForSearch(board, move);
+    const searchScore =
+      evaluateStrategicPosition(next, sideToMove) +
+      strategicMoveBias(board, move, recentPieceIds);
+    choice = chooseTeamAwareRootCandidate(
+      choice,
+      { move, searchScore, team },
+      weights,
+    );
+  }
+
+  if (!choice) return null;
+  const assessment = assessImmediateMaterialSafety(
+    board,
+    choice.move,
+    sideToMove,
+  );
+  if (!assessment.safe) {
+    throw new Error(
+      `${weights.id} selected an unsafe rollout move: ${assessment.reason}`,
+    );
+  }
+  return { ...choice, assessment };
+}
+
 function qualityScore(entry) {
   const moves = Math.max(1, entry.completedPlies);
   const quietMoves = Math.max(1, entry.quietMoves);
@@ -210,38 +315,16 @@ for (let game = 0; game < gamesInShard; game += 1) {
       break;
     }
 
-    const legal = generateLegalMovesForColor(board, side);
-    if (!legal.length) break;
-    const selected = chooseMoveWithVariantRules(
-      pieces,
+    const selected = choosePolicyRolloutMove(
+      board,
       side,
-      "hard",
-      {
-        maxDepth: 1,
-        quiescenceDepth: 0,
-        milliseconds: 60_000,
-        now: () => 0,
-        transpositionEntries: 4_000,
-        recentAiPieceIds: recentBySide[side],
-        teamPlayWeights: weights,
-      },
+      recentBySide[side],
     );
-    if (!selected) {
-      throw new Error(
-        `${weights.id} returned no move in global game ${globalGameIndex}`,
-      );
-    }
+    if (!selected) break;
 
-    const move = findMatchingLegalMove(legal, selected);
-    if (!move) {
-      throw new Error(
-        `${weights.id} returned a non-legal move in global game ${globalGameIndex}`,
-      );
-    }
-
+    const move = selected.move;
     const moving = board.getPieceAt(move.from);
     const captured = pieceById(board, move.capturedPieceId);
-    const assessment = assessImmediateMaterialSafety(board, move, side);
     const next = applyMoveForSearch(board, move);
     const afterStatus = evaluatePosition(next, opposite(side));
     const quiet = Boolean(
@@ -251,8 +334,7 @@ for (let game = 0; game < gamesInShard; game += 1) {
         afterStatus.kind !== "checkmate",
     );
 
-    if (!assessment.safe) result.materialSafetyViolations += 1;
-    if (selected.search?.forcedUnsafeFallback) result.forcedUnsafeFallbacks += 1;
+    if (!selected.assessment.safe) result.materialSafetyViolations += 1;
 
     result.completedPlies += 1;
     result.movesBySide[side] += 1;
@@ -271,14 +353,14 @@ for (let game = 0; game < gamesInShard; game += 1) {
       if (quiet) result.quietQueenMoves += 1;
     }
     if (
-      selected.search?.teamPlayMutualPair ||
-      selected.search?.teamPlaySupportsRecentPiece ||
-      selected.search?.teamPlayMovedPieceJointAttack ||
-      (selected.search?.teamPlayCoordinatedTargetDelta ?? 0) > 0
+      selected.team.mutualPair ||
+      selected.team.supportsRecentPiece ||
+      selected.team.movedPieceJointAttack ||
+      selected.team.coordinatedTargetDelta > 0
     ) {
       result.teamMoves += 1;
     }
-    if (selected.search?.teamPlayFreshPiece) result.freshPieceMoves += 1;
+    if (selected.team.freshPiece) result.freshPieceMoves += 1;
 
     const previousMover = opposite(side);
     const pending = pendingQueenBySide[previousMover];
@@ -314,22 +396,24 @@ for (let game = 0; game < gamesInShard; game += 1) {
 
   if ((game + 1) % 10 === 0) {
     console.log(
-      `${weights.id} seed ${seedOffset}: ${game + 1}/${gamesInShard} games`,
+      `${weights.id} seed ${seedOffset}: ${game + 1}/${gamesInShard} rollouts`,
     );
   }
 }
 
 const completed = completeMetrics(result);
 const report = {
-  schema: 4,
-  mode: "real-legal-8x8x8-hard-self-play-shard",
+  schema: 5,
+  mode: "real-legal-8x8x8-team-policy-rollout-shard",
   syntheticCurriculum: false,
+  fullAlphaBetaGames: false,
   partial: true,
   requestedPolicy,
   seedOffset,
   gamesInShard,
   totalGamesPerPolicy,
   trainingPlies,
+  rootCandidateLimit,
   productionPolicy: TEAM_PLAY_WEIGHTS.id,
   ranking: [completed],
 };
