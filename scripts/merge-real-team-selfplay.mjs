@@ -90,10 +90,11 @@ const offsetsById = new Map(expectedIds.map((id) => [id, new Set()]));
 for (const { report, name } of shardReports) {
   if (
     report.syntheticCurriculum !== false ||
+    report.fullAlphaBetaGames !== false ||
     report.partial !== true ||
-    report.mode !== "real-legal-8x8x8-hard-self-play-shard"
+    report.mode !== "real-legal-8x8x8-team-policy-rollout-shard"
   ) {
-    throw new Error(`${name} is not a valid real self-play shard`);
+    throw new Error(`${name} is not a valid real-board policy rollout shard`);
   }
   if (
     report.totalGamesPerPolicy !== totalGamesPerPolicy ||
@@ -192,9 +193,10 @@ if (!production || !baseline) {
 }
 
 const report = {
-  schema: 5,
-  mode: "60-shard-real-legal-8x8x8-hard-self-play",
+  schema: 6,
+  mode: "150-shard-real-legal-8x8x8-team-policy-rollout",
   syntheticCurriculum: false,
+  fullAlphaBetaGames: false,
   shardReports: shardReports.length,
   shardsPerPolicy: expectedShardsPerPolicy,
   gamesInShard,
@@ -202,6 +204,7 @@ const report = {
   policies: expectedIds.length,
   totalRealGames: totalGamesPerPolicy * expectedIds.length,
   trainingPlies,
+  totalPlies: ranking.reduce((sum, entry) => sum + entry.completedPlies, 0),
   selectedPolicy: selected.id,
   productionPolicy: TEAM_PLAY_WEIGHTS.id,
   ranking,
@@ -218,7 +221,7 @@ for (const entry of ranking) {
       `${entry.id} completed ${entry.games}/${totalGamesPerPolicy} games`,
     );
   }
-  if (entry.completedPlies < totalGamesPerPolicy * 4) {
+  if (entry.completedPlies < totalGamesPerPolicy * 12) {
     throw new Error(`${entry.id} produced only ${entry.completedPlies} plies`);
   }
   if (entry.materialSafetyViolations !== 0) {
@@ -234,7 +237,7 @@ for (const entry of ranking) {
 
 if (selected.id !== TEAM_PLAY_WEIGHTS.id) {
   throw new Error(
-    `Real self-play selected ${selected.id}, but production uses ${TEAM_PLAY_WEIGHTS.id}`,
+    `Real-board rollouts selected ${selected.id}, but production uses ${TEAM_PLAY_WEIGHTS.id}`,
   );
 }
 if (production.samePieceRunViolationRate > 0.01) {
@@ -242,12 +245,12 @@ if (production.samePieceRunViolationRate > 0.01) {
     `Production same-piece run rate is ${production.samePieceRunViolationRate}`,
   );
 }
-if (production.quietQueenMoveRate > 0.35) {
+if (production.quietQueenMoveRate > 0.3) {
   throw new Error(
     `Production quiet queen move rate is ${production.quietQueenMoveRate}`,
   );
 }
-if (production.averageDistinctPieces < 2.75) {
+if (production.averageDistinctPieces < 3.25) {
   throw new Error(
     `Production average distinct pieces is ${production.averageDistinctPieces}`,
   );
