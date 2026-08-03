@@ -30,60 +30,177 @@ if (!files.length) {
   throw new Error(`No real self-play shard reports in ${inputDirectory}`);
 }
 
-const shardReports = files.map((name) =>
-  JSON.parse(readFileSync(resolve(inputDirectory, name), "utf8")),
-);
-const entries = shardReports.flatMap((report) => report.ranking ?? []);
-const byId = new Map();
-for (const entry of entries) {
-  if (byId.has(entry.id)) {
-    throw new Error(`Duplicate real self-play report for ${entry.id}`);
-  }
-  byId.set(entry.id, entry);
+const shardReports = files.map((name) => ({
+  name,
+  report: JSON.parse(readFileSync(resolve(inputDirectory, name), "utf8")),
+}));
+const expectedIds = TEAM_PLAY_TRAINING_CANDIDATES.map((candidate) => candidate.id);
+const totalGamesPerPolicy = shardReports[0].report.totalGamesPerPolicy;
+const gamesInShard = shardReports[0].report.gamesInShard;
+const trainingPlies = shardReports[0].report.trainingPlies;
+const expectedShardsPerPolicy = totalGamesPerPolicy / gamesInShard;
+
+if (!Number.isInteger(expectedShardsPerPolicy)) {
+  throw new Error("Shard size does not divide total games per policy");
 }
 
-const expectedIds = TEAM_PLAY_TRAINING_CANDIDATES.map((candidate) => candidate.id);
-for (const id of expectedIds) {
-  if (!byId.has(id)) throw new Error(`Missing real self-play report for ${id}`);
+const numericFields = [
+  "games",
+  "completedPlies",
+  "distinctPieceTotal",
+  "queenMoves",
+  "quietQueenMoves",
+  "teamMoves",
+  "freshPieceMoves",
+  "samePieceRunViolations",
+  "quietMoves",
+  "materialSafetyViolations",
+  "criticalQueenTradeViolations",
+  "forcedUnsafeFallbacks",
+  "checkmates",
+  "draws",
+];
+
+function emptyMetrics(id) {
+  return {
+    id,
+    games: 0,
+    completedPlies: 0,
+    movesBySide: { white: 0, black: 0 },
+    distinctPieceTotal: 0,
+    queenMoves: 0,
+    quietQueenMoves: 0,
+    teamMoves: 0,
+    freshPieceMoves: 0,
+    samePieceRunViolations: 0,
+    quietMoves: 0,
+    materialSafetyViolations: 0,
+    criticalQueenTradeViolations: 0,
+    forcedUnsafeFallbacks: 0,
+    checkmates: 0,
+    draws: 0,
+  };
 }
-if (byId.size !== expectedIds.length) {
-  throw new Error(
-    `Expected ${expectedIds.length} policies, received ${byId.size}`,
+
+const aggregateById = new Map(
+  expectedIds.map((id) => [id, emptyMetrics(id)]),
+);
+const offsetsById = new Map(expectedIds.map((id) => [id, new Set()]));
+
+for (const { report, name } of shardReports) {
+  if (
+    report.syntheticCurriculum !== false ||
+    report.partial !== true ||
+    report.mode !== "real-legal-8x8x8-hard-self-play-shard"
+  ) {
+    throw new Error(`${name} is not a valid real self-play shard`);
+  }
+  if (
+    report.totalGamesPerPolicy !== totalGamesPerPolicy ||
+    report.gamesInShard !== gamesInShard ||
+    report.trainingPlies !== trainingPlies
+  ) {
+    throw new Error(`${name} used different training settings`);
+  }
+  if (!Number.isInteger(report.seedOffset) || report.seedOffset < 0) {
+    throw new Error(`${name} has an invalid seed offset`);
+  }
+  if (!Array.isArray(report.ranking) || report.ranking.length !== 1) {
+    throw new Error(`${name} must contain exactly one policy result`);
+  }
+
+  const entry = report.ranking[0];
+  const aggregate = aggregateById.get(entry.id);
+  const offsets = offsetsById.get(entry.id);
+  if (!aggregate || !offsets) {
+    throw new Error(`${name} contains unknown policy ${entry.id}`);
+  }
+  if (offsets.has(report.seedOffset)) {
+    throw new Error(`Duplicate ${entry.id} shard at seed ${report.seedOffset}`);
+  }
+  offsets.add(report.seedOffset);
+
+  for (const field of numericFields) {
+    aggregate[field] += Number(entry[field] ?? 0);
+  }
+  aggregate.movesBySide.white += Number(entry.movesBySide?.white ?? 0);
+  aggregate.movesBySide.black += Number(entry.movesBySide?.black ?? 0);
+}
+
+for (const id of expectedIds) {
+  const offsets = offsetsById.get(id);
+  if (offsets.size !== expectedShardsPerPolicy) {
+    throw new Error(
+      `${id} has ${offsets.size}/${expectedShardsPerPolicy} shard reports`,
+    );
+  }
+  for (let offset = 0; offset < totalGamesPerPolicy; offset += gamesInShard) {
+    if (!offsets.has(offset)) {
+      throw new Error(`${id} is missing seed range starting at ${offset}`);
+    }
+  }
+}
+
+function qualityScore(entry) {
+  const moves = Math.max(1, entry.completedPlies);
+  const quietMoves = Math.max(1, entry.quietMoves);
+  const games = Math.max(1, entry.games);
+  const averageDistinctPieces = entry.distinctPieceTotal / (games * 2);
+  const teamMoveRate = entry.teamMoves / moves;
+  const freshPieceRate = entry.freshPieceMoves / moves;
+  const queenMoveRate = entry.queenMoves / moves;
+  const quietQueenMoveRate = entry.quietQueenMoves / quietMoves;
+  const samePieceRunViolationRate = entry.samePieceRunViolations / quietMoves;
+
+  return Math.round(
+    averageDistinctPieces * 18_000 +
+      teamMoveRate * 120_000 +
+      freshPieceRate * 90_000 -
+      queenMoveRate * 45_000 -
+      quietQueenMoveRate * 80_000 -
+      samePieceRunViolationRate * 500_000 -
+      entry.materialSafetyViolations * 5_000_000 -
+      entry.criticalQueenTradeViolations * 20_000_000 -
+      entry.forcedUnsafeFallbacks * 2_000_000,
   );
 }
 
-const gamesPerPolicy = shardReports[0].gamesPerPolicy;
-const trainingPlies = shardReports[0].trainingPlies;
-for (const report of shardReports) {
-  if (report.syntheticCurriculum !== false || report.partial !== true) {
-    throw new Error("Aggregator received a non-real or non-sharded report");
-  }
-  if (
-    report.gamesPerPolicy !== gamesPerPolicy ||
-    report.trainingPlies !== trainingPlies
-  ) {
-    throw new Error("Real self-play shards used different game settings");
-  }
+function completeMetrics(entry) {
+  const moves = Math.max(1, entry.completedPlies);
+  const quietMoves = Math.max(1, entry.quietMoves);
+  const games = Math.max(1, entry.games);
+  return {
+    ...entry,
+    score: qualityScore(entry),
+    averageDistinctPieces: entry.distinctPieceTotal / (games * 2),
+    queenMoveRate: entry.queenMoves / moves,
+    quietQueenMoveRate: entry.quietQueenMoves / quietMoves,
+    teamMoveRate: entry.teamMoves / moves,
+    freshPieceRate: entry.freshPieceMoves / moves,
+    samePieceRunViolationRate: entry.samePieceRunViolations / quietMoves,
+  };
 }
 
-const ranking = [...byId.values()].sort(
-  (left, right) => right.score - left.score || left.id.localeCompare(right.id),
-);
+const ranking = [...aggregateById.values()]
+  .map(completeMetrics)
+  .sort((left, right) => right.score - left.score || left.id.localeCompare(right.id));
 const selected = ranking[0];
-const production = byId.get(TEAM_PLAY_WEIGHTS.id);
-const baseline = byId.get("balanced-v6");
+const production = ranking.find((entry) => entry.id === TEAM_PLAY_WEIGHTS.id);
+const baseline = ranking.find((entry) => entry.id === "balanced-v6");
 if (!production || !baseline) {
   throw new Error("Missing production or legacy baseline policy");
 }
 
 const report = {
-  schema: 4,
-  mode: "parallel-real-legal-8x8x8-hard-self-play",
+  schema: 5,
+  mode: "60-shard-real-legal-8x8x8-hard-self-play",
   syntheticCurriculum: false,
-  parallelPolicyJobs: expectedIds.length,
-  gamesPerPolicy,
+  shardReports: shardReports.length,
+  shardsPerPolicy: expectedShardsPerPolicy,
+  gamesInShard,
+  gamesPerPolicy: totalGamesPerPolicy,
   policies: expectedIds.length,
-  totalRealGames: gamesPerPolicy * expectedIds.length,
+  totalRealGames: totalGamesPerPolicy * expectedIds.length,
   trainingPlies,
   selectedPolicy: selected.id,
   productionPolicy: TEAM_PLAY_WEIGHTS.id,
@@ -96,10 +213,12 @@ writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));
 
 for (const entry of ranking) {
-  if (entry.games !== gamesPerPolicy) {
-    throw new Error(`${entry.id} completed ${entry.games}/${gamesPerPolicy} games`);
+  if (entry.games !== totalGamesPerPolicy) {
+    throw new Error(
+      `${entry.id} completed ${entry.games}/${totalGamesPerPolicy} games`,
+    );
   }
-  if (entry.completedPlies < gamesPerPolicy * 6) {
+  if (entry.completedPlies < totalGamesPerPolicy * 4) {
     throw new Error(`${entry.id} produced only ${entry.completedPlies} plies`);
   }
   if (entry.materialSafetyViolations !== 0) {
