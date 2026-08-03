@@ -63,7 +63,7 @@ export function createArmyDevelopmentBaseline(
     activePieceIds: activePieceIds(board, color),
     developedMinorCount: own.filter(
       (piece) =>
-        (piece.type === "knight" || piece.type === "bishop") && piece.hasMoved,
+        (piece.type === "bishop" || piece.type === "knight") && piece.hasMoved,
     ).length,
   };
 }
@@ -167,6 +167,11 @@ export function combineTeamAndArmyAnalysis(team, army) {
   return {
     ...team,
     ...army,
+    // Existing root discipline already gives a wider comparison window to
+    // quiet queen monopolies. Expose whole-army imbalance through that same
+    // tactical-safe path instead of adding a second contradictory selector.
+    queenMonopoly: Boolean(team?.queenMonopoly || army?.queenArmyImbalance),
+    freshPiece: Boolean(team?.freshPiece || army?.activatesFreshUnit),
     score: Number(team?.score ?? 0) + Number(army?.score ?? 0),
     teamScore: Number(team?.score ?? 0),
     armyScore: Number(army?.score ?? 0),
