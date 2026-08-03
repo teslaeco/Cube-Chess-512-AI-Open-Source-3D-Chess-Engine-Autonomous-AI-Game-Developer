@@ -100,7 +100,7 @@ describe("hard AI root move safety", () => {
     });
   });
 
-  it("allows the narrow exception when promotion remains legal after recapture", () => {
+  it("still rejects a queen sacrifice when a later promotion could compensate", () => {
     const board = createBoard([
       ...kings,
       piece("black-queen", "queen", "black", 0, 3, 6, true),
@@ -113,14 +113,14 @@ describe("hard AI root move safety", () => {
     expect(move).toBeDefined();
     expect(staticExchangeNet(board, move)).toBe(-1300);
     expect(assessRootMoveSafety(board, move, "black")).toMatchObject({
-      safe: true,
-      reason: "supports-level-seven-promotion",
+      safe: false,
+      reason: "queen-for-lower-piece-critical-blunder",
       exchangeNet: -1300,
-      promotionCredit: 1300,
+      promotionCredit: 0,
     });
   });
 
-  it("rejects the exception when the recapture gives check and stops promotion", () => {
+  it("rejects the queen sacrifice when the recapture gives check", () => {
     const board = createBoard([
       piece("white-king", "king", "white", 7, 0, 0),
       piece("black-king", "king", "black", 1, 7, 6),
