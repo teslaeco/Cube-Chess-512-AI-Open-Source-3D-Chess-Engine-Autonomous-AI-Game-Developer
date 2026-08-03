@@ -1,4 +1,5 @@
-const SHARED_TEAM_PLAY_WEIGHTS = Object.freeze({
+const LEGACY_BALANCED_V6 = Object.freeze({
+  id: "balanced-v6",
   rootScoreWindow: 90,
   maxTeamBias: 180,
   switchPieceBonus: 24,
@@ -8,58 +9,67 @@ const SHARED_TEAM_PLAY_WEIGHTS = Object.freeze({
   earlyMajorRepeatPenalty: 42,
   isolatedMovePenalty: 22,
   tacticalRepeatMultiplier: 0.2,
-});
-
-const BALANCED_V6 = Object.freeze({
-  ...SHARED_TEAM_PLAY_WEIGHTS,
-  id: "balanced-v6",
   repeatLinearPenalty: 40,
   repeatQuadraticPenalty: 24,
   mutualPairBonus: 48,
   supportsRecentPieceBonus: 38,
   activePieceDeltaBonus: 14,
   levelCoverageDeltaBonus: 10,
+  historyUsePenalty: 0,
+  pieceMonopolyPenalty: 0,
+  queenMonopolyPenalty: 0,
+  freshPieceBonus: 0,
+  coordinatedTargetDeltaBonus: 0,
+  movedPieceJointAttackBonus: 0,
+  queenEarlyMovePenalty: 0,
+  isolatedQueenPenalty: 0,
 });
 
-const MOBILITY_HEAVY_V6 = Object.freeze({
-  ...SHARED_TEAM_PLAY_WEIGHTS,
-  id: "mobility-heavy-v6",
+const SQUAD_ATTACK_V7 = Object.freeze({
+  id: "squad-attack-v7",
+  rootScoreWindow: 120,
+  maxTeamBias: 280,
+  switchPieceBonus: 30,
+  newlyDefendedPartnerBonus: 38,
+  movedPieceDefendedBonus: 30,
+  undevelopedMinorBonus: 46,
+  earlyMajorRepeatPenalty: 64,
+  isolatedMovePenalty: 30,
+  tacticalRepeatMultiplier: 0.15,
   repeatLinearPenalty: 52,
-  repeatQuadraticPenalty: 34,
-  mutualPairBonus: 38,
-  supportsRecentPieceBonus: 28,
-  activePieceDeltaBonus: 28,
-  levelCoverageDeltaBonus: 22,
+  repeatQuadraticPenalty: 36,
+  mutualPairBonus: 58,
+  supportsRecentPieceBonus: 48,
+  activePieceDeltaBonus: 18,
+  levelCoverageDeltaBonus: 12,
+  historyUsePenalty: 20,
+  pieceMonopolyPenalty: 96,
+  queenMonopolyPenalty: 150,
+  freshPieceBonus: 38,
+  coordinatedTargetDeltaBonus: 56,
+  movedPieceJointAttackBonus: 52,
+  queenEarlyMovePenalty: 110,
+  isolatedQueenPenalty: 150,
 });
 
-const DIVERSITY_HEAVY_V6 = Object.freeze({
-  ...SHARED_TEAM_PLAY_WEIGHTS,
-  id: "diversity-heavy-v6",
-  switchPieceBonus: 46,
-  repeatLinearPenalty: 74,
-  repeatQuadraticPenalty: 52,
-  mutualPairBonus: 42,
-  supportsRecentPieceBonus: 28,
-  activePieceDeltaBonus: 14,
-  levelCoverageDeltaBonus: 10,
+const QUEEN_DISCIPLINE_V7 = Object.freeze({
+  ...SQUAD_ATTACK_V7,
+  id: "queen-discipline-v7",
+  rootScoreWindow: 135,
+  historyUsePenalty: 26,
+  pieceMonopolyPenalty: 112,
+  queenMonopolyPenalty: 210,
+  queenEarlyMovePenalty: 160,
+  isolatedQueenPenalty: 210,
+  freshPieceBonus: 44,
+  coordinatedTargetDeltaBonus: 50,
+  movedPieceJointAttackBonus: 46,
 });
 
-const PAIRED_COORDINATION_V6 = Object.freeze({
-  ...SHARED_TEAM_PLAY_WEIGHTS,
-  id: "paired-coordination-v6",
-  repeatLinearPenalty: 52,
-  repeatQuadraticPenalty: 34,
-  mutualPairBonus: 72,
-  supportsRecentPieceBonus: 54,
-  activePieceDeltaBonus: 14,
-  levelCoverageDeltaBonus: 10,
-});
-
-export const TEAM_PLAY_WEIGHTS = BALANCED_V6;
+export const TEAM_PLAY_WEIGHTS = SQUAD_ATTACK_V7;
 
 export const TEAM_PLAY_TRAINING_CANDIDATES = Object.freeze([
-  BALANCED_V6,
-  MOBILITY_HEAVY_V6,
-  DIVERSITY_HEAVY_V6,
-  PAIRED_COORDINATION_V6,
+  LEGACY_BALANCED_V6,
+  SQUAD_ATTACK_V7,
+  QUEEN_DISCIPLINE_V7,
 ]);
