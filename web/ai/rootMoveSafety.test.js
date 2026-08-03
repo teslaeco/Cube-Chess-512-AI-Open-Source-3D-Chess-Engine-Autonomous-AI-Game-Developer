@@ -76,7 +76,7 @@ describe("hard AI root move safety", () => {
       to: { x: 0, y: 3, z: 0 },
     });
     expect(selected.search).toMatchObject({
-      policy: "team-play-root-safety-v4",
+      policy: "runtime-blunder-veto-v5",
       rejectedRootMoves: expect.any(Number),
     });
     expect(selected.search.rejectedRootMoves).toBeGreaterThan(0);
