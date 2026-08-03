@@ -1,5 +1,5 @@
 export const TEAM_PLAY_WEIGHTS = Object.freeze({
-  id: "paired-coordination-v6",
+  id: "mobility-heavy-v6",
   rootScoreWindow: 90,
   maxTeamBias: 180,
   repeatLinearPenalty: 52,
@@ -7,10 +7,10 @@ export const TEAM_PLAY_WEIGHTS = Object.freeze({
   switchPieceBonus: 24,
   newlyDefendedPartnerBonus: 34,
   movedPieceDefendedBonus: 28,
-  mutualPairBonus: 72,
-  supportsRecentPieceBonus: 54,
-  activePieceDeltaBonus: 14,
-  levelCoverageDeltaBonus: 10,
+  mutualPairBonus: 38,
+  supportsRecentPieceBonus: 28,
+  activePieceDeltaBonus: 28,
+  levelCoverageDeltaBonus: 22,
   undevelopedMinorBonus: 38,
   earlyMajorRepeatPenalty: 42,
   isolatedMovePenalty: 22,
@@ -20,7 +20,7 @@ export const TEAM_PLAY_WEIGHTS = Object.freeze({
 export const TEAM_PLAY_TRAINING_CANDIDATES = Object.freeze([
   Object.freeze({
     ...TEAM_PLAY_WEIGHTS,
-    id: "paired-coordination-v6",
+    id: "mobility-heavy-v6",
   }),
   Object.freeze({
     ...TEAM_PLAY_WEIGHTS,
@@ -29,6 +29,8 @@ export const TEAM_PLAY_TRAINING_CANDIDATES = Object.freeze([
     supportsRecentPieceBonus: 38,
     repeatLinearPenalty: 40,
     repeatQuadraticPenalty: 24,
+    activePieceDeltaBonus: 14,
+    levelCoverageDeltaBonus: 10,
   }),
   Object.freeze({
     ...TEAM_PLAY_WEIGHTS,
@@ -37,13 +39,15 @@ export const TEAM_PLAY_TRAINING_CANDIDATES = Object.freeze([
     repeatLinearPenalty: 74,
     repeatQuadraticPenalty: 52,
     mutualPairBonus: 42,
+    activePieceDeltaBonus: 14,
+    levelCoverageDeltaBonus: 10,
   }),
   Object.freeze({
     ...TEAM_PLAY_WEIGHTS,
-    id: "mobility-heavy-v6",
-    activePieceDeltaBonus: 28,
-    levelCoverageDeltaBonus: 22,
-    mutualPairBonus: 38,
-    supportsRecentPieceBonus: 28,
+    id: "paired-coordination-v6",
+    mutualPairBonus: 72,
+    supportsRecentPieceBonus: 54,
+    activePieceDeltaBonus: 14,
+    levelCoverageDeltaBonus: 10,
   }),
 ]);
