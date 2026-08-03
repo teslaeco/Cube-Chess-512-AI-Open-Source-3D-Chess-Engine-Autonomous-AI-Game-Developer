@@ -36,21 +36,23 @@ describe("strategic hard AI", () => {
     expect(Math.abs(blackScore)).toBeCloseTo(0, 10);
   });
 
-  it("returns a legal serialized move and strategic search diagnostics", () => {
+  it("returns a legal serialized move and whole-army diagnostics", () => {
     const move = chooseAdvancedMove(createInitialPieces(), "white", {
       maxDepth: 1,
       quiescenceDepth: 0,
       milliseconds: 60_000,
       now: () => 0,
       transpositionEntries: 1_000,
+      aiUsageCounts: { "white-pawn-1": 1 },
     });
     expect(move).toMatchObject({
       pieceId: expect.any(String),
       square3D: expect.any(String),
       search: {
-        engine: "strategic-3d-alpha-beta-v3",
+        engine: "strategic-3d-alpha-beta-v4-army",
         completedDepth: 1,
         nodes: expect.any(Number),
+        armyUsageEntries: 1,
       },
     });
     expect(move.search.nodes).toBeGreaterThan(0);
@@ -71,6 +73,7 @@ describe("strategic hard AI", () => {
       milliseconds: 60_000,
       now: () => 0,
       recentAiPieceIds: ["black-rook", "black-rook", "black-rook"],
+      aiUsageCounts: { "black-rook": 5 },
     });
 
     expect(move).toMatchObject({
@@ -80,7 +83,7 @@ describe("strategic hard AI", () => {
     });
   });
 
-  it("uses recent move history without losing a legal move", () => {
+  it("uses game-long usage history without losing a legal move", () => {
     const first = chooseAdvancedMove(createInitialPieces(), "white", {
       maxDepth: 1,
       quiescenceDepth: 0,
@@ -93,10 +96,12 @@ describe("strategic hard AI", () => {
       milliseconds: 60_000,
       now: () => 0,
       recentAiPieceIds: [first.pieceId, first.pieceId, first.pieceId],
+      aiUsageCounts: { [first.pieceId]: 6 },
     });
 
     expect(next?.pieceId).toEqual(expect.any(String));
     expect(next?.square3D).toEqual(expect.any(String));
+    expect(next?.search.armyUsageEntries).toBe(1);
   });
 
   it("honours cancellation without losing the legal fallback move", () => {
