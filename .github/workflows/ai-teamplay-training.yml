@@ -8,6 +8,7 @@ on:
       - "web/ai/**"
       - "web/state/initialPosition.js"
       - "scripts/train-real-team-selfplay.mjs"
+      - "scripts/merge-real-team-selfplay.mjs"
       - "package.json"
       - ".github/workflows/ai-teamplay-training.yml"
   workflow_dispatch:
@@ -33,9 +34,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  train-real-team-play:
+  regressions:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -57,20 +58,84 @@ jobs:
           web/ai/finalMoveSafety.test.js
           web/ai/queenTradeRegression.test.js
 
-      - name: Run 3000 real legal hard-AI games
+  train-policy:
+    needs: regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        policy:
+          - balanced-v6
+          - squad-attack-v7
+          - queen-discipline-v7
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Run 1000 real legal games for ${{ matrix.policy }}
         env:
           GAMES_PER_POLICY: ${{ github.event.inputs.games_per_policy || '1000' }}
           TRAINING_PLIES: ${{ github.event.inputs.plies || '18' }}
+          POLICY: ${{ matrix.policy }}
         run: >-
           npm run train:real-teamplay --
+          --policy="$POLICY"
           --games-per-policy="$GAMES_PER_POLICY"
           --plies="$TRAINING_PLIES"
+          --report="artifacts/real-teamplay-$POLICY.json"
+
+      - name: Upload policy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-teamplay-shard-${{ matrix.policy }}-${{ github.run_id }}
+          path: artifacts/real-teamplay-${{ matrix.policy }}.json
+          if-no-files-found: error
+
+  aggregate:
+    needs: train-policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Download all policy reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: real-teamplay-shard-*-${{ github.run_id }}
+          path: artifacts/real-teamplay-shards
+          merge-multiple: true
+
+      - name: Aggregate and enforce the 3000-game gate
+        run: >-
+          npm run train:real-teamplay:merge --
+          --input=artifacts/real-teamplay-shards
           --report=artifacts/real-team-selfplay-3000-report.json
 
-      - name: Upload real self-play report
+      - name: Upload final 3000-game report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: real-teamplay-training-${{ github.run_id }}
           path: artifacts/real-team-selfplay-3000-report.json
-          if-no-files-found: warn
+          if-no-files-found: error
