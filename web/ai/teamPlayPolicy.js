@@ -51,12 +51,35 @@ export function createTeamPlayBaseline(board, sideToMove, recentPieceIds = []) {
   };
 }
 
+export function scoreTeamPlayFeatures(
+  features,
+  weights = TEAM_PLAY_WEIGHTS,
+) {
+  let repetitionPenalty =
+    features.repeatStreak * weights.repeatLinearPenalty +
+    features.repeatStreak * features.repeatStreak * weights.repeatQuadraticPenalty;
+  if (features.forcing) repetitionPenalty *= weights.tacticalRepeatMultiplier;
+
+  let score = -repetitionPenalty;
+  if (features.switchedPiece) score += weights.switchPieceBonus;
+  score +=
+    features.newlyDefendedPartners * weights.newlyDefendedPartnerBonus;
+  if (features.movedPieceDefended) score += weights.movedPieceDefendedBonus;
+  if (features.mutualPair) score += weights.mutualPairBonus;
+  if (features.supportsRecentPiece) score += weights.supportsRecentPieceBonus;
+  if (features.undevelopedMinor) score += weights.undevelopedMinorBonus;
+  if (features.earlyMajorRepeat) score -= weights.earlyMajorRepeatPenalty;
+  if (features.isolated) score -= weights.isolatedMovePenalty;
+
+  return Math.round(clamp(score, -weights.maxTeamBias, weights.maxTeamBias));
+}
+
 export function analyzeTeamPlayMove(
   board,
   move,
   recentPieceIds = [],
   weights = TEAM_PLAY_WEIGHTS,
-  baseline = createTeamPlayBaseline(board, board.getPieceAt(move.from)?.color, recentPieceIds),
+  baseline = null,
 ) {
   const moving = board.getPieceAt(move.from);
   if (!moving) {
@@ -72,6 +95,8 @@ export function analyzeTeamPlayMove(
     };
   }
 
+  const resolvedBaseline =
+    baseline ?? createTeamPlayBaseline(board, moving.color, recentPieceIds);
   const next = applyMoveForSearch(board, move);
   const movedAfter = next.getAllPieces().find((piece) => piece.id === moving.id);
   if (!movedAfter) {
@@ -99,26 +124,27 @@ export function analyzeTeamPlayMove(
 
   const repeatStreak = consecutiveRepeatStreak(moving.id, recentPieceIds);
   const switchedPiece = Boolean(
-    baseline.recentPieceId && baseline.recentPieceId !== moving.id,
+    resolvedBaseline.recentPieceId && resolvedBaseline.recentPieceId !== moving.id,
   );
   const afterDefended = defendedPieceIds(next, moving.color);
   let newlyDefendedPartners = 0;
   for (const defendedId of afterDefended) {
     if (defendedId === moving.id) continue;
-    if (!baseline.defendedPieceIds.has(defendedId)) newlyDefendedPartners += 1;
+    if (!resolvedBaseline.defendedPieceIds.has(defendedId)) {
+      newlyDefendedPartners += 1;
+    }
   }
 
   const movedPieceDefended = afterDefended.has(moving.id);
-  const recentBefore = baseline.recentPieceId
-    ? board.getAllPieces().find((piece) => piece.id === baseline.recentPieceId)
-    : null;
-  const recentAfter = baseline.recentPieceId
-    ? next.getAllPieces().find((piece) => piece.id === baseline.recentPieceId)
+  const recentAfter = resolvedBaseline.recentPieceId
+    ? next.getAllPieces().find(
+        (piece) => piece.id === resolvedBaseline.recentPieceId,
+      )
     : null;
   const supportsRecentPiece = Boolean(
     switchedPiece &&
       recentAfter &&
-      !baseline.defendedPieceIds.has(recentAfter.id) &&
+      !resolvedBaseline.defendedPieceIds.has(recentAfter.id) &&
       afterDefended.has(recentAfter.id),
   );
   const closePair = Boolean(
@@ -138,36 +164,18 @@ export function analyzeTeamPlayMove(
       newlyDefendedPartners === 0 &&
       !supportsRecentPiece,
   );
-
-  let repetitionPenalty =
-    repeatStreak * weights.repeatLinearPenalty +
-    repeatStreak * repeatStreak * weights.repeatQuadraticPenalty;
-  if (forcing) repetitionPenalty *= weights.tacticalRepeatMultiplier;
-
-  let score = -repetitionPenalty;
-  if (switchedPiece) score += weights.switchPieceBonus;
-  score += newlyDefendedPartners * weights.newlyDefendedPartnerBonus;
-  if (movedPieceDefended) score += weights.movedPieceDefendedBonus;
-  if (mutualPair) score += weights.mutualPairBonus;
-  if (supportsRecentPiece) score += weights.supportsRecentPieceBonus;
-  if (
+  const undevelopedMinor = Boolean(
     !moving.hasMoved &&
-    (moving.type === "bishop" || moving.type === "knight")
-  ) {
-    score += weights.undevelopedMinorBonus;
-  }
-  if (
+      (moving.type === "bishop" || moving.type === "knight"),
+  );
+  const earlyMajorRepeat = Boolean(
     repeatStreak > 0 &&
-    (moving.type === "queen" || moving.type === "rook") &&
-    baseline.developedMinorCount < 2 &&
-    !forcing
-  ) {
-    score -= weights.earlyMajorRepeatPenalty;
-  }
-  if (isolated) score -= weights.isolatedMovePenalty;
+      (moving.type === "queen" || moving.type === "rook") &&
+      resolvedBaseline.developedMinorCount < 2 &&
+      !forcing,
+  );
 
-  return {
-    score: Math.round(clamp(score, -weights.maxTeamBias, weights.maxTeamBias)),
+  const features = {
     forcing,
     repeatStreak,
     switchedPiece,
@@ -175,8 +183,15 @@ export function analyzeTeamPlayMove(
     movedPieceDefended,
     mutualPair,
     supportsRecentPiece,
+    undevelopedMinor,
+    earlyMajorRepeat,
     isolated,
-    recentPieceId: baseline.recentPieceId,
+  };
+
+  return {
+    ...features,
+    score: scoreTeamPlayFeatures(features, weights),
+    recentPieceId: resolvedBaseline.recentPieceId,
     movingPieceId: moving.id,
   };
 }
