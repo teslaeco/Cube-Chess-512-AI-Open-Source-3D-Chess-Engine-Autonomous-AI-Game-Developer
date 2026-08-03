@@ -41,7 +41,7 @@ describe("hard AI root move safety", () => {
     expect(staticExchangeNet(board, move)).toBe(-1300);
     expect(assessRootMoveSafety(board, move, "black")).toMatchObject({
       safe: false,
-      reason: "uncompensated-high-value-sacrifice",
+      reason: "queen-for-lower-piece-critical-blunder",
       exchangeNet: -1300,
     });
 
@@ -76,7 +76,7 @@ describe("hard AI root move safety", () => {
       to: { x: 0, y: 3, z: 0 },
     });
     expect(selected.search).toMatchObject({
-      policy: "runtime-blunder-veto-v5",
+      policy: "runtime-blunder-veto-v7",
       rejectedRootMoves: expect.any(Number),
     });
     expect(selected.search.rejectedRootMoves).toBeGreaterThan(0);
@@ -135,7 +135,7 @@ describe("hard AI root move safety", () => {
     expect(staticExchangeNet(board, move)).toBe(-1300);
     expect(assessRootMoveSafety(board, move, "black")).toMatchObject({
       safe: false,
-      reason: "uncompensated-high-value-sacrifice",
+      reason: "queen-for-lower-piece-critical-blunder",
       exchangeNet: -1300,
       promotionCredit: 0,
     });
