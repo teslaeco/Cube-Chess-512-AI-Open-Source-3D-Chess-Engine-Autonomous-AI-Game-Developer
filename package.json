@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "train:teamplay": "tsx scripts/train-teamplay-selfplay.mjs",
     "train:real-teamplay": "tsx scripts/train-real-team-selfplay.mjs",
+    "train:real-teamplay:merge": "tsx scripts/merge-real-team-selfplay.mjs",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json",
     "smoke:dist": "node scripts/smoke-dist.mjs",
     "server:dev": "tsx watch server/index.ts",
