@@ -16,6 +16,12 @@ import {
 } from "./strategicEvaluation.js";
 import { filterRootMovesBySafety } from "./rootMoveSafety.js";
 import { moveIdentity } from "./finalMoveSafety.js";
+import {
+  analyzeTeamPlayMove,
+  chooseTeamAwareRootCandidate,
+  createTeamPlayBaseline,
+} from "./teamPlayPolicy.js";
+import { TEAM_PLAY_WEIGHTS } from "./teamPlayWeights.js";
 
 const MATE_SCORE = 10_000_000;
 const DEFAULT_LIMITS = Object.freeze({
@@ -222,20 +228,27 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
   const allLegal = generateLegalMovesForColor(board, sideToMove);
   if (!allLegal.length) return null;
 
-  // A final Worker veto may ask search to choose again from a proven-safe root
-  // subset. Empty/mismatched restrictions fail closed instead of silently
-  // restoring the blunder that was just rejected.
   const allowedRootMoveIds = new Set(options.allowedRootMoveIds ?? []);
   const scopedLegal = allowedRootMoveIds.size
     ? allLegal.filter((move) => allowedRootMoveIds.has(moveIdentity(move)))
     : allLegal;
   if (!scopedLegal.length) return null;
 
-  // Minimax still scores every retained move. This search-layer policy removes
-  // known unsound exchanges, while the Worker independently verifies the final
-  // selected move immediately before it reaches the game runtime.
   const legal = filterRootMovesBySafety(board, scopedLegal, sideToMove);
   const rejectedRootMoves = allLegal.length - legal.length;
+  const teamBaseline = createTeamPlayBaseline(board, sideToMove, recent);
+  const teamByMoveId = new Map(
+    legal.map((move) => [
+      moveIdentity(move),
+      analyzeTeamPlayMove(
+        board,
+        move,
+        recent,
+        TEAM_PLAY_WEIGHTS,
+        teamBaseline,
+      ),
+    ]),
+  );
 
   const now = options.now ?? (() => performance.now());
   const deadline = now() + (options.milliseconds ?? DEFAULT_LIMITS.milliseconds);
@@ -251,15 +264,30 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
 
   let bestMove = orderMoves(board, legal)[0];
   let bestScore = -Infinity;
+  let bestTeam = teamByMoveId.get(moveIdentity(bestMove)) ?? {
+    score: 0,
+    forcing: false,
+    repeatStreak: 0,
+    switchedPiece: false,
+    mutualPair: false,
+    supportsRecentPiece: false,
+    newlyDefendedPartners: 0,
+  };
   let completedDepth = 0;
   let principalVariation = bestMove;
 
   for (let depth = 1; depth <= maxDepth; depth += 1) {
-    let iterationBest = null;
-    let iterationScore = -Infinity;
+    let iterationChoice = null;
     let aborted = false;
     const rootMoves = orderedMoves(board, legal, principalVariation, context.history, 0)
-      .sort((a, b) => strategicMoveBias(board, b, recent) - strategicMoveBias(board, a, recent));
+      .sort((a, b) => {
+        const teamDifference =
+          (teamByMoveId.get(moveIdentity(b))?.score ?? 0) -
+          (teamByMoveId.get(moveIdentity(a))?.score ?? 0);
+        const strategicDifference =
+          strategicMoveBias(board, b, recent) - strategicMoveBias(board, a, recent);
+        return strategicDifference + teamDifference;
+      });
 
     for (const move of rootMoves) {
       if (context.shouldStop()) {
@@ -282,17 +310,27 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
         aborted = true;
         break;
       }
-      const score = result.score;
-      if (score > iterationScore) {
-        iterationScore = score;
-        iterationBest = move;
-      }
+
+      const candidate = {
+        move,
+        searchScore: result.score,
+        team: teamByMoveId.get(moveIdentity(move)) ?? {
+          score: 0,
+          forcing: false,
+        },
+      };
+      iterationChoice = chooseTeamAwareRootCandidate(
+        iterationChoice,
+        candidate,
+        TEAM_PLAY_WEIGHTS,
+      );
     }
 
-    if (aborted || !iterationBest) break;
-    bestMove = iterationBest;
-    bestScore = iterationScore;
-    principalVariation = iterationBest;
+    if (aborted || !iterationChoice) break;
+    bestMove = iterationChoice.move;
+    bestScore = iterationChoice.searchScore;
+    bestTeam = iterationChoice.team;
+    principalVariation = iterationChoice.move;
     completedDepth = depth;
   }
 
@@ -300,11 +338,19 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
   serialized.search = {
     engine: "strategic-3d-alpha-beta-v2",
     policy: "runtime-blunder-veto-v5",
+    teamPlayPolicy: TEAM_PLAY_WEIGHTS.id,
     completedDepth,
     nodes: context.nodes,
     score: Number.isFinite(bestScore) ? bestScore : null,
     rejectedRootMoves,
     restrictedRootMoves: allowedRootMoveIds.size ? scopedLegal.length : null,
+    recentHistoryLength: recent.length,
+    teamPlayScore: bestTeam.score,
+    teamPlayRepeatStreak: bestTeam.repeatStreak ?? 0,
+    teamPlaySwitchedPiece: Boolean(bestTeam.switchedPiece),
+    teamPlayMutualPair: Boolean(bestTeam.mutualPair),
+    teamPlaySupportsRecentPiece: Boolean(bestTeam.supportsRecentPiece),
+    teamPlayNewlyDefendedPartners: bestTeam.newlyDefendedPartners ?? 0,
   };
   return serialized;
 }
