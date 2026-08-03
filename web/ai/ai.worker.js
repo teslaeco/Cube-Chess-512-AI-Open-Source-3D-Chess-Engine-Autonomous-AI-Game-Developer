@@ -7,6 +7,10 @@ import {
 } from "./searchEngine.js";
 import { chooseAdvancedMove } from "./advancedSearch.js";
 import { chooseCompletedRootBaseline } from "./classicalRootBaseline.js";
+import {
+  getDifficultyProfile,
+  normalizeDifficulty,
+} from "./difficultyProfiles.js";
 import { applyLoneKingLevelRule } from "../rules/LoneKingLevelRule.js";
 import {
   assessImmediateMaterialSafety,
@@ -25,6 +29,10 @@ function attachRuntimeSafetyDiagnostics(
     vetoedMove = null,
     safeCandidateCount,
     forcedUnsafeFallback = false,
+    requestedDifficulty = null,
+    resolvedDifficulty = null,
+    difficultyEngine = null,
+    searchBudgetMilliseconds = null,
   },
 ) {
   return {
@@ -33,6 +41,10 @@ function attachRuntimeSafetyDiagnostics(
       ...(serialized.search ?? {}),
       policy: "runtime-blunder-veto-v7",
       runtimeSafetyPolicy: "final-worker-static-exchange-gate-v2",
+      requestedDifficulty,
+      resolvedDifficulty,
+      difficultyEngine,
+      searchBudgetMilliseconds,
       safetyVetoApplied: vetoApplied,
       vetoedMove,
       safeCandidateCount,
@@ -114,6 +126,18 @@ function leastLosingFallback(board, moves, sideToMove) {
     })[0];
 }
 
+function routingDiagnostics(difficulty, options) {
+  const resolvedDifficulty = normalizeDifficulty(difficulty);
+  const profile = getDifficultyProfile(resolvedDifficulty);
+  return {
+    requestedDifficulty: options.requestedDifficulty ?? difficulty,
+    resolvedDifficulty,
+    difficultyEngine: profile.engine,
+    searchBudgetMilliseconds:
+      options.milliseconds ?? profile.searchMilliseconds,
+  };
+}
+
 /**
  * Last authoritative AI boundary before a move is posted to the game.
  *
@@ -128,6 +152,8 @@ export function enforceFinalWorkerSafety(
   selected,
   options = {},
 ) {
+  const resolvedDifficulty = normalizeDifficulty(difficulty);
+  const route = routingDiagnostics(resolvedDifficulty, options);
   const board = createBoard(pieces);
   const legal = generateLegalMovesForColor(board, sideToMove);
   const variantLegal = applyLoneKingLevelRule(
@@ -151,14 +177,12 @@ export function enforceFinalWorkerSafety(
         variantLegal,
         sideToMove,
       ).length,
+      ...route,
     });
   }
 
   const safeMoves = filterMovesByFinalSafety(board, variantLegal, sideToMove);
   if (!safeMoves.length) {
-    // A forced position must still progress, but a broad fallback must never
-    // silently restore a voluntary queen-for-pawn/knight exchange. Choose the
-    // least losing non-critical legal move and expose the fallback in telemetry.
     const fallback = leastLosingFallback(board, variantLegal, sideToMove);
     return attachRuntimeSafetyDiagnostics(serializeMove(fallback.move), {
       assessment: fallback.assessment,
@@ -166,11 +190,12 @@ export function enforceFinalWorkerSafety(
       vetoedMove: moveIdentity(candidate),
       safeCandidateCount: 0,
       forcedUnsafeFallback: true,
+      ...route,
     });
   }
 
   let replacement = null;
-  if (difficulty === "hard") {
+  if (resolvedDifficulty === "hard") {
     replacement = chooseHardMove(pieces, sideToMove, {
       ...options,
       allowedRootMoveIds: safeMoves.map(moveIdentity),
@@ -191,6 +216,7 @@ export function enforceFinalWorkerSafety(
     vetoApplied: true,
     vetoedMove: moveIdentity(candidate),
     safeCandidateCount: safeMoves.length,
+    ...route,
   });
 }
 
@@ -200,18 +226,33 @@ export function chooseMoveWithVariantRules(
   difficulty,
   options = {},
 ) {
+  const resolvedDifficulty = normalizeDifficulty(difficulty);
+  const profile = getDifficultyProfile(resolvedDifficulty);
+  const resolvedOptions = {
+    ...options,
+    requestedDifficulty: options.requestedDifficulty ?? difficulty,
+    milliseconds: options.milliseconds ?? profile.searchMilliseconds,
+    maxDepth: options.maxDepth ?? profile.maxDepth,
+    quiescenceDepth:
+      options.quiescenceDepth ?? profile.quiescenceDepth,
+  };
   const selected =
-    difficulty === "hard"
-      ? chooseHardMove(pieces, sideToMove, options)
-      : chooseBestMove(pieces, sideToMove, difficulty, options);
+    resolvedDifficulty === "hard"
+      ? chooseHardMove(pieces, sideToMove, resolvedOptions)
+      : chooseBestMove(
+          pieces,
+          sideToMove,
+          resolvedDifficulty,
+          resolvedOptions,
+        );
   if (!selected) return null;
 
   return enforceFinalWorkerSafety(
     pieces,
     sideToMove,
-    difficulty,
+    resolvedDifficulty,
     selected,
-    options,
+    resolvedOptions,
   );
 }
 
@@ -229,8 +270,12 @@ if (typeof self !== "undefined") {
       event.data.sideToMove,
       event.data.difficulty,
       {
+        requestedDifficulty:
+          event.data.requestedDifficulty ?? event.data.difficulty,
+        milliseconds: event.data.searchMilliseconds,
         isCancelled: () => token !== generation,
         recentAiPieceIds: event.data.recentAiPieceIds ?? [],
+        aiUsageCounts: event.data.aiUsageCounts ?? {},
       },
     );
     self.postMessage({ requestId: event.data.requestId, move });
