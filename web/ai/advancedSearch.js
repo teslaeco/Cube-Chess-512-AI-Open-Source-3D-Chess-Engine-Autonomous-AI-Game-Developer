@@ -15,6 +15,7 @@ import {
   strategicMoveBias,
 } from "./strategicEvaluation.js";
 import { filterRootMovesBySafety } from "./rootMoveSafety.js";
+import { moveIdentity } from "./finalMoveSafety.js";
 
 const MATE_SCORE = 10_000_000;
 const DEFAULT_LIMITS = Object.freeze({
@@ -221,10 +222,19 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
   const allLegal = generateLegalMovesForColor(board, sideToMove);
   if (!allLegal.length) return null;
 
-  // Minimax still scores every retained move. This root-only policy removes
-  // moves that immediately lose a queen, rook or minor piece in a materially
-  // unsound exchange. If every move is unsafe, the full legal set is restored.
-  const legal = filterRootMovesBySafety(board, allLegal, sideToMove);
+  // A final Worker veto may ask search to choose again from a proven-safe root
+  // subset. Empty/mismatched restrictions fail closed instead of silently
+  // restoring the blunder that was just rejected.
+  const allowedRootMoveIds = new Set(options.allowedRootMoveIds ?? []);
+  const scopedLegal = allowedRootMoveIds.size
+    ? allLegal.filter((move) => allowedRootMoveIds.has(moveIdentity(move)))
+    : allLegal;
+  if (!scopedLegal.length) return null;
+
+  // Minimax still scores every retained move. This search-layer policy removes
+  // known unsound exchanges, while the Worker independently verifies the final
+  // selected move immediately before it reaches the game runtime.
+  const legal = filterRootMovesBySafety(board, scopedLegal, sideToMove);
   const rejectedRootMoves = allLegal.length - legal.length;
 
   const now = options.now ?? (() => performance.now());
@@ -272,8 +282,6 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
         aborted = true;
         break;
       }
-      // Root heuristics improve ordering only. They must never override the
-      // authoritative minimax result returned by the completed search.
       const score = result.score;
       if (score > iterationScore) {
         iterationScore = score;
@@ -291,11 +299,12 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
   const serialized = serializeMove(bestMove);
   serialized.search = {
     engine: "strategic-3d-alpha-beta-v2",
-    policy: "team-play-root-safety-v4",
+    policy: "runtime-blunder-veto-v5",
     completedDepth,
     nodes: context.nodes,
     score: Number.isFinite(bestScore) ? bestScore : null,
     rejectedRootMoves,
+    restrictedRootMoves: allowedRootMoveIds.size ? scopedLegal.length : null,
   };
   return serialized;
 }
