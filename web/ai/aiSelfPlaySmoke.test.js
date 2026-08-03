@@ -31,13 +31,14 @@ function plainPieces(board) {
 }
 
 describe("hard AI self-play smoke", () => {
-  it("plays four seeded short games without an accepted immediate material blunder", () => {
+  it("plays four seeded short games safely and develops more than one piece", () => {
     for (let seed = 0; seed < 4; seed += 1) {
       let pieces = createInitialPieces();
       let side = "white";
+      const recentBySide = { white: [], black: [] };
+      const movedBySide = { white: new Set(), black: new Set() };
+      const moveCountBySide = { white: 0, black: 0 };
 
-      // Seed each game with a different legal opening so deterministic hard-vs-
-      // hard smoke tests cover more than one identical principal variation.
       const openingBoard = createBoard(pieces);
       const openings = orderMoves(
         openingBoard,
@@ -47,7 +48,7 @@ describe("hard AI self-play smoke", () => {
       pieces = plainPieces(applyMoveForSearch(openingBoard, opening));
       side = opposite(side);
 
-      for (let ply = 0; ply < 8; ply += 1) {
+      for (let ply = 0; ply < 10; ply += 1) {
         const board = createBoard(pieces);
         const status = evaluatePosition(board, side);
         if (status.kind !== "ongoing" && status.kind !== "check") break;
@@ -62,18 +63,30 @@ describe("hard AI self-play smoke", () => {
             milliseconds: 60_000,
             now: () => 0,
             transpositionEntries: 2_000,
+            recentAiPieceIds: recentBySide[side],
           },
         );
         expect(selected).not.toBeNull();
         expect(selected.search.forcedUnsafeFallback).toBe(false);
+        expect(selected.search.teamPlayPolicy).toBe("paired-coordination-v6");
 
         const legal = generateLegalMovesForColor(board, side);
         const move = findMatchingLegalMove(legal, selected);
         expect(move).not.toBeNull();
         expect(assessImmediateMaterialSafety(board, move, side).safe).toBe(true);
 
+        movedBySide[side].add(move.pieceId);
+        moveCountBySide[side] += 1;
+        recentBySide[side].unshift(move.pieceId);
+        recentBySide[side] = recentBySide[side].slice(0, 12);
         pieces = plainPieces(applyMoveForSearch(board, move));
         side = opposite(side);
+      }
+
+      for (const color of ["white", "black"]) {
+        if (moveCountBySide[color] >= 3) {
+          expect(movedBySide[color].size).toBeGreaterThanOrEqual(2);
+        }
       }
     }
   });
