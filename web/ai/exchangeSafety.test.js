@@ -51,7 +51,7 @@ describe("exchange-safe Cube Chess strategy", () => {
       capturedPieceId: "white-pawn",
       to: { x: 0, y: 3, z: 0 },
     });
-    expect(move.search.policy).toBe("runtime-blunder-veto-v5");
+    expect(move.search.policy).toBe("runtime-blunder-veto-v7");
   });
 
   it("prefers coordinated development over an unsupported pawn march", () => {
