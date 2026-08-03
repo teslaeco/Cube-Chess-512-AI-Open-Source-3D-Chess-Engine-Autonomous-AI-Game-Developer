@@ -140,8 +140,11 @@ const metrics = new Map(
 );
 
 for (let game = 0; game < gameCount; game += 1) {
-  const random = rngFor(game * 2654435761);
+  const gameSeed = game * 2654435761;
   for (const weights of TEAM_PLAY_TRAINING_CANDIDATES) {
+    // Every candidate receives the exact same deterministic game. Recreating
+    // the PRNG here prevents candidate ordering from influencing the ranking.
+    const random = rngFor(gameSeed);
     const recent = [];
     const distinct = new Set();
     const result = metrics.get(weights.id);
@@ -196,7 +199,8 @@ const ranking = [...metrics.values()]
 
 const selected = ranking[0];
 const report = {
-  schema: 1,
+  schema: 2,
+  fairness: "identical-seeded-curriculum-per-candidate",
   games: gameCount,
   pliesPerGame: 12,
   totalPolicyDecisions: gameCount * 12 * TEAM_PLAY_TRAINING_CANDIDATES.length,
