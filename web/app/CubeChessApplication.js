@@ -1,5 +1,6 @@
 import { AiController } from "../ai/AiController.js";
 import { getAiRuntimePlan } from "../ai/difficultyProfiles.js";
+import { executeAiRuntimePlan } from "../ai/runtimeExecution.js";
 import { AttractModeController } from "../demo/AttractModeController.js";
 import { ChessRenderer } from "../renderer/ChessRenderer.js";
 import { SaveRepository } from "../storage/SaveRepository.js";
@@ -180,29 +181,20 @@ export class CubeChessApplication {
     let move = null;
 
     try {
-      const primary = await this.requestAiAttempt(
+      const execution = await executeAiRuntimePlan({
         snapshot,
-        runtimePlan.difficulty,
-        runtimePlan.primary,
-      );
-      move = primary.move;
-      if (primary.error) {
-        console.error("Primary AI worker attempt failed", primary.error);
-      }
-
-      if (!move) {
-        // Terminate the timed-out computation instead of accepting a late stale
-        // result. Preserve the army history, then run a bounded lower-cost engine
-        // on the same position. This is still a searched move, not legalMoves[0].
-        this.ai.restartWorker({ preserveHistory: true });
-        const emergency = await this.requestAiAttempt(
-          snapshot,
-          runtimePlan.emergencyDifficulty,
-          runtimePlan.emergency,
-        );
-        move = emergency.move;
-        if (emergency.error) {
-          console.error("Emergency AI worker attempt failed", emergency.error);
+        runtimePlan,
+        runAttempt: (state, difficulty, profile) =>
+          this.requestAiAttempt(state, difficulty, profile),
+        restartWorker: (options) => this.ai.restartWorker(options),
+      });
+      move = execution.move;
+      for (const attempt of execution.attempts) {
+        if (attempt.error) {
+          console.error(
+            `${attempt.difficulty} AI worker attempt failed`,
+            attempt.error,
+          );
         }
       }
     } finally {
