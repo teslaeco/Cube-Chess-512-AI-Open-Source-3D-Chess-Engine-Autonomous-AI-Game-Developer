@@ -69,10 +69,10 @@ describe("hard AI worker integration", () => {
       pieceId: expect.any(String),
       square3D: expect.any(String),
       search: {
-        engine: "strategic-3d-alpha-beta-v2",
+        engine: "strategic-3d-alpha-beta-v3",
         completedDepth: 1,
-        policy: "runtime-blunder-veto-v5",
-        runtimeSafetyPolicy: "final-worker-material-gate-v1",
+        policy: "runtime-blunder-veto-v7",
+        runtimeSafetyPolicy: "final-worker-static-exchange-gate-v2",
         safetyVetoApplied: false,
       },
     });
@@ -109,8 +109,8 @@ describe("hard AI worker integration", () => {
       to: { x: 0, y: 3, z: 0 },
     });
     expect(selected.search).toMatchObject({
-      policy: "runtime-blunder-veto-v5",
-      runtimeSafetyPolicy: "final-worker-material-gate-v1",
+      policy: "runtime-blunder-veto-v7",
+      runtimeSafetyPolicy: "final-worker-static-exchange-gate-v2",
       safetyVetoApplied: true,
       forcedUnsafeFallback: false,
     });
