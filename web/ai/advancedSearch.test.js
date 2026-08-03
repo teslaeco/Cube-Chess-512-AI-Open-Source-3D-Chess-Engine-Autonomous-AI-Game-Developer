@@ -48,7 +48,7 @@ describe("strategic hard AI", () => {
       pieceId: expect.any(String),
       square3D: expect.any(String),
       search: {
-        engine: "strategic-3d-alpha-beta-v2",
+        engine: "strategic-3d-alpha-beta-v3",
         completedDepth: 1,
         nodes: expect.any(Number),
       },

@@ -48,7 +48,7 @@ describe("strategic 3D AI evaluation", () => {
       .toBeGreaterThan(evaluateStrategicPosition(isolated, "white"));
   });
 
-  it("returns a legal move with v2 strategic diagnostics", () => {
+  it("returns a legal move with v3 strategic diagnostics", () => {
     let tick = 0;
     const move = chooseAdvancedMove(
       [
@@ -68,7 +68,7 @@ describe("strategic 3D AI evaluation", () => {
     );
 
     expect(move).not.toBeNull();
-    expect(move.search.engine).toBe("strategic-3d-alpha-beta-v2");
+    expect(move.search.engine).toBe("strategic-3d-alpha-beta-v3");
     expect(move.search.completedDepth).toBeGreaterThan(0);
   });
 });

@@ -30,8 +30,8 @@ function attachRuntimeSafetyDiagnostics(
     ...serialized,
     search: {
       ...(serialized.search ?? {}),
-      policy: "runtime-blunder-veto-v5",
-      runtimeSafetyPolicy: "final-worker-material-gate-v1",
+      policy: "runtime-blunder-veto-v7",
+      runtimeSafetyPolicy: "final-worker-static-exchange-gate-v2",
       safetyVetoApplied: vetoApplied,
       vetoedMove,
       safeCandidateCount,
@@ -40,9 +40,45 @@ function attachRuntimeSafetyDiagnostics(
       finalSafetyMaterialNet: Number.isFinite(assessment.materialNet)
         ? assessment.materialNet
         : null,
+      finalSafetyExchangeNet: Number.isFinite(assessment.exchangeNet)
+        ? assessment.exchangeNet
+        : null,
       finalSafetyRecaptures: assessment.recaptureCount ?? 0,
+      finalSafetyCapturedPieceType: assessment.capturedPieceType ?? null,
+      finalSafetyExposedPieceType: assessment.exposedPieceType ?? null,
     },
   };
+}
+
+function leastLosingFallback(board, moves, sideToMove) {
+  const ordered = orderMoves(board, moves);
+  return ordered
+    .map((move, orderIndex) => ({
+      move,
+      orderIndex,
+      assessment: assessImmediateMaterialSafety(board, move, sideToMove),
+      movingType: board.getPieceAt(move.from)?.type ?? null,
+    }))
+    .sort((left, right) => {
+      const leftCriticalQueen =
+        left.movingType === "queen" &&
+        left.assessment.reason === "queen-for-lower-piece-critical-blunder";
+      const rightCriticalQueen =
+        right.movingType === "queen" &&
+        right.assessment.reason === "queen-for-lower-piece-critical-blunder";
+      if (leftCriticalQueen !== rightCriticalQueen) {
+        return leftCriticalQueen ? 1 : -1;
+      }
+
+      const leftNet = Number.isFinite(left.assessment.materialNet)
+        ? left.assessment.materialNet
+        : 0;
+      const rightNet = Number.isFinite(right.assessment.materialNet)
+        ? right.assessment.materialNet
+        : 0;
+      if (leftNet !== rightNet) return rightNet - leftNet;
+      return left.orderIndex - right.orderIndex;
+    })[0];
 }
 
 /**
@@ -87,10 +123,12 @@ export function enforceFinalWorkerSafety(
 
   const safeMoves = filterMovesByFinalSafety(board, variantLegal, sideToMove);
   if (!safeMoves.length) {
-    // Forced positions must still progress. This is explicit in diagnostics and
-    // can be found by self-play/regression tooling instead of silently hiding it.
-    return attachRuntimeSafetyDiagnostics(serializeMove(candidate), {
-      assessment,
+    // A forced position must still progress, but a broad fallback must never
+    // silently restore a voluntary queen-for-pawn/knight exchange. Choose the
+    // least losing non-critical legal move and expose the fallback in telemetry.
+    const fallback = leastLosingFallback(board, variantLegal, sideToMove);
+    return attachRuntimeSafetyDiagnostics(serializeMove(fallback.move), {
+      assessment: fallback.assessment,
       vetoApplied: true,
       vetoedMove: moveIdentity(candidate),
       safeCandidateCount: 0,

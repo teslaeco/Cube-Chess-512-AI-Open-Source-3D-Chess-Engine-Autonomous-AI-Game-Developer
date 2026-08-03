@@ -225,6 +225,7 @@ function alphaBeta(board, side, perspective, depth, alpha, beta, qDepth, ply, co
 export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
   const board = createBoard(pieces);
   const recent = options.recentAiPieceIds ?? [];
+  const teamPlayWeights = options.teamPlayWeights ?? TEAM_PLAY_WEIGHTS;
   const allLegal = generateLegalMovesForColor(board, sideToMove);
   if (!allLegal.length) return null;
 
@@ -244,7 +245,7 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
         board,
         move,
         recent,
-        TEAM_PLAY_WEIGHTS,
+        teamPlayWeights,
         teamBaseline,
       ),
     ]),
@@ -268,10 +269,15 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
     score: 0,
     forcing: false,
     repeatStreak: 0,
+    historyUseCount: 0,
     switchedPiece: false,
+    freshPiece: false,
     mutualPair: false,
     supportsRecentPiece: false,
     newlyDefendedPartners: 0,
+    coordinatedTargetDelta: 0,
+    movedPieceJointAttack: false,
+    queenMonopoly: false,
   };
   let completedDepth = 0;
   let principalVariation = bestMove;
@@ -322,7 +328,7 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
       iterationChoice = chooseTeamAwareRootCandidate(
         iterationChoice,
         candidate,
-        TEAM_PLAY_WEIGHTS,
+        teamPlayWeights,
       );
     }
 
@@ -336,9 +342,9 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
 
   const serialized = serializeMove(bestMove);
   serialized.search = {
-    engine: "strategic-3d-alpha-beta-v2",
-    policy: "runtime-blunder-veto-v5",
-    teamPlayPolicy: TEAM_PLAY_WEIGHTS.id,
+    engine: "strategic-3d-alpha-beta-v3",
+    policy: "runtime-blunder-veto-v7",
+    teamPlayPolicy: teamPlayWeights.id,
     completedDepth,
     nodes: context.nodes,
     score: Number.isFinite(bestScore) ? bestScore : null,
@@ -347,10 +353,15 @@ export function chooseAdvancedMove(pieces, sideToMove, options = {}) {
     recentHistoryLength: recent.length,
     teamPlayScore: bestTeam.score,
     teamPlayRepeatStreak: bestTeam.repeatStreak ?? 0,
+    teamPlayHistoryUseCount: bestTeam.historyUseCount ?? 0,
     teamPlaySwitchedPiece: Boolean(bestTeam.switchedPiece),
+    teamPlayFreshPiece: Boolean(bestTeam.freshPiece),
     teamPlayMutualPair: Boolean(bestTeam.mutualPair),
     teamPlaySupportsRecentPiece: Boolean(bestTeam.supportsRecentPiece),
     teamPlayNewlyDefendedPartners: bestTeam.newlyDefendedPartners ?? 0,
+    teamPlayCoordinatedTargetDelta: bestTeam.coordinatedTargetDelta ?? 0,
+    teamPlayMovedPieceJointAttack: Boolean(bestTeam.movedPieceJointAttack),
+    teamPlayQueenMonopoly: Boolean(bestTeam.queenMonopoly),
   };
   return serialized;
 }

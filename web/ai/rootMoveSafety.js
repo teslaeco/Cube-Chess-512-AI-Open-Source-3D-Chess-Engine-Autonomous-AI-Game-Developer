@@ -1,6 +1,6 @@
 import {
+  evaluatePosition,
   generateLegalMovesForColor,
-  isSquareAttacked,
 } from "../../src/engine3d/index.ts";
 import { CUBE_PIECE_VALUES, materialValue } from "./cubePieceValues.js";
 import {
@@ -28,6 +28,11 @@ function chebyshevDistance(left, right) {
     Math.abs(left.y - right.y),
     Math.abs(left.z - right.z),
   );
+}
+
+function pieceById(board, id) {
+  if (!id) return null;
+  return board.getAllPieces().find((piece) => piece.id === id) ?? null;
 }
 
 function capturesOnSquare(board, side, target) {
@@ -68,16 +73,18 @@ export function staticExchangeNet(board, move) {
   const moving = board.getPieceAt(move.from);
   if (!moving) return 0;
 
-  const captured = move.capturedPieceId ? board.getPieceAt(move.to) : null;
+  // Resolve captures by the authoritative id, not only by destination square.
+  // This keeps the safety gate correct for every legal 3D capture encoding.
+  const captured = pieceById(board, move.capturedPieceId);
   const immediateGain = materialValue(captured);
   const next = applyMoveForSearch(board, move);
-  const movedAfter = next.getPieceAt(move.to);
+  const movedAfter = next.getAllPieces().find((piece) => piece.id === moving.id);
   if (!movedAfter) return immediateGain;
 
   const opponentGain = bestExchangeGain(
     next,
     opposite(moving.color),
-    move.to,
+    movedAfter.position,
     materialValue(movedAfter),
   );
   return immediateGain - opponentGain;
@@ -110,9 +117,6 @@ function levelSevenPromotionCredit(board, move, color) {
   const recaptures = capturesOnSquare(board, opposite(color), move.to);
   if (!recaptures.length) return 0;
 
-  // The exception is valid only when accepting the sacrifice cannot remove the
-  // promised immediate promotion. If even one legal recapture blocks promotion,
-  // the opponent can choose it and the material sacrifice remains unsound.
   for (const recapture of recaptures) {
     const afterRecapture = applyMoveForSearch(board, recapture);
     const legalReplies = generateLegalMovesForColor(afterRecapture, color);
@@ -138,26 +142,61 @@ export function assessRootMoveSafety(board, move, sideToMove) {
   }
 
   const next = applyMoveForSearch(board, move);
-  const movedAfter = next.getPieceAt(move.to);
+  const movedAfter = next.getAllPieces().find((piece) => piece.id === moving.id);
   if (!movedAfter) {
     return { safe: true, reason: "missing-piece", exchangeNet: 0, promotionCredit: 0 };
   }
 
   const enemy = opposite(sideToMove);
-  if (!isSquareAttacked(next, movedAfter.position, enemy)) {
-    return { safe: true, reason: "not-attacked", exchangeNet: 0, promotionCredit: 0 };
+  const status = evaluatePosition(next, enemy);
+  if (status.kind === "checkmate" && status.winner === sideToMove) {
+    return {
+      safe: true,
+      reason: "immediate-checkmate",
+      exchangeNet: Infinity,
+      promotionCredit: 0,
+    };
   }
 
-  // Pseudo-attacks are only a fast pre-check. Pinned pieces and checkmate may
-  // make every apparent capture illegal, so the guard confirms a legal capture.
-  const canBeCaptured = capturesOnSquare(next, enemy, move.to).length > 0;
-  if (!canBeCaptured) {
+  // Legal captures are authoritative. Do not rely on a pseudo-attack pre-check,
+  // because a missed attack here can let the final worker approve a queen loss.
+  const legalRecaptures = capturesOnSquare(next, enemy, movedAfter.position);
+  if (!legalRecaptures.length) {
     return { safe: true, reason: "not-legally-capturable", exchangeNet: 0, promotionCredit: 0 };
   }
 
   const exchangeNet = staticExchangeNet(board, move);
+  const captured = pieceById(board, move.capturedPieceId);
+  const queenForLowerPiece = Boolean(
+    moving.type === "queen" &&
+      captured &&
+      materialValue(captured) < materialValue(moving),
+  );
+
+  // Release-blocking invariant: if the opponent can legally take the queen on
+  // the next move, capturing a lower-value piece is never accepted as a sound
+  // exchange. A speculative later recapture or a promotion bonus must not
+  // reclassify the immediate queen loss as safe. The only exception is an
+  // immediate checkmate, handled above before legal recaptures are examined.
+  if (queenForLowerPiece) {
+    return {
+      safe: false,
+      reason: "queen-for-lower-piece-critical-blunder",
+      exchangeNet,
+      promotionCredit: 0,
+      movingPieceType: moving.type,
+      capturedPieceType: captured?.type ?? null,
+      legalRecaptureCount: legalRecaptures.length,
+    };
+  }
+
   if (exchangeNet >= -UNSOUND_MARGIN) {
-    return { safe: true, reason: "sound-exchange", exchangeNet, promotionCredit: 0 };
+    return {
+      safe: true,
+      reason: "sound-exchange",
+      exchangeNet,
+      promotionCredit: 0,
+    };
   }
 
   const promotionCredit = levelSevenPromotionCredit(next, move, sideToMove);
@@ -175,13 +214,19 @@ export function assessRootMoveSafety(board, move, sideToMove) {
     reason: "uncompensated-high-value-sacrifice",
     exchangeNet,
     promotionCredit,
+    movingPieceType: moving.type,
+    capturedPieceType: captured?.type ?? null,
+    legalRecaptureCount: legalRecaptures.length,
   };
 }
 
 export function filterRootMovesBySafety(board, moves, sideToMove) {
   const safe = moves.filter((move) => assessRootMoveSafety(board, move, sideToMove).safe);
+  if (safe.length) return safe;
 
-  // Never leave the engine without a legal move. If every legal move loses
-  // material (for example in a forced defence), full minimax remains authoritative.
-  return safe.length ? safe : moves;
+  // If the position is genuinely forced, prefer any non-queen legal move before
+  // allowing a queen sacrifice. This prevents a broad fallback from undoing the
+  // critical queen-value invariant.
+  const nonQueen = moves.filter((move) => board.getPieceAt(move.from)?.type !== "queen");
+  return nonQueen.length ? nonQueen : moves;
 }

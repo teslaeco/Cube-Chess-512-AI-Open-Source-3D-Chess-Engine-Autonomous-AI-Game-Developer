@@ -30,9 +30,9 @@ function plainPieces(board) {
   }));
 }
 
-describe("hard AI self-play smoke", () => {
-  it("plays four seeded short games safely and develops more than one piece", () => {
-    for (let seed = 0; seed < 4; seed += 1) {
+describe("hard AI real-board self-play smoke", () => {
+  it("plays six seeded games safely and develops more than one piece", () => {
+    for (let seed = 0; seed < 6; seed += 1) {
       let pieces = createInitialPieces();
       let side = "white";
       const recentBySide = { white: [], black: [] };
@@ -43,12 +43,12 @@ describe("hard AI self-play smoke", () => {
       const openings = orderMoves(
         openingBoard,
         generateLegalMovesForColor(openingBoard, side),
-      );
+      ).filter((move) => openingBoard.getPieceAt(move.from)?.type !== "queen");
       const opening = openings[seed % openings.length];
       pieces = plainPieces(applyMoveForSearch(openingBoard, opening));
       side = opposite(side);
 
-      for (let ply = 0; ply < 10; ply += 1) {
+      for (let ply = 0; ply < 12; ply += 1) {
         const board = createBoard(pieces);
         const status = evaluatePosition(board, side);
         if (status.kind !== "ongoing" && status.kind !== "check") break;
@@ -68,12 +68,14 @@ describe("hard AI self-play smoke", () => {
         );
         expect(selected).not.toBeNull();
         expect(selected.search.forcedUnsafeFallback).toBe(false);
-        expect(selected.search.teamPlayPolicy).toBe("balanced-v6");
+        expect(selected.search.teamPlayPolicy).toBe("squad-attack-v7");
 
         const legal = generateLegalMovesForColor(board, side);
         const move = findMatchingLegalMove(legal, selected);
         expect(move).not.toBeNull();
-        expect(assessImmediateMaterialSafety(board, move, side).safe).toBe(true);
+        const safety = assessImmediateMaterialSafety(board, move, side);
+        expect(safety.safe).toBe(true);
+        expect(safety.reason).not.toBe("queen-for-lower-piece-critical-blunder");
 
         movedBySide[side].add(move.pieceId);
         moveCountBySide[side] += 1;

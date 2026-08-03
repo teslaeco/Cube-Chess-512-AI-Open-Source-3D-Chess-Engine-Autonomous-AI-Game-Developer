@@ -1,13 +1,12 @@
-import {
-  evaluatePosition,
-  generateLegalMovesForColor,
-} from "../../src/engine3d/index.ts";
+import { generateLegalMovesForColor } from "../../src/engine3d/index.ts";
 import { materialValue } from "./cubePieceValues.js";
-import { assessRootMoveSafety } from "./rootMoveSafety.js";
+import {
+  assessRootMoveSafety,
+  staticExchangeNet,
+} from "./rootMoveSafety.js";
 import { applyMoveForSearch, opposite } from "./searchEngine.js";
 
 const GUARDED_TYPES = new Set(["queen", "rook", "bishop", "knight"]);
-const EQUAL_EXCHANGE_TOLERANCE = 75;
 
 export function moveIdentity(move) {
   if (!move) return "";
@@ -28,9 +27,14 @@ export function findMatchingLegalMove(moves, selected) {
   return moves.find((move) => moveIdentity(move) === selectedKey) ?? null;
 }
 
+function pieceById(board, id) {
+  if (!id) return null;
+  return board.getAllPieces().find((piece) => piece.id === id) ?? null;
+}
+
 function legalRecapturesOfMovedPiece(board, move, sideToMove) {
   const next = applyMoveForSearch(board, move);
-  const movedAfter = next.getPieceAt(move.to);
+  const movedAfter = next.getAllPieces().find((piece) => piece.id === move.pieceId);
   if (!movedAfter) return { next, movedAfter: null, recaptures: [] };
 
   const recaptures = generateLegalMovesForColor(next, opposite(sideToMove)).filter(
@@ -40,11 +44,11 @@ function legalRecapturesOfMovedPiece(board, move, sideToMove) {
 }
 
 /**
- * Final one-ply material veto used immediately before the Worker posts a move.
+ * Final material veto used immediately before the Worker posts a move.
  *
- * This deliberately duplicates the most important safety invariant instead of
- * trusting search-only heuristics. A searched move, a variant-rule fallback or
- * a move from a lower difficulty must all pass the same production boundary.
+ * The worker delegates to the same bounded static-exchange evaluator used at
+ * the search root. This prevents search, a fallback path or a move serializer
+ * from disagreeing about whether a queen-for-knight/pawn trade is acceptable.
  */
 export function assessImmediateMaterialSafety(board, move, sideToMove) {
   const moving = board.getPieceAt(move?.from);
@@ -57,77 +61,41 @@ export function assessImmediateMaterialSafety(board, move, sideToMove) {
     };
   }
 
-  const { next, movedAfter, recaptures } = legalRecapturesOfMovedPiece(
+  const { movedAfter, recaptures } = legalRecapturesOfMovedPiece(
     board,
     move,
     sideToMove,
   );
-  if (!movedAfter) {
-    return {
-      safe: true,
-      reason: "moved-piece-missing",
-      materialNet: 0,
-      recaptureCount: 0,
-    };
-  }
-
-  const status = evaluatePosition(next, opposite(sideToMove));
-  if (status.kind === "checkmate" && status.winner === sideToMove) {
-    return {
-      safe: true,
-      reason: "immediate-checkmate",
-      materialNet: Infinity,
-      recaptureCount: 0,
-    };
-  }
-
-  if (!recaptures.length) {
-    return {
-      safe: true,
-      reason: "no-legal-immediate-recapture",
-      materialNet: 0,
-      recaptureCount: 0,
-    };
-  }
-
-  const capturedBefore = move.capturedPieceId ? board.getPieceAt(move.to) : null;
-  const gainedValue = materialValue(capturedBefore);
-  const exposedValue = materialValue(movedAfter);
-  const materialNet = gainedValue - exposedValue;
-
-  // Equal exchanges and genuinely winning captures remain legal. The narrow
-  // tolerance permits bishop-for-knight style trades, but not rook-for-bishop
-  // or queen-for-any-lower-piece exchanges.
-  if (materialNet >= -EQUAL_EXCHANGE_TOLERANCE) {
-    return {
-      safe: true,
-      reason: "equal-or-winning-immediate-exchange",
-      materialNet,
-      recaptureCount: recaptures.length,
-    };
-  }
-
-  // Preserve the user's only deliberate sacrifice exception. The existing root
-  // policy proves that a level-G pawn still has a legal promotion on H after
-  // every legal recapture; proximity alone is never enough.
+  const capturedBefore = pieceById(board, move.capturedPieceId);
   const strategicAssessment = assessRootMoveSafety(board, move, sideToMove);
-  if (strategicAssessment.reason === "supports-level-seven-promotion") {
+  const exchangeNet = Number.isFinite(strategicAssessment.exchangeNet)
+    ? strategicAssessment.exchangeNet
+    : staticExchangeNet(board, move);
+
+  if (strategicAssessment.safe) {
     return {
       safe: true,
-      reason: "proven-level-seven-promotion-exception",
-      materialNet,
+      reason: strategicAssessment.reason,
+      materialNet: exchangeNet,
       recaptureCount: recaptures.length,
-      promotionCredit: strategicAssessment.promotionCredit,
+      exchangeNet,
+      promotionCredit: strategicAssessment.promotionCredit ?? 0,
+      exposedPieceType: movedAfter?.type ?? moving.type,
+      capturedPieceType: capturedBefore?.type ?? null,
     };
   }
 
   return {
     safe: false,
-    reason: "immediate-high-value-for-low-value-blunder",
-    materialNet,
+    reason: strategicAssessment.reason,
+    materialNet: exchangeNet,
+    exchangeNet,
     recaptureCount: recaptures.length,
-    exposedPieceType: movedAfter.type,
+    promotionCredit: strategicAssessment.promotionCredit ?? 0,
+    exposedPieceType: movedAfter?.type ?? moving.type,
+    exposedPieceValue: materialValue(movedAfter ?? moving),
     capturedPieceType: capturedBefore?.type ?? null,
+    capturedPieceValue: materialValue(capturedBefore),
     recaptureMoveIds: recaptures.map(moveIdentity),
   };
 }

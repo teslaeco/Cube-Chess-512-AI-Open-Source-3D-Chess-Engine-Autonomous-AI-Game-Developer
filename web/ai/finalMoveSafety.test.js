@@ -38,7 +38,7 @@ describe("final runtime material safety", () => {
     expect(move).toBeDefined();
     expect(assessImmediateMaterialSafety(board, move, "black")).toMatchObject({
       safe: false,
-      reason: "immediate-high-value-for-low-value-blunder",
+      reason: "queen-for-lower-piece-critical-blunder",
       materialNet: -1300,
       recaptureCount: 1,
       exposedPieceType: "queen",
@@ -53,6 +53,26 @@ describe("final runtime material safety", () => {
     ).not.toContainEqual(move);
   });
 
+  it("vetoes queen for knight as a critical exchange error", () => {
+    const board = createBoard([
+      ...kings,
+      piece("black-queen", "queen", "black", 0, 4, 0, true),
+      piece("white-knight", "knight", "white", 0, 3, 0, true),
+      piece("white-rook", "rook", "white", 0, 0, 0, true),
+    ]);
+    const move = findMove(board, "black", "black-queen", 0, 3, 0);
+
+    expect(move).toBeDefined();
+    expect(assessImmediateMaterialSafety(board, move, "black")).toMatchObject({
+      safe: false,
+      reason: "queen-for-lower-piece-critical-blunder",
+      materialNet: -970,
+      recaptureCount: 1,
+      exposedPieceType: "queen",
+      capturedPieceType: "knight",
+    });
+  });
+
   it("vetoes queen for rook because the queen is still the stronger piece", () => {
     const board = createBoard([
       ...kings,
@@ -65,6 +85,7 @@ describe("final runtime material safety", () => {
     expect(move).toBeDefined();
     expect(assessImmediateMaterialSafety(board, move, "black")).toMatchObject({
       safe: false,
+      reason: "queen-for-lower-piece-critical-blunder",
       materialNet: -800,
     });
   });
@@ -81,7 +102,7 @@ describe("final runtime material safety", () => {
     expect(move).toBeDefined();
     expect(assessImmediateMaterialSafety(board, move, "black")).toMatchObject({
       safe: true,
-      reason: "equal-or-winning-immediate-exchange",
+      reason: "sound-exchange",
       materialNet: 800,
     });
   });
@@ -101,7 +122,7 @@ describe("final runtime material safety", () => {
     expect(move).toBeDefined();
     expect(assessImmediateMaterialSafety(board, move, "black")).toMatchObject({
       safe: false,
-      reason: "immediate-high-value-for-low-value-blunder",
+      reason: "uncompensated-high-value-sacrifice",
       capturedPieceType: "pawn",
     });
   });

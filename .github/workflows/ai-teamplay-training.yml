@@ -1,4 +1,4 @@
-name: Train Cube Chess Team Play 100K
+name: Train Cube Chess Real Team Play 3K
 
 on:
   pull_request:
@@ -6,15 +6,12 @@ on:
       - main
     paths:
       - "web/ai/**"
-      - "scripts/train-teamplay-selfplay.mjs"
+      - "web/state/initialPosition.js"
+      - "scripts/train-real-team-selfplay.mjs"
+      - "scripts/merge-real-team-selfplay.mjs"
       - "package.json"
       - ".github/workflows/ai-teamplay-training.yml"
   workflow_dispatch:
-    inputs:
-      games:
-        description: Number of deterministic curriculum games
-        required: false
-        default: "100000"
 
 permissions:
   contents: read
@@ -24,13 +21,13 @@ defaults:
     shell: bash
 
 concurrency:
-  group: ai-teamplay-${{ github.event.pull_request.number || github.ref }}
+  group: ai-real-teamplay-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  train-team-play:
+  regressions:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -44,25 +41,150 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit
 
-      - name: Run focused team-play engine tests
+      - name: Run material and team-play regressions
         run: >-
           npx vitest run
           web/ai/teamPlayPolicy.test.js
           web/ai/aiSelfPlaySmoke.test.js
           web/ai/finalMoveSafety.test.js
+          web/ai/queenTradeRegression.test.js
+          web/ai/rootMoveSafety.test.js
 
-      - name: Run 100000 computational team-play games
+  train-shard:
+    needs: regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 15
+      matrix:
+        policy:
+          - balanced-v6
+          - squad-attack-v7
+          - queen-discipline-v7
+        shard:
+          - 0
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+          - 11
+          - 12
+          - 13
+          - 14
+          - 15
+          - 16
+          - 17
+          - 18
+          - 19
+          - 20
+          - 21
+          - 22
+          - 23
+          - 24
+          - 25
+          - 26
+          - 27
+          - 28
+          - 29
+          - 30
+          - 31
+          - 32
+          - 33
+          - 34
+          - 35
+          - 36
+          - 37
+          - 38
+          - 39
+          - 40
+          - 41
+          - 42
+          - 43
+          - 44
+          - 45
+          - 46
+          - 47
+          - 48
+          - 49
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Run deterministic real-game shard
         env:
-          TRAINING_GAMES: ${{ github.event.inputs.games || '100000' }}
-        run: >-
-          npm run train:teamplay --
-          --games="$TRAINING_GAMES"
-          --report=artifacts/teamplay-100k-report.json
+          TOTAL_GAMES_PER_POLICY: "1000"
+          GAMES_PER_SHARD: "20"
+          TRAINING_PLIES: "18"
+          POLICY: ${{ matrix.policy }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          SEED_OFFSET=$((SHARD * GAMES_PER_SHARD))
+          npm run train:real-teamplay -- \
+            --policy="$POLICY" \
+            --games="$GAMES_PER_SHARD" \
+            --seed-offset="$SEED_OFFSET" \
+            --total-games-per-policy="$TOTAL_GAMES_PER_POLICY" \
+            --plies="$TRAINING_PLIES" \
+            --report="artifacts/real-teamplay-$POLICY-shard-$SHARD.json"
 
-      - name: Upload training report
+      - name: Upload shard report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: teamplay-training-${{ github.run_id }}
-          path: artifacts/teamplay-100k-report.json
-          if-no-files-found: warn
+          name: real-teamplay-shard-${{ matrix.policy }}-${{ matrix.shard }}-${{ github.run_id }}
+          path: artifacts/real-teamplay-${{ matrix.policy }}-shard-${{ matrix.shard }}.json
+          if-no-files-found: error
+
+  aggregate:
+    needs: train-shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Download all 150 shard reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: real-teamplay-shard-*-${{ github.run_id }}
+          path: artifacts/real-teamplay-shards
+          merge-multiple: true
+
+      - name: Aggregate and enforce the 3000-game gate
+        run: >-
+          npm run train:real-teamplay:merge --
+          --input=artifacts/real-teamplay-shards
+          --report=artifacts/real-team-selfplay-3000-report.json
+
+      - name: Upload final 3000-game report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-teamplay-training-${{ github.run_id }}
+          path: artifacts/real-team-selfplay-3000-report.json
+          if-no-files-found: error
