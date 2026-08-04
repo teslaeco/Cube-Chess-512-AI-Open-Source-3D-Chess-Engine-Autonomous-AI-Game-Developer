@@ -1,12 +1,12 @@
 import { generateLegalMovesForColor } from "../../src/engine3d/index.ts";
 import {
-  chooseBestMove,
   createBoard,
   orderMoves,
   serializeMove,
 } from "./searchEngine.js";
 import { chooseAdvancedMove } from "./advancedSearch.js";
 import { chooseCompletedRootBaseline } from "./classicalRootBaseline.js";
+import { chooseBasicArmyMove } from "./basicArmySearch.js";
 import {
   getDifficultyProfile,
   normalizeDifficulty,
@@ -239,7 +239,7 @@ export function chooseMoveWithVariantRules(
   const selected =
     resolvedDifficulty === "hard"
       ? chooseHardMove(pieces, sideToMove, resolvedOptions)
-      : chooseBestMove(
+      : chooseBasicArmyMove(
           pieces,
           sideToMove,
           resolvedDifficulty,
