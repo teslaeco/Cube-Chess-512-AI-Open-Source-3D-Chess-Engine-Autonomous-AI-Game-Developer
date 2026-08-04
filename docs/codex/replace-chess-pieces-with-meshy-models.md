@@ -20,9 +20,9 @@ Replace the currently displayed pawn, rook, knight, bishop, queen and king geome
 ## Required architecture
 
 1. Do not ship the raw 224k–344k triangle assets.
-2. Generate mobile-safe derivatives with roughly 2.7k–3.2k triangles per unique piece.
+2. Generate mobile-safe derivatives with roughly 800–920 triangles per unique piece.
 3. Quantize positions to unsigned 16-bit values and indices to unsigned 16-bit values in a versioned compact binary format.
-4. Split each compact payload into four ordered static Base64 text assets so GitHub Pages, Vite, Tauri and the PWA can serve the same assets without Git LFS, then join them deterministically before decoding.
+4. Store each compact payload as one static Base64 text asset so GitHub Pages, Vite, Tauri and the PWA can serve the same assets without Git LFS.
 5. Decode each unique geometry only once and share it across all instances of that piece type.
 6. Compute normals after decoding, preserve white/black production materials, shadows and readability outlines.
 7. Normalize every imported model to the existing `pieceCellEnvelope` contract.
@@ -32,7 +32,7 @@ Replace the currently displayed pawn, rook, knight, bishop, queen and king geome
 ## Validation
 
 - Add unit tests for compact format signature, bounds, counts, index safety and all six assets.
-- Enforce no more than 1,600 vertices and 3,200 triangles per unique model.
+- Enforce no more than 450 vertices and 920 triangles per unique model.
 - Run `npm run typecheck`, `npm test`, `npm run build` and `npm run smoke:dist`.
 - Manually verify desktop and phone layouts, white/black contrast, selection, captures, promotion, camera fit and PWA reload.
 
