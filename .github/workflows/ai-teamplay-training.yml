@@ -47,6 +47,7 @@ jobs:
           scripts/real-teamplay-gates.test.js
           web/ai/difficultyProfiles.test.js
           web/ai/runtimeExecution.test.js
+          web/ai/basicArmySearch.test.js
           web/ai/armyDevelopmentPolicy.test.js
           web/ai/teamPlayPolicy.test.js
           web/ai/aiSelfPlaySmoke.test.js
