@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { OriginalChessModelSet } from "./OriginalChessModelSet.js";
+import { MeshyChessModelSet } from "./MeshyChessModelSet.js";
 import { pieceCellEnvelope } from "./pieceScaleProfile.js";
 
 const RADIAL_SEGMENTS = 40;
@@ -125,13 +125,16 @@ export class PieceGeometryFactory {
     this.materials={white:new THREE.MeshPhysicalMaterial({color:0xf2ede2,metalness:0.08,roughness:0.24,clearcoat:0.65,clearcoatRoughness:0.22}),black:new THREE.MeshPhysicalMaterial({color:0x151a22,metalness:0.34,roughness:0.2,clearcoat:0.72,clearcoatRoughness:0.18})};
     this.accents={white:new THREE.MeshStandardMaterial({color:0xb99845,metalness:0.68,roughness:0.24}),black:new THREE.MeshStandardMaterial({color:0x151a22,metalness:0.34,roughness:0.2})};
     this.bishopCuts={white:new THREE.MeshStandardMaterial({color:0x171b22,roughness:0.8}),black:new THREE.MeshStandardMaterial({color:0x151a22,metalness:0.2,roughness:0.28})};
-    this.originalModels=new OriginalChessModelSet(this.materials);
+    this.meshyModels=new MeshyChessModelSet(this.materials);
+    // Backwards-compatible alias for any diagnostics that previously inspected
+    // the imported model provider through this property.
+    this.originalModels=this.meshyModels;
   }
 
   create(type,color) {
     const material=this.materials[color]; const accent=this.accents[color]; const outlineColor=color==="white"?0x202733:0xc8d3df;
     const builders={pawn:()=>createPawn(material),rook:()=>createRook(material),knight:()=>createKnightFallback(material),bishop:()=>createBishop(material,this.bishopCuts[color]),queen:()=>createQueen(material,accent),king:()=>createKing(material,accent)};
     const fallback=fitPieceInsideCell(builders[type]?.()??createPawn(material), type); addOutline(fallback,outlineColor);
-    return this.originalModels.create(type,color,fallback);
+    return this.meshyModels.create(type,color,fallback);
   }
 }
