@@ -240,7 +240,7 @@ export class ForumPanel {
         <header><div><p class="eyebrow">${editing ? "EDYCJA DYSKUSJI" : "NOWA DYSKUSJA"}</p><h2>${editing ? "Edytuj temat" : "Utwórz temat"}</h2></div><button type="button" data-close-composer aria-label="Zamknij">×</button></header>
         <label>Tytuł<input name="title" minlength="4" maxlength="120" required value="${escapeHtml(topic?.title || "")}"></label>
         <label>Kategoria<select name="category">${CATEGORIES.map(([key, label]) => `<option value="${key}" ${topic?.category === key ? "selected" : ""}>${label}</option>`).join("")}</select></label>
-        <label>Treść<textarea name="body" minlength="10" maxlength="5000" required>${escapeHtml(topic?.body || "")}</textarea></label>
+        <label>Treść<textarea name="body" minlength="10" required>${escapeHtml(topic?.body || "")}</textarea></label>
         <p data-composer-status aria-live="polite"></p>
         <footer><button type="button" data-close-composer>Anuluj</button><button class="primary-action" type="submit">${editing ? "Zapisz zmiany" : "Opublikuj temat"}</button></footer>
       </form>
@@ -295,7 +295,7 @@ export class ForumPanel {
           </article>
           <section class="forum-replies"><h2>Odpowiedzi (${replies.length})</h2>
             <div class="forum-reply-list">${replies.length ? replies.map((reply) => `<article class="forum-reply"><header><strong>${escapeHtml(reply.author_name || "Gracz")}</strong><small>${formatDate(reply.updated_at || reply.created_at)}</small></header><p>${escapeHtml(reply.body).replaceAll("\n", "<br>")}</p></article>`).join("") : `<p class="forum-no-replies">Brak odpowiedzi. Napisz pierwszą.</p>`}</div>
-            <form class="forum-reply-form" data-forum-reply-form data-topic-id="${escapeHtml(topic.id)}"><label>Napisz odpowiedź<textarea name="body" minlength="2" maxlength="5000" required></textarea></label><p data-reply-status aria-live="polite"></p><button class="primary-action" type="submit">Dodaj odpowiedź</button></form>
+            <form class="forum-reply-form" data-forum-reply-form data-topic-id="${escapeHtml(topic.id)}"><label>Napisz odpowiedź<textarea name="body" minlength="2" required></textarea></label><p data-reply-status aria-live="polite"></p><button class="primary-action" type="submit">Dodaj odpowiedź</button></form>
           </section>
         </main>
         ${this.topicComposer(topic)}`;
