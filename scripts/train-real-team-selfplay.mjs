@@ -26,6 +26,11 @@ import {
   createTeamPlayBaseline,
 } from "../web/ai/teamPlayPolicy.js";
 import {
+  analyzeArmyDevelopmentMove,
+  combineTeamAndArmyAnalysis,
+  createArmyDevelopmentBaseline,
+} from "../web/ai/armyDevelopmentPolicy.js";
+import {
   TEAM_PLAY_TRAINING_CANDIDATES,
   TEAM_PLAY_WEIGHTS,
 } from "../web/ai/teamPlayWeights.js";
@@ -109,10 +114,13 @@ function createMetrics() {
     completedPlies: 0,
     movesBySide: { white: 0, black: 0 },
     distinctPieceTotal: 0,
+    roleCoverageTotal: 0,
     queenMoves: 0,
     quietQueenMoves: 0,
     teamMoves: 0,
+    armyBroadeningMoves: 0,
     freshPieceMoves: 0,
+    queenArmyImbalanceSelections: 0,
     samePieceRunViolations: 0,
     quietMoves: 0,
     materialSafetyViolations: 0,
@@ -153,12 +161,6 @@ function safeSeededOpening(pieces, side, globalGameIndex) {
   return { pieces: currentPieces, side: currentSide };
 }
 
-/**
- * Build a bounded but diverse root set from real legal moves. The first half
- * preserves the engine's tactical ordering; the second half guarantees that
- * alternative pieces can compete with the queen. Every selected move remains
- * legal and passes the production material-safety gate.
- */
 function selectDiverseSafeCandidates(board, legal, sideToMove, limit) {
   const safe = filterMovesByFinalSafety(board, legal, sideToMove);
   if (!safe.length) return [];
@@ -189,15 +191,12 @@ function selectDiverseSafeCandidates(board, legal, sideToMove, limit) {
   return selected;
 }
 
-/**
- * Fast training selector for real-board policy rollouts.
- *
- * This is intentionally not presented as a full-depth Alpha-Beta game. It uses
- * real Board3D states, real legal moves, production exchange safety, production
- * strategic evaluation and the exact production team-play feature scorer. The
- * bounded root set makes thousands of reproducible rollouts practical in CI.
- */
-function choosePolicyRolloutMove(board, sideToMove, recentPieceIds) {
+function choosePolicyRolloutMove(
+  board,
+  sideToMove,
+  recentPieceIds,
+  usageCounts,
+) {
   const legal = generateLegalMovesForColor(board, sideToMove);
   const candidates = selectDiverseSafeCandidates(
     board,
@@ -207,10 +206,15 @@ function choosePolicyRolloutMove(board, sideToMove, recentPieceIds) {
   );
   if (!candidates.length) return null;
 
-  const baseline = createTeamPlayBaseline(
+  const teamBaseline = createTeamPlayBaseline(
     board,
     sideToMove,
     recentPieceIds,
+  );
+  const armyBaseline = createArmyDevelopmentBaseline(
+    board,
+    sideToMove,
+    usageCounts,
   );
   let choice = null;
 
@@ -220,15 +224,22 @@ function choosePolicyRolloutMove(board, sideToMove, recentPieceIds) {
       move,
       recentPieceIds,
       weights,
-      baseline,
+      teamBaseline,
     );
+    const army = analyzeArmyDevelopmentMove(
+      board,
+      move,
+      usageCounts,
+      armyBaseline,
+    );
+    const combined = combineTeamAndArmyAnalysis(team, army);
     const next = applyMoveForSearch(board, move);
     const searchScore =
       evaluateStrategicPosition(next, sideToMove) +
       strategicMoveBias(board, move, recentPieceIds);
     choice = chooseTeamAwareRootCandidate(
       choice,
-      { move, searchScore, team },
+      { move, searchScore, team: combined },
       weights,
     );
   }
@@ -252,7 +263,9 @@ function qualityScore(entry) {
   const quietMoves = Math.max(1, entry.quietMoves);
   const games = Math.max(1, entry.games);
   const averageDistinctPieces = entry.distinctPieceTotal / (games * 2);
+  const averageRoleCoverage = entry.roleCoverageTotal / (games * 2);
   const teamMoveRate = entry.teamMoves / moves;
+  const armyBroadeningRate = entry.armyBroadeningMoves / moves;
   const freshPieceRate = entry.freshPieceMoves / moves;
   const queenMoveRate = entry.queenMoves / moves;
   const quietQueenMoveRate = entry.quietQueenMoves / quietMoves;
@@ -260,10 +273,13 @@ function qualityScore(entry) {
 
   return Math.round(
     averageDistinctPieces * 18_000 +
+      averageRoleCoverage * 14_000 +
       teamMoveRate * 120_000 +
+      armyBroadeningRate * 110_000 +
       freshPieceRate * 90_000 -
       queenMoveRate * 45_000 -
       quietQueenMoveRate * 80_000 -
+      entry.queenArmyImbalanceSelections * 500_000 -
       samePieceRunViolationRate * 500_000 -
       entry.materialSafetyViolations * 5_000_000 -
       entry.criticalQueenTradeViolations * 20_000_000 -
@@ -279,9 +295,11 @@ function completeMetrics(entry) {
     ...entry,
     score: qualityScore(entry),
     averageDistinctPieces: entry.distinctPieceTotal / (games * 2),
+    averageRoleCoverage: entry.roleCoverageTotal / (games * 2),
     queenMoveRate: entry.queenMoves / moves,
     quietQueenMoveRate: entry.quietQueenMoves / quietMoves,
     teamMoveRate: entry.teamMoves / moves,
+    armyBroadeningRate: entry.armyBroadeningMoves / moves,
     freshPieceRate: entry.freshPieceMoves / moves,
     samePieceRunViolationRate: entry.samePieceRunViolations / quietMoves,
   };
@@ -299,7 +317,9 @@ for (let game = 0; game < gamesInShard; game += 1) {
   let pieces = opening.pieces;
   let side = opening.side;
   const recentBySide = { white: [], black: [] };
+  const usageBySide = { white: {}, black: {} };
   const distinctBySide = { white: new Set(), black: new Set() };
+  const rolesBySide = { white: new Set(), black: new Set() };
   const pendingQueenBySide = { white: null, black: null };
   result.games += 1;
 
@@ -319,6 +339,7 @@ for (let game = 0; game < gamesInShard; game += 1) {
       board,
       side,
       recentBySide[side],
+      usageBySide[side],
     );
     if (!selected) break;
 
@@ -339,6 +360,7 @@ for (let game = 0; game < gamesInShard; game += 1) {
     result.completedPlies += 1;
     result.movesBySide[side] += 1;
     distinctBySide[side].add(move.pieceId);
+    if (moving?.type && moving.type !== "king") rolesBySide[side].add(moving.type);
     if (quiet) {
       result.quietMoves += 1;
       if (
@@ -360,7 +382,11 @@ for (let game = 0; game < gamesInShard; game += 1) {
     ) {
       result.teamMoves += 1;
     }
+    if (selected.team.broadensArmy) result.armyBroadeningMoves += 1;
     if (selected.team.freshPiece) result.freshPieceMoves += 1;
+    if (selected.team.queenArmyImbalance) {
+      result.queenArmyImbalanceSelections += 1;
+    }
 
     const previousMover = opposite(side);
     const pending = pendingQueenBySide[previousMover];
@@ -385,14 +411,17 @@ for (let game = 0; game < gamesInShard; game += 1) {
       pendingQueenBySide[side] = null;
     }
 
+    usageBySide[side][move.pieceId] =
+      Number(usageBySide[side][move.pieceId] ?? 0) + 1;
     recentBySide[side].unshift(move.pieceId);
-    recentBySide[side] = recentBySide[side].slice(0, 12);
+    recentBySide[side] = recentBySide[side].slice(0, 24);
     pieces = plainPieces(next);
     side = opposite(side);
   }
 
   result.distinctPieceTotal +=
     distinctBySide.white.size + distinctBySide.black.size;
+  result.roleCoverageTotal += rolesBySide.white.size + rolesBySide.black.size;
 
   if ((game + 1) % 10 === 0) {
     console.log(
@@ -403,8 +432,8 @@ for (let game = 0; game < gamesInShard; game += 1) {
 
 const completed = completeMetrics(result);
 const report = {
-  schema: 5,
-  mode: "real-legal-8x8x8-team-policy-rollout-shard",
+  schema: 6,
+  mode: "real-legal-8x8x8-whole-army-rollout-shard",
   syntheticCurriculum: false,
   fullAlphaBetaGames: false,
   partial: true,
@@ -443,5 +472,10 @@ if (completed.criticalQueenTradeViolations !== 0) {
 if (completed.forcedUnsafeFallbacks !== 0) {
   throw new Error(
     `${weights.id} used ${completed.forcedUnsafeFallbacks} unsafe fallbacks`,
+  );
+}
+if (completed.queenArmyImbalanceSelections !== 0) {
+  throw new Error(
+    `${weights.id} selected ${completed.queenArmyImbalanceSelections} quiet queen-army imbalance moves`,
   );
 }

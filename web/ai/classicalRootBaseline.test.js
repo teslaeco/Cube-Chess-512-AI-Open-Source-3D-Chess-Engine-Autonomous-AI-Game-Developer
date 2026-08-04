@@ -30,7 +30,7 @@ describe("completed classical root baseline", () => {
     expect(move).toMatchObject({
       pieceId: expect.any(String),
       search: {
-        engine: "classical-completed-root-v1",
+        engine: "classical-completed-root-v2-army",
         completedDepth: 0,
         baselineCompleted: true,
         baselineCandidateCount: expect.any(Number),
@@ -49,6 +49,7 @@ describe("completed classical root baseline", () => {
         isCancelled: () => true,
         now: () => 0,
         recentAiPieceIds: ["black-rook", "black-rook", "black-rook"],
+        aiUsageCounts: { "black-rook": 3 },
       },
     );
 

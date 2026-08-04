@@ -7,8 +7,8 @@ on:
     paths:
       - "web/ai/**"
       - "web/state/initialPosition.js"
-      - "scripts/train-real-team-selfplay.mjs"
-      - "scripts/merge-real-team-selfplay.mjs"
+      - "scripts/*real-team*.mjs"
+      - "scripts/*real-team*.js"
       - "package.json"
       - ".github/workflows/ai-teamplay-training.yml"
   workflow_dispatch:
@@ -41,14 +41,20 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit
 
-      - name: Run material and team-play regressions
+      - name: Run material, routing and whole-army regressions
         run: >-
           npx vitest run
+          scripts/real-teamplay-gates.test.js
+          web/ai/difficultyProfiles.test.js
+          web/ai/runtimeExecution.test.js
+          web/ai/basicArmySearch.test.js
+          web/ai/armyDevelopmentPolicy.test.js
           web/ai/teamPlayPolicy.test.js
           web/ai/aiSelfPlaySmoke.test.js
           web/ai/finalMoveSafety.test.js
           web/ai/queenTradeRegression.test.js
           web/ai/rootMoveSafety.test.js
+          web/ai/ai.worker.test.js
 
   train-shard:
     needs: regressions
@@ -126,7 +132,7 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit
 
-      - name: Run deterministic real-game shard
+      - name: Run deterministic real-board shard
         env:
           TOTAL_GAMES_PER_POLICY: "1000"
           GAMES_PER_SHARD: "20"
@@ -175,13 +181,13 @@ jobs:
           path: artifacts/real-teamplay-shards
           merge-multiple: true
 
-      - name: Aggregate and enforce the 3000-game gate
+      - name: Aggregate and enforce the 3000-rollout gate
         run: >-
           npm run train:real-teamplay:merge --
           --input=artifacts/real-teamplay-shards
           --report=artifacts/real-team-selfplay-3000-report.json
 
-      - name: Upload final 3000-game report
+      - name: Upload final 3000-rollout report
         if: always()
         uses: actions/upload-artifact@v4
         with:

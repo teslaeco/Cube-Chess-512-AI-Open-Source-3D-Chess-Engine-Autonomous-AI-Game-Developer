@@ -17,6 +17,11 @@ import {
   chooseTeamAwareRootCandidate,
   createTeamPlayBaseline,
 } from "./teamPlayPolicy.js";
+import {
+  analyzeArmyDevelopmentMove,
+  combineTeamAndArmyAnalysis,
+  createArmyDevelopmentBaseline,
+} from "./armyDevelopmentPolicy.js";
 import { TEAM_PLAY_WEIGHTS } from "./teamPlayWeights.js";
 
 const BASELINE_MATE_SCORE = 10_000_000;
@@ -31,15 +36,6 @@ function terminalBaselineScore(status, perspective) {
   return null;
 }
 
-/**
- * Completes a deterministic comparison of every safe root move before the
- * expensive recursive search begins.
- *
- * This is deliberately independent of the Alpha-Beta clock. A 512-cell board
- * may prevent depth one from completing on a mobile device, but hard mode must
- * still return a move that was compared against all permitted root candidates,
- * never a provisional move inherited from move ordering.
- */
 export function chooseCompletedRootBaseline(
   pieces,
   sideToMove,
@@ -58,8 +54,14 @@ export function chooseCompletedRootBaseline(
   const safetyFiltered = filterRootMovesBySafety(board, scopedLegal, sideToMove);
   const candidates = safetyFiltered.length ? safetyFiltered : scopedLegal;
   const recent = options.recentAiPieceIds ?? [];
+  const usageCounts = options.aiUsageCounts ?? {};
   const weights = options.teamPlayWeights ?? TEAM_PLAY_WEIGHTS;
   const teamBaseline = createTeamPlayBaseline(board, sideToMove, recent);
+  const armyBaseline = createArmyDevelopmentBaseline(
+    board,
+    sideToMove,
+    usageCounts,
+  );
 
   let choice = null;
   for (const move of orderMoves(board, candidates)) {
@@ -73,13 +75,19 @@ export function chooseCompletedRootBaseline(
       weights,
       teamBaseline,
     );
+    const army = analyzeArmyDevelopmentMove(
+      board,
+      move,
+      usageCounts,
+      armyBaseline,
+    );
     const candidate = {
       move,
       searchScore:
         terminal ??
         evaluateBoard(next, sideToMove) +
           (status.kind === "check" ? 80 : 0),
-      team,
+      team: combineTeamAndArmyAnalysis(team, army),
     };
     choice = chooseTeamAwareRootCandidate(choice, candidate, weights);
   }
@@ -87,7 +95,7 @@ export function chooseCompletedRootBaseline(
   if (!choice) return null;
   const serialized = serializeMove(choice.move);
   serialized.search = {
-    engine: "classical-completed-root-v1",
+    engine: "classical-completed-root-v2-army",
     policy: "runtime-blunder-veto-v7",
     teamPlayPolicy: weights.id,
     completedDepth: 0,
@@ -97,7 +105,16 @@ export function chooseCompletedRootBaseline(
     baselineCandidateCount: candidates.length,
     baselineSafetyFilteredCount: safetyFiltered.length,
     resultSource: "completed-static-root",
-    teamPlayScore: choice.team.score,
+    armyUsageEntries: Object.keys(usageCounts).length,
+    teamPlayScore: choice.team.teamScore ?? choice.team.score,
+    armyDevelopmentScore: choice.team.armyScore ?? 0,
+    armyUsedPieceCount: choice.team.usedPieceCount ?? 0,
+    armySize: choice.team.armySize ?? 0,
+    armyActivatesFreshUnit: Boolean(choice.team.activatesFreshUnit),
+    armyNewRole: Boolean(choice.team.newRole),
+    armyBroadens: Boolean(choice.team.broadensArmy),
+    armyQueenImbalance: Boolean(choice.team.queenArmyImbalance),
+    armyLifetimeUseCount: choice.team.lifetimeUseCount ?? 0,
     teamPlayRepeatStreak: choice.team.repeatStreak ?? 0,
     teamPlayHistoryUseCount: choice.team.historyUseCount ?? 0,
     teamPlaySwitchedPiece: Boolean(choice.team.switchedPiece),

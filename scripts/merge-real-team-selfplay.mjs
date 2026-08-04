@@ -48,10 +48,13 @@ const numericFields = [
   "games",
   "completedPlies",
   "distinctPieceTotal",
+  "roleCoverageTotal",
   "queenMoves",
   "quietQueenMoves",
   "teamMoves",
+  "armyBroadeningMoves",
   "freshPieceMoves",
+  "queenArmyImbalanceSelections",
   "samePieceRunViolations",
   "quietMoves",
   "materialSafetyViolations",
@@ -68,10 +71,13 @@ function emptyMetrics(id) {
     completedPlies: 0,
     movesBySide: { white: 0, black: 0 },
     distinctPieceTotal: 0,
+    roleCoverageTotal: 0,
     queenMoves: 0,
     quietQueenMoves: 0,
     teamMoves: 0,
+    armyBroadeningMoves: 0,
     freshPieceMoves: 0,
+    queenArmyImbalanceSelections: 0,
     samePieceRunViolations: 0,
     quietMoves: 0,
     materialSafetyViolations: 0,
@@ -92,9 +98,9 @@ for (const { report, name } of shardReports) {
     report.syntheticCurriculum !== false ||
     report.fullAlphaBetaGames !== false ||
     report.partial !== true ||
-    report.mode !== "real-legal-8x8x8-team-policy-rollout-shard"
+    report.mode !== "real-legal-8x8x8-whole-army-rollout-shard"
   ) {
-    throw new Error(`${name} is not a valid real-board policy rollout shard`);
+    throw new Error(`${name} is not a valid real-board whole-army rollout shard`);
   }
   if (
     report.totalGamesPerPolicy !== totalGamesPerPolicy ||
@@ -147,7 +153,9 @@ function qualityScore(entry) {
   const quietMoves = Math.max(1, entry.quietMoves);
   const games = Math.max(1, entry.games);
   const averageDistinctPieces = entry.distinctPieceTotal / (games * 2);
+  const averageRoleCoverage = entry.roleCoverageTotal / (games * 2);
   const teamMoveRate = entry.teamMoves / moves;
+  const armyBroadeningRate = entry.armyBroadeningMoves / moves;
   const freshPieceRate = entry.freshPieceMoves / moves;
   const queenMoveRate = entry.queenMoves / moves;
   const quietQueenMoveRate = entry.quietQueenMoves / quietMoves;
@@ -155,10 +163,13 @@ function qualityScore(entry) {
 
   return Math.round(
     averageDistinctPieces * 18_000 +
+      averageRoleCoverage * 14_000 +
       teamMoveRate * 120_000 +
+      armyBroadeningRate * 110_000 +
       freshPieceRate * 90_000 -
       queenMoveRate * 45_000 -
       quietQueenMoveRate * 80_000 -
+      entry.queenArmyImbalanceSelections * 500_000 -
       samePieceRunViolationRate * 500_000 -
       entry.materialSafetyViolations * 5_000_000 -
       entry.criticalQueenTradeViolations * 20_000_000 -
@@ -174,9 +185,11 @@ function completeMetrics(entry) {
     ...entry,
     score: qualityScore(entry),
     averageDistinctPieces: entry.distinctPieceTotal / (games * 2),
+    averageRoleCoverage: entry.roleCoverageTotal / (games * 2),
     queenMoveRate: entry.queenMoves / moves,
     quietQueenMoveRate: entry.quietQueenMoves / quietMoves,
     teamMoveRate: entry.teamMoves / moves,
+    armyBroadeningRate: entry.armyBroadeningMoves / moves,
     freshPieceRate: entry.freshPieceMoves / moves,
     samePieceRunViolationRate: entry.samePieceRunViolations / quietMoves,
   };
@@ -193,8 +206,8 @@ if (!production || !baseline) {
 }
 
 const report = {
-  schema: 6,
-  mode: "150-shard-real-legal-8x8x8-team-policy-rollout",
+  schema: 7,
+  mode: "150-shard-real-legal-8x8x8-whole-army-rollout",
   syntheticCurriculum: false,
   fullAlphaBetaGames: false,
   shardReports: shardReports.length,
@@ -232,6 +245,11 @@ for (const entry of ranking) {
   }
   if (entry.forcedUnsafeFallbacks !== 0) {
     throw new Error(`${entry.id} used a forced unsafe fallback`);
+  }
+  if (entry.queenArmyImbalanceSelections !== 0) {
+    throw new Error(
+      `${entry.id} selected quiet queen moves while its army remained unused`,
+    );
   }
 }
 
