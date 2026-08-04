@@ -5,24 +5,20 @@ const MODEL_REVISION = "20260804-1";
 const HEADER_BYTES = 36;
 const COMPACT_MODEL_MAGIC = "CCM1";
 
-function modelUrls(name) {
-  return Object.freeze(
-    Array.from({ length: 4 }, (_, index) =>
-      new URL(
-        `../../assets/meshy-chess-models/${name}.ccm.b64.part${index + 1}?v=${MODEL_REVISION}`,
-        import.meta.url,
-      ).href,
-    ),
-  );
+function modelUrl(name) {
+  return new URL(
+    `../../assets/meshy-chess-models/${name}.ccm.b64?v=${MODEL_REVISION}`,
+    import.meta.url,
+  ).href;
 }
 
 export const MESHY_MODEL_URLS = Object.freeze({
-  pawn: modelUrls("pawn"),
-  rook: modelUrls("rook"),
-  knight: modelUrls("knight"),
-  bishop: modelUrls("bishop"),
-  queen: modelUrls("queen"),
-  king: modelUrls("king"),
+  pawn: modelUrl("pawn"),
+  rook: modelUrl("rook"),
+  knight: modelUrl("knight"),
+  bishop: modelUrl("bishop"),
+  queen: modelUrl("queen"),
+  king: modelUrl("king"),
 });
 
 function readMagic(view) {
@@ -128,16 +124,12 @@ export function parseCompactChessGeometry(payload) {
   return geometry;
 }
 
-async function fetchModelPayload(urls) {
-  const responses = await Promise.all(
-    urls.map((url) => fetch(url, { cache: "force-cache" })),
-  );
-  const failed = responses.find((response) => !response.ok);
-  if (failed) {
-    throw new Error(`Failed to load compact chess model (${failed.status})`);
+async function fetchModelPayload(url) {
+  const response = await fetch(url, { cache: "force-cache" });
+  if (!response.ok) {
+    throw new Error(`Failed to load compact chess model (${response.status})`);
   }
-  const parts = await Promise.all(responses.map((response) => response.text()));
-  return decodeBase64Bytes(parts.join(""));
+  return decodeBase64Bytes(await response.text());
 }
 
 function addOutline(group, geometry, color) {
@@ -180,12 +172,12 @@ export class MeshyChessModelSet {
   }
 
   loadGeometry(type) {
-    const urls = MESHY_MODEL_URLS[type];
-    if (!urls) return Promise.reject(new Error(`No Meshy model is registered for ${type}`));
+    const url = MESHY_MODEL_URLS[type];
+    if (!url) return Promise.reject(new Error(`No Meshy model is registered for ${type}`));
     if (!this.geometryPromises.has(type)) {
       this.geometryPromises.set(
         type,
-        fetchModelPayload(urls).then((payload) => parseCompactChessGeometry(payload)),
+        fetchModelPayload(url).then((payload) => parseCompactChessGeometry(payload)),
       );
     }
     return this.geometryPromises.get(type);
