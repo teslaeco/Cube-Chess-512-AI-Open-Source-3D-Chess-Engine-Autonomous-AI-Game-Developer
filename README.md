@@ -1,4 +1,25 @@
-# Cube Chess 512 AI
+# Cube Chess 512 AI — Open Source Edition
+
+> [!IMPORTANT]
+> ## Open-source milestone completed
+>
+> On **5 August 2026**, the current active-development phase of this public
+> edition was concluded as a completed open-source milestone.
+>
+> This repository remains public, playable and preserved under the MIT License.
+> It is not being deleted or abandoned, and development may return here in the
+> future. The source history, documentation and browser release remain available
+> as the technical foundation and historical record of the project.
+>
+> The next production phase is planned as a separate commercial project built in
+> Unreal Engine under the preliminary working title **CHESS ARENA 512 AI**. That
+> project will use a separate repository, asset pipeline, release process and
+> commercial licensing model. The working title may still be refined before
+> trademark filing, store registration or commercial launch.
+>
+> The commercial successor may reuse the original code and architecture from
+> this repository. Any open-source or third-party components included in a future
+> product will remain subject to their respective licenses and required notices.
 
 [Play the current browser release](https://teslaeco.github.io/Cube-Chess-512-AI-Open-Source-3D-Chess-Engine-Autonomous-AI-Game-Developer/)
 
@@ -8,7 +29,40 @@ kept independent from Three.js and the browser UI.
 
 ![Desktop main menu](docs/audits/screenshots/desktop-main-menu.png)
 
-## Working in this branch
+## Open-source milestone and future direction
+
+This edition established a working foundation for three-dimensional chess across
+512 addressable cells, including:
+
+- legal movement and captures across all three spatial axes;
+- an engine separated from the Three.js presentation layer;
+- local play and a Web Worker computer opponent;
+- deterministic state restoration, undo, redo and local saves;
+- responsive browser, PWA and desktop-build foundations;
+- localization and accessibility infrastructure;
+- an authoritative local multiplayer test server;
+- automated unit, integration, browser and production-build validation.
+
+Future commercial production is expected to focus on a dedicated Unreal Engine
+implementation with professional 3D assets, cinematic animation, advanced AI,
+authoritative hosted multiplayer, cross-platform delivery and a commercial beta
+programme. The preliminary commercial working title is documented as
+[CHESS ARENA 512 AI](docs/project-transition/chess-512-ai-working-title.md). No
+public release date or production feature is claimed by this repository.
+
+## Thanks and collaboration
+
+Thank you to everyone who tested the game, reviewed its behaviour, reported
+problems, shared ideas, supported the documentation or followed the project's
+development. Every test and discussion helped turn an experimental concept into
+a playable 8×8×8 chess system.
+
+This is the conclusion of the first public development chapter, not the end of
+the project. Research, publishing, Unreal Engine development and commercial
+collaboration proposals may be directed to the project owner through the
+[teslaeco GitHub profile](https://github.com/teslaeco).
+
+## Current implementation
 
 - legal pointer and touch moves, captures, turn changes, check, checkmate and
   stalemate;
@@ -100,13 +154,22 @@ deployment**.
 
 ## Project status and boundaries
 
-The game is now interactively playable, but the broader roadmap is not finished.
-Replay navigation, a teaching/explanation layer, a curated demo ending in a
-proved checkmate, hosted multiplayer/lobbies, full settings, strict typing of
-the remaining JavaScript UI, signed desktop installers and professional review
-of draft translations remain open work. See the
+The browser edition remains interactively playable, but the broader product
+roadmap is not represented as complete. Replay navigation, a teaching and
+explanation layer, a curated demo ending in a proved checkmate, hosted
+multiplayer and lobbies, full settings, strict typing of the remaining
+JavaScript UI, signed desktop installers and professional review of draft
+translations remain possible future work. See the
 [audit](docs/audits/playability-and-ui-audit.md) and
 [roadmap](docs/roadmap/full-product-roadmap.md).
 
-Cube Chess 512 AI is licensed under the MIT License. The original 8×8×8 game
-concept is by Sebastian Laskowski.
+## Ownership and licensing
+
+The original 8×8×8 game concept and this project were created by **Sebastian
+Laskowski**, operating through the Tesla Eco account and the Terraforming Planet
+organization.
+
+The source code in this repository remains available under the MIT License.
+Existing permissions granted under that license are unchanged. The MIT License
+does not grant ownership of the project name, future commercial branding or
+separately produced proprietary assets.
