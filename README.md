@@ -12,9 +12,10 @@
 > as the technical foundation and historical record of the project.
 >
 > The next production phase is planned as a separate commercial project built in
-> Unreal Engine under the working title **CROWNGRID 512 — The 8×8×8 Chess
-> Arena**. That project will use a separate repository, asset pipeline, release
-> process and commercial licensing model.
+> Unreal Engine under the preliminary working title **CHESS 512 AI**. That
+> project will use a separate repository, asset pipeline, release process and
+> commercial licensing model. The working title may still be refined before
+> trademark filing, store registration or commercial launch.
 >
 > The commercial successor may reuse the original code and architecture from
 > this repository. Any open-source or third-party components included in a future
@@ -45,8 +46,9 @@ This edition established a working foundation for three-dimensional chess across
 Future commercial production is expected to focus on a dedicated Unreal Engine
 implementation with professional 3D assets, cinematic animation, advanced AI,
 authoritative hosted multiplayer, cross-platform delivery and a commercial beta
-programme. No public release date or production feature is claimed by this
-repository.
+programme. The preliminary commercial working title is documented as
+[CHESS 512 AI](docs/project-transition/chess-512-ai-working-title.md). No public
+release date or production feature is claimed by this repository.
 
 ## Thanks and collaboration
 
