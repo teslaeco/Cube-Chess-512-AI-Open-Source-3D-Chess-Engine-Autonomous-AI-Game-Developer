@@ -1,15 +1,15 @@
-# CHESS 512 AI — Working Commercial Title
+# CHESS ARENA 512 AI — Working Commercial Title
 
 The preliminary name of the future Unreal Engine commercial edition is:
 
-# CHESS 512 AI
+# CHESS ARENA 512 AI
 
 This is a working title and may be refined before trademark filing, store registration or public commercial launch.
 
 ## Product meaning
 
-- **CHESS** identifies the strategic foundation immediately.
-- **512** refers to the complete 8 × 8 × 8 battlefield containing 512 playable cells.
+- **CHESS ARENA** presents the game as a competitive three-dimensional battlefield.
+- **512** refers to the complete 8 × 8 × 8 board containing 512 playable cells.
 - **AI** highlights the computer-opponent, training and game-intelligence direction of the project.
 
 ## Relationship to the open-source edition
