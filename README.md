@@ -23,6 +23,9 @@
 
 [Play the current browser release](https://teslaeco.github.io/Cube-Chess-512-AI-Open-Source-3D-Chess-Engine-Autonomous-AI-Game-Developer/)
 
+<img width="2048" height="919" alt="33053" src="https://github.com/user-attachments/assets/f8396ef2-7fc4-4933-83ed-823c93d681e9" />
+<img width="1080" height="2460" alt="33070" src="https://github.com/user-attachments/assets/8febc608-1b0d-4fb6-ba8f-11ebc955dac9" />
+
 Cube Chess 512 AI is an open-source 8×8×8 chess project. One continuous 3D
 lattice contains 512 addressable cells across levels A–H. The rules engine is
 kept independent from Three.js and the browser UI.
