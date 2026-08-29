@@ -55,9 +55,9 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator("canvas.game-canvas")).toBeVisible();
 });
 
-test("opens eight functional menu sections and switches ar-PS to RTL", async ({ page }) => {
+test("opens nine functional menu sections and switches ar-PS to RTL", async ({ page }) => {
   test.setTimeout(90_000);
-  await expect(page.locator("[data-panel]")).toHaveCount(8);
+  await expect(page.locator("[data-panel]")).toHaveCount(9);
   for (const [index, panel] of [
     "newGame",
     "save",
@@ -67,6 +67,7 @@ test("opens eight functional menu sections and switches ar-PS to RTL", async ({ 
     "license",
     "help",
     "about",
+    "forgemcp",
   ].entries()) {
     await page.getByTestId(`menu-${panel}`).click({ force: true });
     await expect(page.locator(".panel-heading > span")).toHaveText(
@@ -75,6 +76,9 @@ test("opens eight functional menu sections and switches ar-PS to RTL", async ({ 
   }
   await page.getByTestId("menu-about").click({ force: true });
   await expect(page.locator(".about-copy")).toContainText("Sebastian Laskowski");
+  await page.getByTestId("menu-forgemcp").click({ force: true });
+  await expect(page.locator(".forgemcp-panel")).toContainText("PROMOTE or REJECT");
+  await expect(page.locator('.forgemcp-links a[href="./forgemcp/"]')).toBeVisible();
   await page.locator("[data-language]").selectOption("ar-PS");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.getByTestId("menu-newGame")).toContainText("لعبة جديدة");
