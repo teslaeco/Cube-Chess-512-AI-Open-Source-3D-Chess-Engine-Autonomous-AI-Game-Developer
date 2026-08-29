@@ -221,6 +221,18 @@ button { border: 0; }
 .prose { max-width: 850px; color: #ccdae3; line-height: 1.72; }
 .prose p { margin: 0 0 1rem; }
 .responsibility-note { padding: .85rem; border-inline-start: 3px solid var(--green); background: rgba(57, 135, 92, .12); }
+.forgemcp-panel { display: grid; gap: .85rem; color: #ccdae3; line-height: 1.55; }
+.forgemcp-panel section, .forgemcp-grid article { padding: .9rem; border: 1px solid var(--line); border-radius: .7rem; background: rgba(15, 36, 51, .52); }
+.forgemcp-panel h3 { margin: 0 0 .45rem; color: var(--cyan); font-size: .9rem; }
+.forgemcp-panel p { margin: 0; }
+.forgemcp-flow { border-inline-start: 3px solid var(--cyan-strong) !important; }
+.forgemcp-flow p, .forgemcp-pipeline { margin-top: .5rem !important; color: #effaff; font-size: .82rem; font-weight: 650; overflow-wrap: anywhere; }
+.forgemcp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+.forgemcp-grid article:first-child { border-inline-start: 3px solid #f6c453; }
+.forgemcp-links { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.forgemcp-links a:not(.primary-action) { padding: .55rem .8rem; color: #dff8ff; }
+.forgemcp-links .primary-action { margin-top: 0; }
+@media (max-width: 700px) { .forgemcp-grid { grid-template-columns: 1fr; } }
 .help-steps { display: grid; gap: .7rem; }
 .help-steps article { display: grid; grid-template-columns: 36px 1fr; gap: .75rem; align-items: start; }
 .help-steps article > span { display: grid; place-items: center; width: 34px; aspect-ratio: 1; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--cyan); }

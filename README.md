@@ -29,6 +29,26 @@ kept independent from Three.js and the browser UI.
 
 ![Desktop main menu](docs/audits/screenshots/desktop-main-menu.png)
 
+## ForgeMCP — Multi-Agent Research & Game Studio
+
+Cube Chess 512 predates the WebMCP Challenge. ForgeMCP is new Challenge work,
+and Cube's role within it is **LEARN & COMPETE + CREATE**: a deterministic
+8×8×8 laboratory where agent-proposed experiments remain subordinate to the
+Cube rule engine and human judgment.
+
+The target evaluation loop compares a controlled baseline AI with a candidate
+AI through executed legal games, stored moves and results, measurable metrics,
+policy comparison and retesting. Legality and regression gates must pass before
+human review, and only a human-controlled promotion decision can accept a
+candidate. Self-play by itself is not proof of improvement, and no game counts,
+wins/losses, Elo, benchmarks or training results should be claimed without
+executed and recorded evidence. Historical policy tuning in this repository is
+not described as neural-network training.
+
+Explore the [ForgeMCP repository](https://github.com/Terraforming-Planet/ForgeMCP-Multi-Agent-Research---Game-Studio),
+the [Cube ForgeMCP page](https://teslaeco.github.io/Cube-Chess-512-AI-Open-Source-3D-Chess-Engine-Autonomous-AI-Game-Developer/forgemcp/),
+and the [Terra Observation System](https://terraforming-planet.github.io/Polar-Sun-Moon-Analysis/).
+
 ## Open-source milestone and future direction
 
 This edition established a working foundation for three-dimensional chess across
@@ -70,7 +90,7 @@ collaboration proposals may be directed to the project owner through the
   animation and camera tracking;
 - corrected upward pawn movement for both colours and diagonal-only bishops;
 - undo, redo, exact state restoration and versioned local saves in IndexedDB;
-- an eight-section start menu, local two-player mode and a Web Worker computer
+- a nine-section start menu, local two-player mode and a Web Worker computer
   opponent with three search limits;
 - a legal engine-driven attract demo that stops when a real game starts;
 - responsive desktop, phone and tablet layouts, keyboard focus handling, RTL,

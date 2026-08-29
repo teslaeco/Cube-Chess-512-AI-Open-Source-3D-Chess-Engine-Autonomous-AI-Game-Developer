@@ -14,6 +14,7 @@ const MENU_ITEMS = [
   ["license", "license"],
   ["help", "help"],
   ["about", "about"],
+  ["forgemcp", "forgemcp"],
 ];
 
 const REGION_KEYS = [
@@ -413,6 +414,22 @@ export class GameHud {
         return `<div class="panel-heading"><span>07</span><div><h2>${this.t("helpTitle")}</h2><p>${this.t("contact")}: <a href="mailto:xodobrox@gmail.com">xodobrox@gmail.com</a></p></div></div><div class="help-steps"><article><span>1</span><p>${this.t("helpSteps")}</p></article><article><span>2</span><p>${this.t("cameraHelp")}</p></article></div><button data-action="diagnostic">${this.t("diagnostic")}</button>`;
       case "about":
         return `<div class="panel-heading"><span>08</span><div><h2>${this.t("aboutTitle")}</h2><p>Cube Chess 512 AI · Terraforming Planet</p></div></div><div class="prose about-copy"><p>${this.t("aboutP1")}</p><p>${this.t("aboutP2")}</p><p>${this.t("aboutP3")}</p><p class="responsibility-note">${this.t("aboutP4")}</p></div>`;
+      case "forgemcp":
+        return `
+          <div class="panel-heading"><span>09</span><div><h2>${this.t("forgemcpTitle")}</h2><p>${this.t("forgemcpIntro")}</p></div></div>
+          <div class="forgemcp-panel">
+            <section class="forgemcp-flow" aria-label="ForgeMCP architecture"><strong>${this.t("forgemcpArchitecture")}</strong><p>HUMAN → GAME COORDINATOR → AI TRAINER / RULES ENGINEER / VISUAL AGENT / QA → WEBMCP TOOLS → CUBE RULE ENGINE → EXECUTED EXPERIMENT → VERIFICATION → HUMAN DECISION</p></section>
+            <section><h3>${this.t("forgemcpSelfPlayTitle")}</h3><p class="forgemcp-pipeline">BASELINE AI vs CANDIDATE AI → legal games → stored moves/results → analyze errors → compare policies → retest → benchmark → legality/regression checks → human review → <strong>PROMOTE or REJECT</strong></p></section>
+            <div class="forgemcp-grid">
+              <article><h3>${this.t("forgemcpTruthTitle")}</h3><p>${this.t("forgemcpTruthBody")}</p></article>
+              <article><h3>${this.t("forgemcpStateTitle")}</h3><p>${this.t("forgemcpStateBody")}</p></article>
+            </div>
+            <nav class="forgemcp-links" aria-label="ForgeMCP project links">
+              <a class="primary-action" href="https://github.com/Terraforming-Planet/ForgeMCP-Multi-Agent-Research---Game-Studio" target="_blank" rel="noreferrer">${this.t("forgemcpRepository")} ↗</a>
+              <a href="./forgemcp/">${this.t("forgemcpPublicPage")}</a>
+              <a href="https://terraforming-planet.github.io/Polar-Sun-Moon-Analysis/" target="_blank" rel="noreferrer">${this.t("terraObservationSystem")} ↗</a>
+            </nav>
+          </div>`;
       default:
         return "";
     }
