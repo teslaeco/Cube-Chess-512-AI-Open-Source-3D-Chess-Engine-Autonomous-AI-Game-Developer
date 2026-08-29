@@ -1,106 +1,88 @@
-name: ForgeMCP native integration one-shot
+name: Codex ForgeMCP Cube Integration
 
 on:
   push:
-    branches: [forgemcp-native-integration]
+    branches: ["forgemcp-native-integration"]
+    paths:
+      - ".github/workflows/forgemcp-native-one-shot.yml"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: codex-forgemcp-cube-integration
+  cancel-in-progress: true
+
 jobs:
-  integrate:
+  execute:
     runs-on: ubuntu-latest
+    timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+          ref: forgemcp-native-integration
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.12'
-      - name: Apply ForgeMCP integration
+          node-version: "22"
+
+      - name: Normalize and mask OpenAI API key
         shell: bash
+        env:
+          RAW_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
+          set -euo pipefail
           python - <<'PY'
+          import os
           from pathlib import Path
-
-          hud = Path('web/ui/GameHud.js')
-          text = hud.read_text(encoding='utf-8')
-          menu_anchor = '  ["online", "online"],\n'
-          if '["forgemcp", "forgemcp"]' not in text:
-              if menu_anchor not in text:
-                  raise SystemExit('Cube menu anchor not found')
-              text = text.replace(menu_anchor, menu_anchor + '  ["forgemcp", "forgemcp"],\n', 1)
-
-          menu_render_old = '${MENU_ITEMS.map(([panel, key], index) => `<button data-panel="${panel}" data-testid="menu-${panel}"><span class="menu-number">${index + 1}</span><span data-i="${key}"></span><span class="menu-arrow" aria-hidden="true">›</span></button>`).join("")}'
-          menu_render_new = '${MENU_ITEMS.map(([panel, key], index) => `<button data-panel="${panel}" data-testid="menu-${panel}"><span class="menu-number">${index + 1}</span>${key === "forgemcp" ? `<span>ForgeMCP</span>` : `<span data-i="${key}"></span>`}<span class="menu-arrow" aria-hidden="true">›</span></button>`).join("")}'
-          if menu_render_old in text:
-              text = text.replace(menu_render_old, menu_render_new, 1)
-          elif 'key === "forgemcp"' not in text:
-              raise SystemExit('Cube menu render anchor not found')
-
-          case_marker = 'case "forgemcp":'
-          if case_marker not in text:
-              anchor = '      case "settings": {'
-              if anchor not in text:
-                  raise SystemExit('Cube settings case anchor not found')
-              panel = '''      case "forgemcp":\n        return `\n          <div class="panel-heading"><span>04</span><div><h2>ForgeMCP</h2><p>Multi-Agent Research & Game Studio · WebMCP Challenge 2026</p></div></div>\n          <div class="prose about-copy">\n            <p><strong>Cube Chess 512 is a pre-existing deterministic 8×8×8 game laboratory.</strong> ForgeMCP is the new WebMCP Challenge integration layer for controlled human–agent experimentation, training workflows, visual-development proposals and verification.</p>\n            <p><strong>Architecture:</strong> HUMAN → GAME COORDINATOR → AI TRAINER / RULES ENGINEER / VISUAL AGENT / QA → WEBMCP TOOLS → CUBE CHESS 512 RULE ENGINE → EXECUTED EXPERIMENT → VERIFICATION → HUMAN DECISION.</p>\n            <p><strong>Training target:</strong> BASELINE AI vs CANDIDATE AI → legal games → measured W/D/L, blunder and search metrics → legality/regression checks → human review → PROMOTE or REJECT.</p>\n            <p><strong>Current status:</strong> ForgeMCP WebMCP foundation is implemented; the initial read-only Cube <code>inspect_position</code> boundary is connected at the framework level; the complete self-play tournament WebMCP workflow is not yet fully connected. The promotion-gate and human-approval model are part of ForgeMCP.</p>\n            <p class="responsibility-note">Self-play alone is not proof of improvement. This interface does not fabricate game counts, wins, Elo, benchmark results or training outcomes. The deterministic rules engine remains the source of truth.</p>\n            <p><a class="primary-action" href="https://github.com/Terraforming-Planet/ForgeMCP-Multi-Agent-Research---Game-Studio" target="_blank" rel="noreferrer">Open ForgeMCP repository ↗</a></p>\n            <p><a href="./forgemcp/">Open ForgeMCP project page</a> · <a href="https://terraforming-planet.github.io/Polar-Sun-Moon-Analysis/" target="_blank" rel="noreferrer">Open Terra Observation System ↗</a></p>\n          </div>`;\n'''
-              text = text.replace(anchor, panel + anchor, 1)
-
-          hud.write_text(text, encoding='utf-8')
-
-          readme = Path('README.md')
-          r = readme.read_text(encoding='utf-8')
-          marker = '## ForgeMCP — Multi-Agent Research & Game Studio'
-          if marker not in r:
-              title_anchor = '# Cube Chess 512 AI'
-              if title_anchor in r:
-                  pos = r.find('\n', r.find(title_anchor)) + 1
-              else:
-                  pos = 0
-              section = """
-
-## ForgeMCP — Multi-Agent Research & Game Studio
-
-**Cube Chess 512 is one of ForgeMCP's two real laboratories for the OpenAI WebMCP Challenge 2026.** The game predates the Challenge. The new Challenge work is the controlled WebMCP integration, specialist-agent orchestration, measurable AI-vs-AI experimentation, verification gates and human-controlled promotion path.
-
-Cube's role inside ForgeMCP is **LEARN & COMPETE + CREATE**. The target workflow compares a baseline opponent with a candidate under controlled seeds/openings and color swaps, records legal games and measurable outcomes, analyzes errors, checks legality/regressions, and promotes a candidate only after evidence supports improvement. Historical policy-tuning runs are not described as neural-network training, and no unmeasured game count or Elo result is invented.
-
-- **ForgeMCP repository:** <https://github.com/Terraforming-Planet/ForgeMCP-Multi-Agent-Research---Game-Studio>
-- **Cube ForgeMCP page:** <https://teslaeco.github.io/Cube-Chess-512-AI-Open-Source-3D-Chess-Engine-Autonomous-AI-Game-Developer/forgemcp/>
-- **Terra Observation System laboratory:** <https://terraforming-planet.github.io/Polar-Sun-Moon-Analysis/>
-
-The deterministic Cube Chess rules engine remains the source of truth. Agents may propose, test and compare changes, but promotion is evidence-gated and remains under human control.
-"""
-              r = r[:pos] + section + r[pos:]
-              readme.write_text(r, encoding='utf-8')
-
-          page = Path('public/forgemcp/index.html')
-          if not page.exists():
-              page = Path('web/public/forgemcp/index.html')
-          if page.exists():
-              p = page.read_text(encoding='utf-8')
-              cross_marker = 'data-forgemcp-crosslinks'
-              if cross_marker not in p:
-                  links = """<section data-forgemcp-crosslinks style=\"margin-top:2rem\"><h2>Connected laboratories</h2><p><a href=\"../\">Cube Chess 512</a> · <a href=\"https://github.com/Terraforming-Planet/ForgeMCP-Multi-Agent-Research---Game-Studio\" target=\"_blank\" rel=\"noreferrer\">ForgeMCP repository</a> · <a href=\"https://terraforming-planet.github.io/Polar-Sun-Moon-Analysis/\" target=\"_blank\" rel=\"noreferrer\">Terra Observation System</a></p></section>"""
-                  if '</main>' in p:
-                      p = p.replace('</main>', links + '\n</main>', 1)
-                  else:
-                      p += links
-                  page.write_text(p, encoding='utf-8')
-
-          wf = Path('.github/workflows/forgemcp-native-one-shot.yml')
-          if wf.exists():
-              wf.unlink()
+          raw = os.environ.get("RAW_OPENAI_API_KEY", "")
+          clean = raw.replace("\r", "").replace("\n", "").strip(" \t")
+          if not clean:
+              raise SystemExit("Missing OPENAI_API_KEY repository secret.")
+          print(f"::add-mask::{clean}")
+          with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as handle:
+              handle.write(f"OPENAI_API_KEY={clean}\n")
           PY
-      - name: Commit integration
+
+      - name: Install Codex
         shell: bash
         run: |
-          git config user.name "ForgeMCP Automation"
-          git config user.email "actions@users.noreply.github.com"
+          set -euo pipefail
+          npm install -g @openai/codex@latest
+          codex --version
+          printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key
+          codex login status
+
+      - name: Execute Codex task
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROTECTED_BRIEF='CODEX_FORGEMCP_NATIVE_INTEGRATION.md'
+          PROTECTED_WORKFLOW='.github/workflows/forgemcp-native-one-shot.yml'
+          env -u OPENAI_API_KEY codex exec --sandbox danger-full-access "$(cat "$PROTECTED_BRIEF")"
+          git diff --exit-code -- "$PROTECTED_BRIEF" "$PROTECTED_WORKFLOW"
+
+      - name: Validate implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run typecheck --if-present
+          npm test -- --run
+          npm run build
+
+      - name: Commit validated implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -f CODEX_FORGEMCP_NATIVE_INTEGRATION.md .github/workflows/forgemcp-native-one-shot.yml
           git add -A
-          if git diff --cached --quiet; then
-            echo "No changes required"
-            exit 0
-          fi
-          git commit -m "feat: add native ForgeMCP Cube integration"
+          git diff --cached --quiet && { echo 'Codex produced no changes'; exit 1; }
+          git commit -m 'feat: complete native ForgeMCP Cube integration'
           git push origin HEAD:forgemcp-native-integration
