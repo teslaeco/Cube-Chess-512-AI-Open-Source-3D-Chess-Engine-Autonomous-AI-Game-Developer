@@ -13,8 +13,8 @@ import {
 const TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
 const HEIGHT_ORDER = ["king", "queen", "bishop", "knight", "rook", "pawn"];
 
-describe("Open-source Staunton Piece Set v6", () => {
-  it.each(TYPES)("builds detailed %s geometry fully inside one cell and level", (type) => {
+describe("Open-source Staunton Piece Set v7 sculpted", () => {
+  it.each(TYPES)("builds detailed %s geometry fully inside one conservative 512-cell envelope", (type) => {
     const set = new OpenSourceStauntonPieceSet();
     const object = set.create(type, "white");
     object.updateMatrixWorld(true);
@@ -29,13 +29,13 @@ describe("Open-source Staunton Piece Set v6", () => {
     expect(size.y).toBeLessThanOrEqual(envelope.maxHeight + 1e-6);
     expect(size.x).toBeLessThanOrEqual(envelope.maxFootprint + 1e-6);
     expect(size.z).toBeLessThanOrEqual(envelope.maxFootprint + 1e-6);
-    expect(size.x).toBeLessThanOrEqual(CELL_RENDER_SIZE * 0.49 + 1e-6);
-    expect(size.z).toBeLessThanOrEqual(CELL_RENDER_SIZE * 0.49 + 1e-6);
-    expect(triangles).toBeGreaterThan(1200);
-    expect(triangles).toBeLessThan(22000);
+    expect(size.x).toBeLessThanOrEqual(CELL_RENDER_SIZE * 0.40 + 1e-6);
+    expect(size.z).toBeLessThanOrEqual(CELL_RENDER_SIZE * 0.40 + 1e-6);
+    expect(triangles).toBeGreaterThan(1800);
+    expect(triangles).toBeLessThan(30000);
   });
 
-  it("preserves the classical FIDE descending height hierarchy", () => {
+  it("preserves the classical descending height hierarchy", () => {
     const set = new OpenSourceStauntonPieceSet();
     const heights = Object.fromEntries(TYPES.map((type) => {
       const object = set.create(type, "white");
@@ -47,28 +47,31 @@ describe("Open-source Staunton Piece Set v6", () => {
     }
   });
 
-  it("keeps generous vertical clearance for the 8-level board", () => {
+  it("keeps more than half a level of vertical air above every piece", () => {
     const set = new OpenSourceStauntonPieceSet();
     for (const type of TYPES) {
       const object = set.create(type, "black");
       object.updateMatrixWorld(true);
       const bounds = new THREE.Box3().setFromObject(object);
-      expect(LEVEL_SPACING - bounds.max.y).toBeGreaterThanOrEqual(LEVEL_SPACING * 0.42 - 1e-6);
+      expect(LEVEL_SPACING - bounds.max.y).toBeGreaterThanOrEqual(LEVEL_SPACING * 0.51 - 1e-6);
     }
   });
 
-  it("creates a recognisable three-dimensional Staunton knight with anatomy", () => {
+  it("creates a sculpted three-dimensional knight instead of a flat extruded silhouette", () => {
     const knight = new OpenSourceStauntonPieceSet().create("knight", "black");
     const roles = new Set();
     knight.traverse((child) => { if (child.userData?.openSourceStauntonRole) roles.add(child.userData.openSourceStauntonRole); });
-    for (const role of ["knight-body", "head", "muzzle", "ear", "mane", "eye"]) expect(roles.has(role)).toBe(true);
+    for (const role of ["knight-body", "knight-head", "knight-muzzle", "jaw", "ear", "mane-fin", "eye"]) expect(roles.has(role)).toBe(true);
+    expect(countObjectTriangles(knight)).toBeGreaterThan(5000);
   });
 
-  it("creates a recognisable bishop with a distinct split mitre/notch", () => {
+  it("creates a smooth split bishop mitre with a real modeled diagonal notch", () => {
     const bishop = new OpenSourceStauntonPieceSet().create("bishop", "white");
-    const roles = new Set();
-    bishop.traverse((child) => { if (child.userData?.openSourceStauntonRole) roles.add(child.userData.openSourceStauntonRole); });
-    for (const role of ["mitre-left", "mitre-right", "bishop-notch"]) expect(roles.has(role)).toBe(true);
+    const roles = [];
+    bishop.traverse((child) => { if (child.userData?.openSourceStauntonRole) roles.push(child.userData.openSourceStauntonRole); });
+    expect(roles.filter((role) => role === "bishop-mitre").length).toBe(2);
+    expect(roles.includes("bishop-notch")).toBe(true);
+    expect(countObjectTriangles(bishop)).toBeGreaterThan(4000);
   });
 
   it("creates distinct rook battlements, queen crown and king cross", () => {
@@ -107,7 +110,7 @@ describe("Open-source Staunton Piece Set v6", () => {
     }
   });
 
-  it("uses contrasting light and dark matte PBR materials", () => {
+  it("uses contrasting light and dark satin PBR materials", () => {
     const set = new OpenSourceStauntonPieceSet();
     const signature = (object) => {
       const values = [];
@@ -119,23 +122,23 @@ describe("Open-source Staunton Piece Set v6", () => {
     expect(signature(set.create("king", "white"))).not.toBe(signature(set.create("king", "black")));
   });
 
-  it("reports measured open-source stats and revision for all six pieces", () => {
+  it("reports measured open-source v7 stats for all six pieces", () => {
     const set = new OpenSourceStauntonPieceSet();
     const stats = set.inspectAll();
     expect(stats.map((item) => item.type)).toEqual(TYPES);
-    expect(OPEN_SOURCE_STAUNTON_REVISION).toContain("opensource-staunton-v6");
+    expect(OPEN_SOURCE_STAUNTON_REVISION).toContain("opensource-staunton-v7-sculpted");
     for (const item of stats) {
       expect(item.finite).toBe(true);
       expect(item.fitsLevel).toBe(true);
       expect(item.fitsCell).toBe(true);
       expect(item.style).toContain("Staunton");
-      expect(item.triangles).toBeGreaterThan(1200);
-      expect(item.triangles).toBeLessThan(22000);
+      expect(item.triangles).toBeGreaterThan(1800);
+      expect(item.triangles).toBeLessThan(30000);
     }
   });
 
   it("keeps the existing WebMCP compatibility constructor functional", () => {
     const compatible = new ForgeMcpPremiumPieceSet().create("pawn", "white");
-    expect(compatible.userData.forgeVisualSource).toBe("open-source-staunton-v6");
+    expect(compatible.userData.forgeVisualSource).toBe("open-source-staunton-v7-sculpted");
   });
 });
