@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { describe, expect, it } from "vitest";
 import { CELL_RENDER_SIZE, LEVEL_SPACING } from "./coordinates.js";
 import {
   ForgeMcpPremiumPieceSet,
