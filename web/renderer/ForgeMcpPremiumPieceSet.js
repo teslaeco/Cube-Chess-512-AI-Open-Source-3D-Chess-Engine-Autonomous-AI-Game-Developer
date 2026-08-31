@@ -27,7 +27,7 @@ export class OpenSourceStauntonPieceSet extends OpenSourceReferenceGuidedV12Piec
 // Historical constructor name retained only so existing WebMCP imports continue to work.
 export class ForgeMcpPremiumPieceSet extends OpenSourceReferenceGuidedV12PieceSet {}
 
+export { OPEN_SOURCE_STAUNTON_REVISION, countObjectTriangles, countUniquePieceResources };
 export const FORGEMCP_PREMIUM_REVISION = REVISION;
 export const OPEN_SOURCE_STAUNTON_SAFE_FIT = PIECE_CELL_ENVELOPE;
-export { countObjectTriangles, countUniquePieceResources };
 export const FORGEMCP_PREMIUM_SAFE_FIT = PIECE_CELL_ENVELOPE;
