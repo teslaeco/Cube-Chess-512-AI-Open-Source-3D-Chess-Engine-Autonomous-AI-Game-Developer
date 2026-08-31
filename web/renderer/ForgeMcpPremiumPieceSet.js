@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import {
   OpenSourceStauntonV8PieceSet,
-  OPEN_SOURCE_STAUNTON_SAFE_FIT,
   countObjectTriangles,
   countUniquePieceResources,
 } from "./OpenSourceStauntonV8PieceSet.js";
+import { pieceCellEnvelope, PIECE_CELL_ENVELOPE } from "./pieceScaleProfile.js";
 
 // NORMAL / PUBLIC / OPEN-SOURCE renderer for every player.
 // Uploaded chess source assets are REFERENCE ONLY. They are not loaded, copied, or rendered here.
@@ -132,17 +132,23 @@ function addReferenceGuidedDetails(group, type, color) {
 }
 
 function refit(group, type) {
-  const envelope = OPEN_SOURCE_STAUNTON_SAFE_FIT[type];
+  // IMPORTANT: runtime fitting and WebMCP QA use exactly the same source of truth.
+  // This prevents a piece from passing renderer fit but failing agent verification.
+  const envelope = pieceCellEnvelope(type);
+  group.position.set(0, 0, 0);
+  group.scale.setScalar(1);
   group.updateMatrixWorld(true);
   let box = new THREE.Box3().setFromObject(group);
-  let size = box.getSize(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  if (![size.x, size.y, size.z].every((value) => Number.isFinite(value) && value > 0)) {
+    throw new Error(`Generated ${type} has invalid bounds`);
+  }
   const scale = Math.min(
-    1,
     envelope.maxHeight / size.y,
     envelope.maxFootprint / size.x,
     envelope.maxFootprint / size.z,
   );
-  if (scale < 1) group.scale.multiplyScalar(scale);
+  group.scale.setScalar(scale);
   group.updateMatrixWorld(true);
   box = new THREE.Box3().setFromObject(group);
   const center = box.getCenter(new THREE.Vector3());
@@ -193,7 +199,7 @@ export class OpenSourceReferenceGuidedV9PieceSet {
     object.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(object);
     const size = box.getSize(new THREE.Vector3());
-    const envelope = OPEN_SOURCE_STAUNTON_SAFE_FIT[type];
+    const envelope = pieceCellEnvelope(type);
     return {
       type,
       color,
@@ -221,5 +227,6 @@ export class ForgeMcpPremiumPieceSet extends OpenSourceReferenceGuidedV9PieceSet
 
 export const OPEN_SOURCE_STAUNTON_REVISION = REVISION;
 export const FORGEMCP_PREMIUM_REVISION = REVISION;
-export { OPEN_SOURCE_STAUNTON_SAFE_FIT, countObjectTriangles, countUniquePieceResources };
-export const FORGEMCP_PREMIUM_SAFE_FIT = OPEN_SOURCE_STAUNTON_SAFE_FIT;
+export const OPEN_SOURCE_STAUNTON_SAFE_FIT = PIECE_CELL_ENVELOPE;
+export { countObjectTriangles, countUniquePieceResources };
+export const FORGEMCP_PREMIUM_SAFE_FIT = PIECE_CELL_ENVELOPE;
