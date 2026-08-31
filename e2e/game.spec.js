@@ -12,10 +12,13 @@ async function projectedPoint(page, kind, id) {
       if (!object) throw new Error(`Missing ${kind} ${id}`);
       renderer.sceneController.scene.updateMatrixWorld(true);
       renderer.cameraController.camera.updateMatrixWorld(true);
-      const position =
-        kind === "piece"
-          ? object.localToWorld(object.position.clone().set(0, 0.72, 0))
-          : object.getWorldPosition(object.position.clone());
+
+      // Pieces now occupy only ~0.23–0.45 world units vertically. The historical
+      // +0.72 sample point sat above the intended pawn and could raycast a piece behind it.
+      // Keep the click inside the lower-middle body where every current piece has geometry.
+      const position = kind === "piece"
+        ? object.localToWorld(object.position.clone().set(0, 0.10, 0))
+        : object.getWorldPosition(object.position.clone().set(0, 0, 0));
       position.project(renderer.cameraController.camera);
       const rect = renderer.sceneController.renderer.domElement.getBoundingClientRect();
       return {
