@@ -79,6 +79,7 @@ function createMaterialSet(color) {
     jewel: makePhysical(0x48cfff, { metalness: 0.36, roughness: 0.035, iridescence: 0.92, emissive: 0x087fa5, emissiveIntensity: 0.78, flatShading: true }),
     dark: makePhysical(0x182330, { metalness: 0.72, roughness: 0.13 }),
     glow: makePhysical(0x61efff, { metalness: 0.34, roughness: 0.05, emissive: 0x00b8d8, emissiveIntensity: 1.25 }),
+    contour: new THREE.MeshBasicMaterial({ color: 0x101820, side: THREE.BackSide, transparent: true, opacity: 0.42, depthWrite: false }),
     outline: 0x101820,
     edge: 0x7fefff,
   } : {
@@ -88,6 +89,7 @@ function createMaterialSet(color) {
     jewel: makePhysical(0x28efb0, { metalness: 0.42, roughness: 0.03, iridescence: 0.96, emissive: 0x008967, emissiveIntensity: 0.9, flatShading: true }),
     dark: makePhysical(0x020508, { metalness: 0.72, roughness: 0.13 }),
     glow: makePhysical(0x38ffc2, { metalness: 0.38, roughness: 0.04, emissive: 0x00c58d, emissiveIntensity: 1.4 }),
+    contour: new THREE.MeshBasicMaterial({ color: 0xc8fff0, side: THREE.BackSide, transparent: true, opacity: 0.42, depthWrite: false }),
     outline: 0xc8fff0,
     edge: 0x49ffd0,
   };
@@ -136,7 +138,7 @@ function addContours(group, materials) {
   group.traverse((child) => { if (child.isMesh && !child.userData.decorative) sourceMeshes.push(child); });
   for (const child of sourceMeshes) {
     if (!["jewel", "eye", "glow-ring", "accent-ring", "crystal-fin"].includes(child.userData?.forgePremiumRole)) continue;
-    const shell = new THREE.Mesh(child.geometry, new THREE.MeshBasicMaterial({ color: materials.outline, side: THREE.BackSide, transparent: true, opacity: 0.42, depthWrite: false }));
+    const shell = new THREE.Mesh(child.geometry, materials.contour);
     shell.position.copy(child.position); shell.rotation.copy(child.rotation); shell.scale.copy(child.scale).multiplyScalar(1.018);
     shell.renderOrder = 30; shell.userData.decorative = true; child.parent.add(shell);
   }
