@@ -13,7 +13,7 @@ import {
 const TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
 const HEIGHT_ORDER = ["king", "queen", "bishop", "knight", "rook", "pawn"];
 
-describe("Open-source Staunton Piece Set v7 sculpted", () => {
+describe("Open-source Staunton Piece Set v7.1 quad-cage sculpted", () => {
   it.each(TYPES)("builds detailed %s geometry fully inside one conservative 512-cell envelope", (type) => {
     const set = new OpenSourceStauntonPieceSet();
     const object = set.create(type, "white");
@@ -57,21 +57,23 @@ describe("Open-source Staunton Piece Set v7 sculpted", () => {
     }
   });
 
-  it("creates a sculpted three-dimensional knight instead of a flat extruded silhouette", () => {
+  it("creates a sculpted three-dimensional knight from efficient loft cages", () => {
     const knight = new OpenSourceStauntonPieceSet().create("knight", "black");
     const roles = new Set();
     knight.traverse((child) => { if (child.userData?.openSourceStauntonRole) roles.add(child.userData.openSourceStauntonRole); });
     for (const role of ["knight-body", "knight-head", "knight-muzzle", "jaw", "ear", "mane-fin", "eye"]) expect(roles.has(role)).toBe(true);
     expect(countObjectTriangles(knight)).toBeGreaterThan(5000);
+    expect(countObjectTriangles(knight)).toBeLessThan(30000);
   });
 
-  it("creates a smooth split bishop mitre with a real modeled diagonal notch", () => {
+  it("creates a smooth split bishop mitre with an efficient modeled notch", () => {
     const bishop = new OpenSourceStauntonPieceSet().create("bishop", "white");
     const roles = [];
     bishop.traverse((child) => { if (child.userData?.openSourceStauntonRole) roles.push(child.userData.openSourceStauntonRole); });
     expect(roles.filter((role) => role === "bishop-mitre").length).toBe(2);
     expect(roles.includes("bishop-notch")).toBe(true);
     expect(countObjectTriangles(bishop)).toBeGreaterThan(4000);
+    expect(countObjectTriangles(bishop)).toBeLessThan(30000);
   });
 
   it("creates distinct rook battlements, queen crown and king cross", () => {
@@ -122,11 +124,11 @@ describe("Open-source Staunton Piece Set v7 sculpted", () => {
     expect(signature(set.create("king", "white"))).not.toBe(signature(set.create("king", "black")));
   });
 
-  it("reports measured open-source v7 stats for all six pieces", () => {
+  it("reports measured open-source v7.1 stats for all six pieces", () => {
     const set = new OpenSourceStauntonPieceSet();
     const stats = set.inspectAll();
     expect(stats.map((item) => item.type)).toEqual(TYPES);
-    expect(OPEN_SOURCE_STAUNTON_REVISION).toContain("opensource-staunton-v7-sculpted");
+    expect(OPEN_SOURCE_STAUNTON_REVISION).toContain("opensource-staunton-v7.1-quad-cage");
     for (const item of stats) {
       expect(item.finite).toBe(true);
       expect(item.fitsLevel).toBe(true);
@@ -139,6 +141,6 @@ describe("Open-source Staunton Piece Set v7 sculpted", () => {
 
   it("keeps the existing WebMCP compatibility constructor functional", () => {
     const compatible = new ForgeMcpPremiumPieceSet().create("pawn", "white");
-    expect(compatible.userData.forgeVisualSource).toBe("open-source-staunton-v7-sculpted");
+    expect(compatible.userData.forgeVisualSource).toBe("open-source-staunton-v7.1-quad-cage");
   });
 });
