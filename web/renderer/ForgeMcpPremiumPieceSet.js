@@ -14,8 +14,10 @@ const TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
 export class OpenSourceReferenceGuidedV12PieceSet extends OpenSourceStauntonV12PieceSet {
   inspect(type, color = "white") {
     const object = this.create(type, color);
+    const stat = super.inspect(type, color);
     return {
-      ...super.inspect(type, color),
+      ...stat,
+      bounds: { x: stat.width, y: stat.height, z: stat.depth },
       resources: countUniquePieceResources(object),
     };
   }
