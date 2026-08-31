@@ -13,7 +13,7 @@ import {
 const TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
 const HEIGHT_ORDER = ["king", "queen", "bishop", "knight", "rook", "pawn"];
 
-describe("Normal public open-source reference-guided v9 set", () => {
+describe("Normal public open-source continuously sculpted v10 set", () => {
   it.each(TYPES)("builds %s entirely from generated geometry inside one 512-cell envelope", (type) => {
     const set = new OpenSourceStauntonPieceSet();
     const object = set.create(type, "white");
@@ -34,7 +34,7 @@ describe("Normal public open-source reference-guided v9 set", () => {
     expect(triangles).toBeGreaterThan(1800);
     expect(triangles).toBeLessThan(30000);
     expect(object.userData.referenceAssetsPolicy).toBe("reference-only-not-runtime");
-    expect(object.userData.forgeVisualSource).toBe("open-source-reference-guided-generated-v9");
+    expect(object.userData.forgeVisualSource).toBe("open-source-reference-guided-generated-v10");
   });
 
   it("preserves classical descending height hierarchy", () => {
@@ -49,28 +49,39 @@ describe("Normal public open-source reference-guided v9 set", () => {
     }
   });
 
-  it("keeps at least 62 percent of a level clear above every piece", () => {
+  it("keeps at least 64 percent of a level clear above every piece", () => {
     const set = new OpenSourceStauntonPieceSet();
     for (const type of TYPES) {
       const object = set.create(type, "black");
       object.updateMatrixWorld(true);
       const bounds = new THREE.Box3().setFromObject(object);
-      expect(LEVEL_SPACING - bounds.max.y).toBeGreaterThanOrEqual(LEVEL_SPACING * 0.62 - 1e-6);
+      expect(LEVEL_SPACING - bounds.max.y).toBeGreaterThanOrEqual(LEVEL_SPACING - OPEN_SOURCE_STAUNTON_SAFE_FIT.king.maxHeight - 1e-6);
     }
   });
 
-  it("replaces pencil-like knight mane with backward-following faceted mane plates", () => {
+  it("sculpts knight as a continuous horse mass with one backward crest, not pencil spikes", () => {
     const knight = new OpenSourceStauntonPieceSet().create("knight", "black");
-    const plates = [];
-    knight.traverse((child) => {
-      if (child.userData?.openSourceStauntonRole === "mane-plate") plates.push(child);
-    });
-    expect(plates.length).toBe(10);
-    expect(plates.every((plate) => plate.geometry?.isBufferGeometry)).toBe(true);
-    expect(plates[0].position.y).toBeLessThan(plates.at(-1).position.y);
+    const roles = [];
+    knight.traverse((child) => { if (child.userData?.openSourceStauntonRole) roles.push(child.userData.openSourceStauntonRole); });
+    expect(roles).toContain("knight-sculpt");
+    expect(roles).toContain("knight-jaw");
+    expect(roles).toContain("knight-cheek");
+    expect(roles.filter((role) => role === "knight-ear")).toHaveLength(2);
+    expect(roles.filter((role) => role === "mane-ridge")).toHaveLength(1);
+    expect(roles).not.toContain("mane-plate");
+    expect(roles).not.toContain("mane");
   });
 
-  it("adds new modeled detail to all six roles", () => {
+  it("models bishop mitre as two spatial lobes with a physical diagonal gap", () => {
+    const bishop = new OpenSourceStauntonPieceSet().create("bishop", "white");
+    const roles = [];
+    bishop.traverse((child) => { if (child.userData?.openSourceStauntonRole) roles.push(child.userData.openSourceStauntonRole); });
+    expect(roles).toContain("bishop-mitre-left");
+    expect(roles).toContain("bishop-mitre-right");
+    expect(roles).toContain("bishop-notch-recess");
+  });
+
+  it("adds actual modeled geometry to all six roles", () => {
     const set = new OpenSourceStauntonPieceSet();
     const rolesFor = (type) => {
       const roles = [];
@@ -81,17 +92,15 @@ describe("Normal public open-source reference-guided v9 set", () => {
     };
     expect(rolesFor("pawn")).toContain("pawn-facet");
     expect(rolesFor("rook")).toContain("rook-buttress");
-    expect(rolesFor("knight")).toContain("knight-cheek-facet");
-    expect(rolesFor("bishop")).toContain("bishop-rib");
+    expect(rolesFor("knight")).toContain("knight-sculpt");
+    expect(rolesFor("bishop")).toContain("bishop-mitre-left");
     expect(rolesFor("queen")).toContain("queen-crown-facet");
     expect(rolesFor("king")).toContain("king-cross-facet");
   });
 
   it("keeps browser geometry below the existing triangle ceiling", () => {
     const set = new OpenSourceStauntonPieceSet();
-    for (const type of TYPES) {
-      expect(countObjectTriangles(set.create(type, "white"))).toBeLessThan(30000);
-    }
+    for (const type of TYPES) expect(countObjectTriangles(set.create(type, "white"))).toBeLessThan(30000);
   });
 
   it("keeps browser resource counts bounded", () => {
@@ -104,13 +113,13 @@ describe("Normal public open-source reference-guided v9 set", () => {
     }
   });
 
-  it("reports generated source and reference-only asset policy for all pieces", () => {
+  it("reports generated v10 source and reference-only asset policy for all pieces", () => {
     const set = new OpenSourceStauntonPieceSet();
     const stats = set.inspectAll();
     expect(stats.map((item) => item.type)).toEqual(TYPES);
-    expect(OPEN_SOURCE_STAUNTON_REVISION).toContain("reference-guided-v9");
+    expect(OPEN_SOURCE_STAUNTON_REVISION).toContain("staunton-v10-sculpted");
     for (const item of stats) {
-      expect(item.runtimePrimarySource).toBe("open-source-reference-guided-generated-v9");
+      expect(item.runtimePrimarySource).toBe("open-source-reference-guided-generated-v10");
       expect(item.referenceAssetsPolicy).toBe("reference-only-not-runtime");
       expect(item.freeForPublicRenderer).toBe(true);
       expect(item.triangles).toBeLessThan(30000);
@@ -122,7 +131,7 @@ describe("Normal public open-source reference-guided v9 set", () => {
 
   it("keeps the old internal compatibility constructor on the same free generated source", () => {
     const compatible = new ForgeMcpPremiumPieceSet();
-    expect(compatible.inspect("pawn").runtimePrimarySource).toBe("open-source-reference-guided-generated-v9");
+    expect(compatible.inspect("pawn").runtimePrimarySource).toBe("open-source-reference-guided-generated-v10");
     expect(compatible.inspect("pawn").freeForPublicRenderer).toBe(true);
   });
 });
