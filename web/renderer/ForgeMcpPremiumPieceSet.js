@@ -1,51 +1,47 @@
 import {
-  OpenSourceStauntonV8PieceSet,
-  OPEN_SOURCE_STAUNTON_SAFE_FIT as BASE_SAFE_FIT,
-  OPEN_SOURCE_STAUNTON_REVISION as BASE_REVISION,
+  OpenSourceStauntonV11PieceSet,
+  OPEN_SOURCE_STAUNTON_V11_REVISION,
   countObjectTriangles,
-  countUniquePieceResources,
-} from "./OpenSourceStauntonV8PieceSet.js";
+} from "./OpenSourceStauntonV11PieceSet.js";
+import { PIECE_CELL_ENVELOPE } from "./pieceScaleProfile.js";
 
-// Compatibility facade for existing WebMCP imports.
-// There is NO paid/premium tier: this is the same normal free open-source renderer used by every player.
-// Uploaded FBX/GLB assets are reference-only and never become runtime pieces.
-const REVISION = BASE_REVISION;
-const SOURCE_ID = "open-source-reference-guided-generated-v10";
+// Compatibility facade only. There is NO paid/premium visual tier.
+// The normal public game and WebMCP visual tools use the exact same v11 renderer.
+const REVISION = OPEN_SOURCE_STAUNTON_V11_REVISION;
 const TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
 
-export class OpenSourceReferenceGuidedV10PieceSet extends OpenSourceStauntonV8PieceSet {
-  create(type, color) {
-    const object = super.create(type, color);
-    object.userData.forgeVisualSource = SOURCE_ID;
-    object.userData.openSourceStauntonRevision = REVISION;
-    object.userData.referenceAssetsPolicy = "reference-only-not-runtime";
-    return object;
-  }
-
-  inspect(type, color = "white") {
-    const stat = super.inspect(type, color);
-    return {
-      ...stat,
-      revision: REVISION,
-      style: "Open-source continuously sculpted Staunton v10",
-      runtimePrimarySource: SOURCE_ID,
-      referenceAssetsPolicy: "reference-only-not-runtime",
-      freeForPublicRenderer: true,
-    };
-  }
-
-  inspectAll() {
-    return TYPES.map((type) => this.inspect(type, "white"));
-  }
+export function countUniquePieceResources(object) {
+  const geometries = new Set();
+  const materials = new Set();
+  let meshes = 0;
+  object?.traverse?.((child) => {
+    if (!child.isMesh) return;
+    meshes += 1;
+    if (child.geometry) geometries.add(child.geometry.uuid);
+    for (const material of Array.isArray(child.material) ? child.material : [child.material]) {
+      if (material) materials.add(material.uuid);
+    }
+  });
+  return { meshes, uniqueGeometries: geometries.size, uniqueMaterials: materials.size };
 }
 
-export class OpenSourceStauntonPieceSet extends OpenSourceReferenceGuidedV10PieceSet {}
+export class OpenSourceReferenceGuidedV11PieceSet extends OpenSourceStauntonV11PieceSet {
+  inspect(type, color = "white") {
+    return {
+      ...super.inspect(type, color),
+      resources: countUniquePieceResources(this.create(type, color)),
+    };
+  }
+  inspectAll() { return TYPES.map((type) => this.inspect(type, "white")); }
+}
 
-// Historical constructor name retained only so existing WebMCP code does not break.
-export class ForgeMcpPremiumPieceSet extends OpenSourceReferenceGuidedV10PieceSet {}
+export class OpenSourceStauntonPieceSet extends OpenSourceReferenceGuidedV11PieceSet {}
+
+// Historical constructor name retained so existing WebMCP imports continue to work.
+export class ForgeMcpPremiumPieceSet extends OpenSourceReferenceGuidedV11PieceSet {}
 
 export const OPEN_SOURCE_STAUNTON_REVISION = REVISION;
 export const FORGEMCP_PREMIUM_REVISION = REVISION;
-export const OPEN_SOURCE_STAUNTON_SAFE_FIT = BASE_SAFE_FIT;
-export { countObjectTriangles, countUniquePieceResources };
-export const FORGEMCP_PREMIUM_SAFE_FIT = BASE_SAFE_FIT;
+export const OPEN_SOURCE_STAUNTON_SAFE_FIT = PIECE_CELL_ENVELOPE;
+export { countObjectTriangles };
+export const FORGEMCP_PREMIUM_SAFE_FIT = PIECE_CELL_ENVELOPE;
