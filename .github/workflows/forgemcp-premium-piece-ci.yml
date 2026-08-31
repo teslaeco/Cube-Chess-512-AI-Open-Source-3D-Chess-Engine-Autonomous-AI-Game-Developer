@@ -6,6 +6,7 @@ on:
       - "web/renderer/**"
       - "web/forgemcp/**"
       - "web/promotion/**"
+      - "scripts/measure-forgemcp-premium-pieces.mjs"
       - "docs/FORGEMCP_PREMIUM_PIECES.md"
       - "package.json"
       - "package-lock.json"
@@ -33,6 +34,8 @@ jobs:
         run: npm run typecheck
       - name: Unit tests
         run: npm test
+      - name: Measure real premium geometry
+        run: node scripts/measure-forgemcp-premium-pieces.mjs
       - name: Production build
         run: npm run build
       - name: Dist smoke test
