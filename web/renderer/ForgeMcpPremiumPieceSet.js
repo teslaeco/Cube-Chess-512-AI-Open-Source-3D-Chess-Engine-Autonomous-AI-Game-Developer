@@ -1,7 +1,7 @@
 import {
   OpenSourceStauntonV8PieceSet,
-  OPEN_SOURCE_STAUNTON_SAFE_FIT,
-  OPEN_SOURCE_STAUNTON_REVISION,
+  OPEN_SOURCE_STAUNTON_SAFE_FIT as BASE_SAFE_FIT,
+  OPEN_SOURCE_STAUNTON_REVISION as BASE_REVISION,
   countObjectTriangles,
   countUniquePieceResources,
 } from "./OpenSourceStauntonV8PieceSet.js";
@@ -9,7 +9,7 @@ import {
 // Compatibility facade for existing WebMCP imports.
 // There is NO paid/premium tier: this is the same normal free open-source renderer used by every player.
 // Uploaded FBX/GLB assets are reference-only and never become runtime pieces.
-const REVISION = OPEN_SOURCE_STAUNTON_REVISION;
+const REVISION = BASE_REVISION;
 const SOURCE_ID = "open-source-reference-guided-generated-v10";
 const TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
 
@@ -46,6 +46,6 @@ export class ForgeMcpPremiumPieceSet extends OpenSourceReferenceGuidedV10PieceSe
 
 export const OPEN_SOURCE_STAUNTON_REVISION = REVISION;
 export const FORGEMCP_PREMIUM_REVISION = REVISION;
-export const OPEN_SOURCE_STAUNTON_SAFE_FIT = OPEN_SOURCE_STAUNTON_SAFE_FIT;
+export const OPEN_SOURCE_STAUNTON_SAFE_FIT = BASE_SAFE_FIT;
 export { countObjectTriangles, countUniquePieceResources };
-export const FORGEMCP_PREMIUM_SAFE_FIT = OPEN_SOURCE_STAUNTON_SAFE_FIT;
+export const FORGEMCP_PREMIUM_SAFE_FIT = BASE_SAFE_FIT;
