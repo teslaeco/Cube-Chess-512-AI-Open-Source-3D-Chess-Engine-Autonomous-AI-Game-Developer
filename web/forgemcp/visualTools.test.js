@@ -1,0 +1,137 @@
+import * as THREE from "three";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  FORGEMCP_VISUAL_PRESETS,
+  registerVisualWebMcpTools,
+  rollbackPieceVisuals,
+  upgradePieceVisuals,
+} from "./visualTools.js";
+
+function legacyPiece(type, color, id, position) {
+  const group = new THREE.Group();
+  const geometry = new THREE.BoxGeometry(0.25, 0.5, 0.25);
+  const material = new THREE.MeshStandardMaterial({ color: color === "white" ? 0xffffff : 0x222222 });
+  const surface = new THREE.Mesh(geometry, material);
+  surface.name = `${color}-${type}-meshy-surface`;
+  group.add(surface);
+  group.userData = { kind: "piece", piece: { id, type, color, position } };
+  return group;
+}
+
+function fakeApplication() {
+  const levels = Array.from({ length: 8 }, (_, index) => ({ index, visible: index !== 6 }));
+  const boardGroup = new THREE.Group();
+  const capturedGroup = new THREE.Group();
+  const pieces = new Map();
+  const captured = new Map();
+  const whitePawn = legacyPiece("pawn", "white", "wp1", { x: 1, y: 2, z: 0 });
+  const blackKnight = legacyPiece("knight", "black", "bn1", { x: 4, y: 3, z: 2 });
+  const capturedRook = legacyPiece("rook", "white", "wr1", { x: 7, y: 7, z: 1 });
+  whitePawn.position.set(1, 0.3, 2);
+  blackKnight.position.set(4, 2.3, 3);
+  capturedRook.position.set(-6.1, 0.28, 0);
+  boardGroup.add(whitePawn, blackKnight);
+  capturedGroup.add(capturedRook);
+  pieces.set("wp1", whitePawn);
+  pieces.set("bn1", blackKnight);
+  captured.set("wr1", capturedRook);
+
+  const factory = {
+    create(type, color) {
+      return legacyPiece(type, color, `new-${type}`, { x: 0, y: 0, z: 0 });
+    },
+  };
+
+  const pieceRenderer = {
+    factory,
+    pieces,
+    captured,
+    boardGroup,
+    capturedGroup,
+    selectedPieceId: "bn1",
+    replaceObjectForPiece(id, object, piece, parent) {
+      const position = object.position.clone();
+      const scale = object.scale.clone();
+      object.removeFromParent();
+      const replacement = this.factory.create(piece.type, piece.color);
+      replacement.userData = { kind: parent === capturedGroup ? "captured" : "piece", piece };
+      replacement.position.copy(position);
+      replacement.scale.copy(scale);
+      parent.add(replacement);
+      return replacement;
+    },
+    addCaptureAura() {},
+    setSelected(id) { this.selectedPieceId = id; },
+    setLevelVisibility(nextLevels) { this.lastLevels = nextLevels.map((level) => ({ ...level })); },
+  };
+
+  return {
+    renderer: { pieceRenderer },
+    presentation: { snapshot: () => ({ levels: levels.map((level) => ({ ...level })) }) },
+  };
+}
+
+afterEach(() => {
+  delete globalThis.__forgeMcpCubeApplication;
+  delete globalThis.document;
+});
+
+describe("ForgeMCP premium visual WebMCP tools", () => {
+  it("rejects mutation without explicit human approval", async () => {
+    globalThis.__forgeMcpCubeApplication = fakeApplication();
+    const result = await upgradePieceVisuals({ preset: FORGEMCP_VISUAL_PRESETS.PREMIUM });
+    expect(result.state).toBe("FAIL");
+    expect(result.verification).toBe("FAIL");
+  });
+
+  it("rejects an unsupported preset", async () => {
+    globalThis.__forgeMcpCubeApplication = fakeApplication();
+    const result = await upgradePieceVisuals({ preset: "FAKE_PRESET", humanApproved: true });
+    expect(result.state).toBe("FAIL");
+  });
+
+  it("rebuilds active and captured objects while preserving identity, coordinates, selection and levels", async () => {
+    const app = fakeApplication();
+    globalThis.__forgeMcpCubeApplication = app;
+    const beforePositions = new Map([...app.renderer.pieceRenderer.pieces].map(([id, object]) => [id, object.position.clone()]));
+    const result = await upgradePieceVisuals({ preset: FORGEMCP_VISUAL_PRESETS.PREMIUM, humanApproved: true });
+
+    expect(result.state).toBe("PASS");
+    expect(result.data.presetAfter).toBe(FORGEMCP_VISUAL_PRESETS.PREMIUM);
+    expect(result.data.activePieces).toBe(2);
+    expect(result.data.capturedPieces).toBe(1);
+    expect(result.data.qa.activePieceCountPreserved).toBe(true);
+    expect(result.data.qa.capturedPieceCountPreserved).toBe(true);
+    expect(result.data.qa.coordinatesPreserved).toBe(true);
+    expect(result.data.qa.selectedPiecePreserved).toBe(true);
+    expect(result.data.qa.levelVisibilityPreserved).toBe(true);
+    expect(result.data.trianglesAfter).toBeGreaterThan(result.data.trianglesBefore);
+    for (const [id, object] of app.renderer.pieceRenderer.pieces) expect(object.position.equals(beforePositions.get(id))).toBe(true);
+  });
+
+  it("rolls back to the legacy factory after a premium upgrade", async () => {
+    const app = fakeApplication();
+    globalThis.__forgeMcpCubeApplication = app;
+    const upgraded = await upgradePieceVisuals({ preset: FORGEMCP_VISUAL_PRESETS.PREMIUM, humanApproved: true });
+    expect(upgraded.state).toBe("PASS");
+    const rolledBack = await rollbackPieceVisuals({ humanApproved: true });
+    expect(rolledBack.state).toBe("PASS");
+    expect(rolledBack.data.presetAfter).toBe(FORGEMCP_VISUAL_PRESETS.LEGACY);
+    expect(rolledBack.data.qa.legacyPresetRestored).toBe(true);
+  });
+
+  it("registers four real browser-native tools through document.modelContext.registerTool", async () => {
+    const tools = [];
+    globalThis.document = { modelContext: { registerTool: async (tool) => tools.push(tool) } };
+    const registration = await registerVisualWebMcpTools();
+    expect(registration.availability).toBe("WEBMCP_AVAILABLE");
+    expect(registration.registered).toBe(4);
+    expect(tools.map((tool) => tool.name)).toEqual([
+      "inspect_piece_visuals",
+      "preview_piece_visual_upgrade",
+      "upgrade_piece_visuals",
+      "rollback_piece_visuals",
+    ]);
+    expect(typeof tools.find((tool) => tool.name === "upgrade_piece_visuals").execute).toBe("function");
+  });
+});

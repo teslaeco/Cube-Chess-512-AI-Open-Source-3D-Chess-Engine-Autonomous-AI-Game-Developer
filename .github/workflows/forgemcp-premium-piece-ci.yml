@@ -1,0 +1,64 @@
+name: ForgeMCP Premium Piece CI
+
+on:
+  pull_request:
+    paths:
+      - "web/renderer/**"
+      - "web/forgemcp/**"
+      - "web/promotion/**"
+      - "scripts/measure-forgemcp-premium-pieces.mjs"
+      - "scripts/verify-forgemcp-premium-live.mjs"
+      - "docs/FORGEMCP_PREMIUM_PIECES.md"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/forgemcp-premium-piece-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Measure real premium geometry
+        run: node scripts/measure-forgemcp-premium-pieces.mjs
+      - name: Production build
+        run: npm run build
+      - name: Dist smoke test
+        run: npm run smoke:dist
+      - name: Install Chromium for live visual verification
+        run: npx playwright install --with-deps chromium
+      - name: Start production preview
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 > /tmp/forgemcp-vite-preview.log 2>&1 &
+          echo $! > /tmp/forgemcp-vite-preview.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/forgemcp-vite-preview.log
+          exit 1
+      - name: Live Chromium WebMCP before-after verification
+        run: node scripts/verify-forgemcp-premium-live.mjs
+      - name: Upload live before-after evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forgemcp-premium-live-evidence
+          path: artifacts/forgemcp-premium-live/
+          if-no-files-found: warn
