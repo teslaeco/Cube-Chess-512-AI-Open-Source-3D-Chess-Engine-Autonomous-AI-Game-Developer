@@ -7,6 +7,7 @@ on:
       - "web/forgemcp/**"
       - "web/promotion/**"
       - "scripts/measure-forgemcp-premium-pieces.mjs"
+      - "scripts/verify-forgemcp-premium-live.mjs"
       - "docs/FORGEMCP_PREMIUM_PIECES.md"
       - "package.json"
       - "package-lock.json"
@@ -19,7 +20,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,3 +41,24 @@ jobs:
         run: npm run build
       - name: Dist smoke test
         run: npm run smoke:dist
+      - name: Install Chromium for live visual verification
+        run: npx playwright install --with-deps chromium
+      - name: Start production preview
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 > /tmp/forgemcp-vite-preview.log 2>&1 &
+          echo $! > /tmp/forgemcp-vite-preview.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/forgemcp-vite-preview.log
+          exit 1
+      - name: Live Chromium WebMCP before-after verification
+        run: node scripts/verify-forgemcp-premium-live.mjs
+      - name: Upload live before-after evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forgemcp-premium-live-evidence
+          path: artifacts/forgemcp-premium-live/
+          if-no-files-found: warn
