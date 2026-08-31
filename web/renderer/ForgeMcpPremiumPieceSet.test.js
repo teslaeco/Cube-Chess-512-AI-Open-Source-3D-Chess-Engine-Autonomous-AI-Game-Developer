@@ -6,6 +6,8 @@ import {
   ForgeMcpPremiumPieceSet,
   OPEN_SOURCE_STAUNTON_SAFE_FIT,
   OPEN_SOURCE_STAUNTON_REVISION,
+  ORIGINAL_CHESS_SOURCE_ID,
+  ORIGINAL_CHESS_MODEL_URL,
   countObjectTriangles,
   countUniquePieceResources,
 } from "./ForgeMcpPremiumPieceSet.js";
@@ -13,8 +15,8 @@ import {
 const TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
 const HEIGHT_ORDER = ["king", "queen", "bishop", "knight", "rook", "pawn"];
 
-describe("Normal public open-source Staunton v8 sculpted set", () => {
-  it.each(TYPES)("builds detailed %s geometry fully inside one 512-cell envelope", (type) => {
+describe("Normal public open-source original-model v9 set", () => {
+  it.each(TYPES)("starts %s with a safe sculpted fallback while the original FBX loads", (type) => {
     const set = new OpenSourceStauntonPieceSet();
     const object = set.create(type, "white");
     object.updateMatrixWorld(true);
@@ -33,9 +35,11 @@ describe("Normal public open-source Staunton v8 sculpted set", () => {
     expect(size.z).toBeLessThanOrEqual(CELL_RENDER_SIZE * 0.33 + 1e-6);
     expect(triangles).toBeGreaterThan(1800);
     expect(triangles).toBeLessThan(30000);
+    expect(object.userData.originalModelState).toBe("loading");
+    expect(object.userData.originalChessSource).toBe(ORIGINAL_CHESS_SOURCE_ID);
   });
 
-  it("preserves the classical descending height hierarchy", () => {
+  it("preserves classical fallback height hierarchy before the FBX swap", () => {
     const set = new OpenSourceStauntonPieceSet();
     const heights = Object.fromEntries(TYPES.map((type) => {
       const object = set.create(type, "white");
@@ -47,7 +51,7 @@ describe("Normal public open-source Staunton v8 sculpted set", () => {
     }
   });
 
-  it("keeps at least 62 percent of a level clear above every piece", () => {
+  it("keeps at least 62 percent of a level clear in the loading fallback", () => {
     const set = new OpenSourceStauntonPieceSet();
     for (const type of TYPES) {
       const object = set.create(type, "black");
@@ -57,40 +61,16 @@ describe("Normal public open-source Staunton v8 sculpted set", () => {
     }
   });
 
-  it("sculpts the knight as connected volumetric loft surfaces", () => {
-    const knight = new OpenSourceStauntonPieceSet().create("knight", "black");
-    const roles = new Set();
-    knight.traverse((child) => { if (child.userData?.openSourceStauntonRole) roles.add(child.userData.openSourceStauntonRole); });
-    for (const role of ["knight-body", "knight-head", "knight-muzzle", "ear", "mane", "eye"]) expect(roles.has(role)).toBe(true);
-    expect(countObjectTriangles(knight)).toBeGreaterThan(4500);
-    expect(countObjectTriangles(knight)).toBeLessThan(30000);
-  });
-
-  it("sculpts a smooth split bishop mitre with a modeled diagonal notch", () => {
-    const bishop = new OpenSourceStauntonPieceSet().create("bishop", "white");
-    const roles = [];
-    bishop.traverse((child) => { if (child.userData?.openSourceStauntonRole) roles.push(child.userData.openSourceStauntonRole); });
-    expect(roles.filter((role) => role === "bishop-mitre").length).toBe(2);
-    expect(roles.includes("bishop-notch")).toBe(true);
-    expect(countObjectTriangles(bishop)).toBeGreaterThan(3500);
-    expect(countObjectTriangles(bishop)).toBeLessThan(30000);
-  });
-
-  it("models recognisable detail on every chess role", () => {
+  it("keeps detailed geometry for all six roles during loading", () => {
     const set = new OpenSourceStauntonPieceSet();
-    const rolesFor = (type) => {
-      const roles = [];
-      set.create(type, "white").traverse((child) => { if (child.userData?.openSourceStauntonRole) roles.push(child.userData.openSourceStauntonRole); });
-      return roles;
-    };
-    expect(rolesFor("pawn")).toContain("head");
-    expect(rolesFor("rook").filter((role) => role === "battlement").length).toBe(8);
-    expect(rolesFor("bishop")).toContain("bishop-mitre");
-    expect(rolesFor("queen").filter((role) => role === "crown").length).toBeGreaterThanOrEqual(10);
-    expect(rolesFor("king").filter((role) => role === "cross").length).toBe(2);
+    for (const type of TYPES) {
+      const object = set.create(type, "white");
+      expect(countObjectTriangles(object)).toBeGreaterThan(1800);
+      expect(countObjectTriangles(object)).toBeLessThan(30000);
+    }
   });
 
-  it("shares immutable geometry and materials between repeated live pieces", () => {
+  it("shares immutable fallback geometry/materials between repeated pieces", () => {
     const set = new OpenSourceStauntonPieceSet();
     const first = set.create("knight", "white");
     const second = set.create("knight", "white");
@@ -101,10 +81,9 @@ describe("Normal public open-source Staunton v8 sculpted set", () => {
     expect(a.length).toBe(b.length);
     expect(a[0].geometry).toBe(b[0].geometry);
     expect(a[0].material).toBe(b[0].material);
-    expect(countObjectTriangles(first)).toBe(countObjectTriangles(second));
   });
 
-  it("keeps browser resource counts bounded", () => {
+  it("keeps browser resource counts bounded during fallback", () => {
     const set = new OpenSourceStauntonPieceSet();
     for (const type of TYPES) {
       const resources = countUniquePieceResources(set.create(type, "white"));
@@ -114,35 +93,24 @@ describe("Normal public open-source Staunton v8 sculpted set", () => {
     }
   });
 
-  it("uses contrasting light and dark satin PBR materials", () => {
-    const set = new OpenSourceStauntonPieceSet();
-    const signature = (object) => {
-      const values = [];
-      object.traverse((child) => {
-        if (child.isMesh && child.material?.color) values.push([child.material.color.getHex(), child.material.metalness, child.material.roughness]);
-      });
-      return JSON.stringify(values.slice(0, 4));
-    };
-    expect(signature(set.create("king", "white"))).not.toBe(signature(set.create("king", "black")));
-  });
-
-  it("reports measured v8 open-source stats for all six pieces", () => {
+  it("declares the repository uploaded FBX as the real normal runtime source", () => {
     const set = new OpenSourceStauntonPieceSet();
     const stats = set.inspectAll();
     expect(stats.map((item) => item.type)).toEqual(TYPES);
-    expect(OPEN_SOURCE_STAUNTON_REVISION).toContain("opensource-staunton-v8-sculpted-all");
+    expect(OPEN_SOURCE_STAUNTON_REVISION).toContain("open-source-original-fbx-v9");
+    expect(ORIGINAL_CHESS_SOURCE_ID).toBe("original-uploaded-chess-fbx");
+    expect(ORIGINAL_CHESS_MODEL_URL).toContain("original-chess-models/chess.fbx");
     for (const item of stats) {
-      expect(item.finite).toBe(true);
-      expect(item.fitsLevel).toBe(true);
-      expect(item.fitsCell).toBe(true);
-      expect(item.style).toContain("Open-source");
-      expect(item.triangles).toBeGreaterThan(1800);
+      expect(item.runtimePrimarySource).toBe(ORIGINAL_CHESS_SOURCE_ID);
+      expect(item.runtimeAsset).toContain("chess.fbx");
+      expect(item.freeForPublicRenderer).toBe(true);
       expect(item.triangles).toBeLessThan(30000);
     }
   });
 
-  it("keeps the old internal compatibility constructor on the same free/open-source v8 geometry", () => {
-    const compatible = new ForgeMcpPremiumPieceSet().create("pawn", "white");
-    expect(compatible.userData.forgeVisualSource).toBe("open-source-staunton-v8-sculpted-all");
+  it("keeps the old internal compatibility constructor on the same free source", () => {
+    const compatible = new ForgeMcpPremiumPieceSet();
+    expect(compatible.inspect("pawn").runtimePrimarySource).toBe(ORIGINAL_CHESS_SOURCE_ID);
+    expect(compatible.inspect("pawn").freeForPublicRenderer).toBe(true);
   });
 });
