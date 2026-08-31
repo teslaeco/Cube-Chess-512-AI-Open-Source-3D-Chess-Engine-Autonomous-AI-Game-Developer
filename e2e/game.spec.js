@@ -12,10 +12,17 @@ async function projectedPoint(page, kind, id) {
       if (!object) throw new Error(`Missing ${kind} ${id}`);
       renderer.sceneController.scene.updateMatrixWorld(true);
       renderer.cameraController.camera.updateMatrixWorld(true);
-      const position =
-        kind === "piece"
-          ? object.localToWorld(object.position.clone().set(0, 0.72, 0))
-          : object.getWorldPosition(object.position.clone());
+
+      // Project the actual live object's world-space bounding-box center.
+      // The old hard-coded +0.72 local Y point became invalid once piece heights were
+      // deliberately reduced for the 8-level board, and could raycast a piece behind it.
+      let position;
+      if (kind === "piece") {
+        const box = new renderer.THREE.Box3().setFromObject(object);
+        position = box.getCenter(new renderer.THREE.Vector3());
+      } else {
+        position = object.getWorldPosition(new renderer.THREE.Vector3());
+      }
       position.project(renderer.cameraController.camera);
       const rect = renderer.sceneController.renderer.domElement.getBoundingClientRect();
       return {
