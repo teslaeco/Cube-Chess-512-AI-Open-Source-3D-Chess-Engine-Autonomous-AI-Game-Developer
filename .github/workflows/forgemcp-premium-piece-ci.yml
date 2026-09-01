@@ -3,9 +3,12 @@ name: ForgeMCP Premium Piece CI
 on:
   pull_request:
     paths:
+      - "index.html"
       - "web/renderer/**"
       - "web/forgemcp/**"
       - "web/promotion/**"
+      - "public/assets/high-detail-chess-models/**"
+      - "scripts/build-high-detail-chess-assets.mjs"
       - "scripts/measure-forgemcp-premium-pieces.mjs"
       - "scripts/capture-staunton-closeups.mjs"
       - "scripts/verify-forgemcp-premium-live.mjs"
@@ -56,7 +59,7 @@ jobs:
           exit 1
       - name: Live Chromium WebMCP before-after verification
         run: node scripts/verify-forgemcp-premium-live.mjs
-      - name: Capture authenticated v14 model close-ups
+      - name: Capture authenticated uploaded-model close-ups
         run: node scripts/capture-staunton-closeups.mjs
       - name: Upload live before-after evidence
         if: always()

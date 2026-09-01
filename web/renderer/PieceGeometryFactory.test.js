@@ -14,7 +14,7 @@ describe("piece cell fitting", () => {
     const factory = new PieceGeometryFactory();
     for (const color of ["white", "black"]) {
       for (const type of ["pawn", "rook", "knight", "bishop", "queen", "king"]) {
-        const piece = factory.create(type, color);
+        const piece = factory.openSourceModels.create(type, color);
         const size = dimensions(piece);
         const envelope = pieceCellEnvelope(type);
         expect(size.y, `${color} ${type} height`).toBeLessThanOrEqual(envelope.maxHeight * 1.03);
@@ -26,9 +26,9 @@ describe("piece cell fitting", () => {
 
   it("makes pawns visibly smaller than all major pieces", () => {
     const factory = new PieceGeometryFactory();
-    const pawnHeight = dimensions(factory.create("pawn", "white")).y;
+    const pawnHeight = dimensions(factory.openSourceModels.create("pawn", "white")).y;
     for (const type of ["rook", "knight", "bishop", "queen", "king"]) {
-      expect(dimensions(factory.create(type, "white")).y, `${type} versus pawn`).toBeGreaterThan(
+      expect(dimensions(factory.openSourceModels.create(type, "white")).y, `${type} versus pawn`).toBeGreaterThan(
         pawnHeight * 1.2,
       );
     }

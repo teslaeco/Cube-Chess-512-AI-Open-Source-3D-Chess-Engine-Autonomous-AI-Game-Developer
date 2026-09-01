@@ -20,7 +20,6 @@ export class ChessRenderer {
       (active) => this.handleAnimationState(active),
     );
     this.sceneController.scene.add(this.boardRenderer.group, this.pieceRenderer.group);
-    this.cameraController.setBoardObject(this.boardRenderer.group);
     this.selection = new SelectionController(
       this.sceneController.renderer.domElement,
       this.cameraController.camera,
@@ -35,6 +34,9 @@ export class ChessRenderer {
     this.resizeObserver = new ResizeObserver(this.resize);
     this.resizeObserver.observe(container);
     this.resize();
+    // Fit only after the real canvas aspect is known. Fitting at the constructor's
+    // temporary 1:1 aspect cropped portrait screens and over-shrank desktop views.
+    this.cameraController.setBoardObject(this.boardRenderer.group);
     this.running = true;
     this.lastFrameTime = performance.now();
     this.frame = requestAnimationFrame((time) => this.animate(time));
@@ -80,7 +82,7 @@ export class ChessRenderer {
     this.presentation.startGame(config);
     this.lastFollowedMove = null;
     this.refresh();
-    this.cameraController.fitBoard(false);
+    this.cameraController.activeLayerView(this.presentation.activeLevel, true);
   }
 
   startLocalGame() { this.startGame({ mode: "local" }); }
@@ -103,7 +105,7 @@ export class ChessRenderer {
     this.selection.clearPendingSelection();
     this.presentation.resetGame({ appState: "playing", preserveMenu: true });
     this.refresh();
-    this.cameraController.fitBoard(false);
+    this.cameraController.activeLayerView(this.presentation.activeLevel, true);
   }
 
   loadGame(serialized) {
@@ -111,7 +113,7 @@ export class ChessRenderer {
     this.presentation.load(serialized);
     this.lastFollowedMove = null;
     this.refresh();
-    this.cameraController.fitBoard(false);
+    this.cameraController.activeLayerView(this.presentation.activeLevel, true);
   }
 
   undo() { if (this.presentation.undo()) this.refresh(); }
@@ -134,7 +136,7 @@ export class ChessRenderer {
     this.cameraController.resize(width, height);
   }
 
-  resetCamera() { this.cameraController.reset(); }
+  resetCamera() { this.cameraController.activeLayerView(this.presentation.activeLevel, false); }
 
   animate(time) {
     if (!this.running) return;

@@ -1,52 +1,44 @@
-# ForgeMCP Premium Piece Set — WebMCP Challenge Work
+# ForgeMCP high-detail chess pieces — WebMCP Challenge work
 
-Date added: 2026-08-31
+Date updated: 2026-09-01
 
-## PRE-CHALLENGE WORK
+## Pre-challenge work
 
-The following existed before the OpenAI WebMCP Challenge submission period and must not be presented as new challenge work:
+Cube Chess 512 already had its 8×8×8 rules engine, Three.js board, camera controls, saves, multiplayer foundations, procedural piece fallbacks, and six owner-supplied Meshy GLB sources. The earlier browser derivatives under `public/assets/meshy-chess-models/` retained only 834–898 triangles per figure and remain available as the explicit `LEGACY_COMPACT` rollback preset.
 
-- Cube Chess 512 deterministic 8×8×8 rules/game engine.
-- Existing Three.js renderer, board, camera, legal move handling, save state and multiplayer foundations.
-- Existing procedural chess-piece fallback geometry in `web/renderer/PieceGeometryFactory.js`.
-- Existing Meshy-derived source provenance and compact runtime delivery pipeline.
-- Existing compact `.ccm.b64` runtime assets under `public/assets/meshy-chess-models/`.
+## Current owner-uploaded model pipeline
 
-The compact runtime derivatives are intentionally much smaller than the supplied source GLB files. Repository provenance records approximately 834–898 runtime triangles per compact model while the supplied source GLBs were much larger. Merely uploading a larger GLB does not change the live game because the runtime loader explicitly resolves the compact `.ccm.b64` assets.
+The public `FORGEMCP_PREMIUM` preset now renders geometry derived from the owner's actual six GLBs instead of the procedural v14 approximation:
 
-## NEW WEBMCP CHALLENGE WORK — ADDED AFTER AUGUST 25, 2026
+| Piece | Runtime triangles | Runtime vertices | Readable height |
+| --- | ---: | ---: | ---: |
+| Pawn | 78,941 | 39,304 | 0.62 |
+| Rook | 106,798 | 53,276 | 0.76 |
+| Knight | 112,072 | 55,406 | 0.79 |
+| Bishop | 90,134 | 44,818 | 0.82 |
+| Queen | 91,668 | 45,546 | 0.86 |
+| King | 77,848 | 38,451 | 0.90 |
 
-This change adds a new `FORGEMCP_PREMIUM` visual preset and a new browser-native human-agent workflow that mutates the real running Cube Chess renderer after explicit approval.
+`scripts/build-high-detail-chess-assets.mjs` clusters the source surfaces on a fine grid, averages positions inside each occupied cell, removes degenerate and duplicate triangles, then writes versioned `CCM1` assets under `public/assets/high-detail-chess-models/`. This preserves the supplied classical silhouettes and 77k–112k triangles per type without shipping the 29 MB raw GLBs.
 
-### New premium geometry
+`HighDetailChessModelSet` validates and decodes each unique geometry once. Board instances share immutable geometry but clone white/black materials so selection highlighting stays local to one piece. The procedural v14 object is visible only while the asynchronous uploaded model is loading or if validation fails; a fallback is never reported as a successful premium load.
 
-`web/renderer/OpenSourceStauntonV14PieceSet.js` constructs the current coherent six-piece set with Three.js geometry committed as code. `ForgeMcpPremiumPieceSet.js` remains a compatibility facade for the established WebMCP preset name.
+## Scale and camera correction
 
-- Pawn — layered sculpted base, tapered body, collar, faceted head and accent cap.
-- Rook — architectural tower body, upper ring, crown recess and eight modeled battlements.
-- Knight — a multi-part extruded horse profile with connected base support, muzzle, paired ears, mane, cheek and eyes.
-- Bishop — tall carved body, paired mitre lobes, modeled diagonal inset and accent tip.
-- Queen — elongated body, collar, crown points, jewels and center gem.
-- King — heavy body, crown base, orb and an actual 3D cross made from geometry.
+The rejected 0.23–0.45 height profile made every figure too small. The new 0.62–0.90 profile still leaves clearance below the next 1.25-spaced level, including the selected-piece 1.1× scale. Horizontal fitting uses the available 0.58–0.70 footprint so the figures remain readable on full-board views.
 
-White pieces use an ivory physical material family with a warm metallic accent. Black pieces use readable dark-slate texture values with turquoise trim so their silhouettes and carved details remain visible against the dark scene.
+The gameplay camera is fitted only after the real canvas aspect is known. Starting, loading, resetting, or beginning a new game opens an active-layer gameplay composition; the explicit “Fit entire board” action retains the full-cube view. Portrait framing uses a near-axis, steeper camera to keep the board inside the narrow viewport. Inactive levels and cell wires remain visible but much fainter so they do not obscure the pieces.
 
-### Runtime preset and rollback
+## Browser-native WebMCP tools
 
-The normal public renderer uses v14 directly. The legacy compact Meshy path is explicit as `PieceGeometryFactory.createLegacy()` and is retained only for rollback and provenance verification. ForgeMCP rebuilds active and captured Three.js piece objects while preserving game state, piece identity, board coordinates, selection and level visibility.
-
-The fitted v14 content lives below an identity transform root. Board placement, selection scaling, capture scaling and animation therefore no longer overwrite the cell-fit transform. Twelve type/side templates share immutable geometry and textures, while every rendered piece receives its own cloned materials so highlighting one piece cannot change another.
-
-### Browser-native WebMCP tools
-
-The browser registers real tools through `document.modelContext.registerTool(...)`:
+The page registers real tools through `document.modelContext.registerTool(...)`:
 
 - `inspect_piece_visuals`
 - `preview_piece_visual_upgrade`
 - `upgrade_piece_visuals`
 - `rollback_piece_visuals`
 
-`upgrade_piece_visuals` requires:
+Mutation remains approval-gated:
 
 ```json
 {
@@ -55,24 +47,10 @@ The browser registers real tools through `document.modelContext.registerTool(...
 }
 ```
 
-Without explicit approval, live mutation is rejected.
+The upgrade waits until every live active and captured holder reports `highDetailModelState: "ready"`. QA measures live triangle counts, source identity, material separation, coordinates, piece counts, selection and level visibility. It fails on loading timeouts, fallbacks, wrong provenance, fewer than 70,000 triangles for any type, invalid bounds, or a no-op transition. Rollback independently waits for all compact models and verifies the reverse mutation.
 
-### Verification and provenance
+The Chromium evidence job performs `LEGACY_COMPACT → FORGEMCP_PREMIUM → LEGACY_COMPACT`, captures board screenshots and twelve white/black close-ups, and rejects browser console errors. This visual workflow does not modify movement rules, AI policy, serialized game state, or multiplayer authority.
 
-The tool measures actual Three.js `BufferGeometry` triangle counts from live objects. It records before/after active and captured piece counts, coordinates, selected piece, level visibility, per-type triangle counts, material signatures, preset state and provenance. Deterministic QA blocks the upgrade if the six premium models do not have finite non-zero geometry or do not fit their configured cell envelope.
+## Provenance
 
-The production Chromium verifier authenticates a guest before application startup, checks that the login gate is hidden and that a canvas is visible, establishes a real compact-Meshy baseline, then runs `LEGACY_COMPACT → FORGEMCP_PREMIUM → LEGACY_COMPACT`. A PASS requires both geometry counts and provenance to change in each direction. Compact-model loading failures and no-op transitions fail verification. CI also captures twelve authenticated type/side close-ups for human review.
-
-This is geometry/configuration/runtime verification plus screenshot evidence for human review. It is not a claim of photorealistic user-study validation or automated perceptual QA.
-
-### Safety boundary
-
-This visual workflow does not modify legal move rules, AI policy, check/mate logic, serialized game state or multiplayer authority. Mutation is approval-gated and reversible.
-
-## Challenge evidence
-
-Foundation PR: #112 (`forgemcp/real-visual-upgrade`).
-
-Premium implementation branch: `forgemcp/premium-piece-set`.
-
-The final PR created from this branch is the challenge-period evidence for the new premium set and its real WebMCP mutation path.
+The repository owner supplied the source models. Keep proof of generation and confirm that the applicable Meshy account/license permits redistribution before commercial store distribution.
