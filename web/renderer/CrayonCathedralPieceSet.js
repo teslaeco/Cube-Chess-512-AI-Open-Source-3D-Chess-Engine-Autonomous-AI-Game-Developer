@@ -10,7 +10,7 @@ import {
 
 export { CRAYON_CATHEDRAL_PRESET };
 export const CRAYON_CATHEDRAL_REVISION =
-  "2026-09-01-windowed-crayon-polyhedral-v1";
+  "2026-09-01-windowed-crayon-polyhedral-v2-compact-knight";
 export const CRAYON_CATHEDRAL_SOURCE_ID =
   "original-procedural-crayon-cathedral";
 
@@ -105,6 +105,71 @@ function extrude(shape, depth, material, role, bevelSize = 0.012, bevelSegments 
   });
   geometry.center();
   return mesh(geometry, material, role);
+}
+
+function sweepLoftGeometry(sections, radialSegments = 64) {
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+  const ringSize = radialSegments + 1;
+
+  for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex += 1) {
+    const section = sections[sectionIndex];
+    const previous = sections[Math.max(0, sectionIndex - 1)];
+    const next = sections[Math.min(sections.length - 1, sectionIndex + 1)];
+    const tangentX = next.x - previous.x;
+    const tangentY = next.y - previous.y;
+    const tangentLength = Math.hypot(tangentX, tangentY) || 1;
+    const normalX = -tangentY / tangentLength;
+    const normalY = tangentX / tangentLength;
+
+    for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
+      const ratio = radialIndex / radialSegments;
+      const angle = ratio * Math.PI * 2;
+      const normalOffset = Math.cos(angle) * section.radius;
+      positions.push(
+        section.x + normalX * normalOffset,
+        section.y + normalY * normalOffset,
+        (section.z ?? 0) + Math.sin(angle) * section.depth,
+      );
+      uvs.push(sectionIndex / (sections.length - 1), ratio);
+    }
+  }
+
+  for (let sectionIndex = 0; sectionIndex < sections.length - 1; sectionIndex += 1) {
+    const current = sectionIndex * ringSize;
+    const next = (sectionIndex + 1) * ringSize;
+    for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
+      const a = current + radialIndex;
+      const b = current + radialIndex + 1;
+      const c = next + radialIndex + 1;
+      const d = next + radialIndex;
+      indices.push(a, b, d, b, c, d);
+    }
+  }
+
+  for (const [sectionIndex, reverse] of [[0, true], [sections.length - 1, false]]) {
+    const section = sections[sectionIndex];
+    const centerIndex = positions.length / 3;
+    positions.push(section.x, section.y, section.z ?? 0);
+    uvs.push(0.5, 0.5);
+    const ringStart = sectionIndex * ringSize;
+    for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
+      const current = ringStart + radialIndex;
+      const next = ringStart + radialIndex + 1;
+      if (reverse) indices.push(centerIndex, next, current);
+      else indices.push(centerIndex, current, next);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
 }
 
 function archedWindowShape(width, height) {
@@ -374,20 +439,6 @@ function rook(mats) {
   return group;
 }
 
-function knightProfile() {
-  const shape = new THREE.Shape();
-  shape.moveTo(-0.23, 0.02);
-  shape.bezierCurveTo(-0.33, 0.22, -0.31, 0.51, -0.19, 0.72);
-  shape.bezierCurveTo(-0.11, 0.89, -0.06, 1.10, 0.07, 1.23);
-  shape.bezierCurveTo(0.22, 1.38, 0.47, 1.38, 0.60, 1.22);
-  shape.bezierCurveTo(0.67, 1.13, 0.60, 1.01, 0.46, 0.98);
-  shape.bezierCurveTo(0.31, 0.94, 0.23, 0.82, 0.19, 0.65);
-  shape.bezierCurveTo(0.15, 0.46, 0.16, 0.23, 0.14, 0.08);
-  shape.bezierCurveTo(0.04, -0.02, -0.12, -0.05, -0.23, 0.02);
-  shape.closePath();
-  return shape;
-}
-
 function knight(mats) {
   const group = new THREE.Group();
   addBase(group, mats, 0.86);
@@ -411,36 +462,72 @@ function knight(mats) {
     offset: Math.PI / 4,
   });
   ring(group, mats.dark, 0.82, 0.195, 0.014, "knight-neck-lead-ring");
-  const head = extrude(knightProfile(), 0.32, mats.body, "knight-sculpted-head", 0.024, 8);
-  head.position.set(-0.03, 1.20, 0);
-  group.add(head);
-  addRoseWindow(group, mats, -0.08, 1.18, 0.171, 0, 0.74, "knight-near-rose-window");
-  addRoseWindow(group, mats, -0.08, 1.18, -0.171, Math.PI, 0.74, "knight-far-rose-window");
-  for (let index = 0; index < 7; index += 1) {
+  group.add(mesh(sweepLoftGeometry([
+    { x: -0.08, y: 0.82, radius: 0.205, depth: 0.175 },
+    { x: -0.15, y: 0.97, radius: 0.215, depth: 0.180 },
+    { x: -0.17, y: 1.13, radius: 0.205, depth: 0.175 },
+    { x: -0.14, y: 1.28, radius: 0.190, depth: 0.168 },
+    { x: -0.08, y: 1.42, radius: 0.178, depth: 0.158 },
+    { x: -0.01, y: 1.53, radius: 0.165, depth: 0.150 },
+  ], 72), mats.body, "knight-s-neck"));
+  group.add(mesh(sweepLoftGeometry([
+    { x: -0.04, y: 1.57, radius: 0.155, depth: 0.150 },
+    { x: 0.05, y: 1.62, radius: 0.190, depth: 0.178 },
+    { x: 0.14, y: 1.59, radius: 0.170, depth: 0.165 },
+    { x: 0.22, y: 1.52, radius: 0.135, depth: 0.140 },
+    { x: 0.30, y: 1.44, radius: 0.105, depth: 0.115 },
+    { x: 0.38, y: 1.38, radius: 0.070, depth: 0.085 },
+  ], 72), mats.body, "knight-sculpted-head"));
+  group.add(mesh(sweepLoftGeometry([
+    { x: 0.09, y: 1.45, radius: 0.085, depth: 0.130 },
+    { x: 0.18, y: 1.39, radius: 0.078, depth: 0.118 },
+    { x: 0.28, y: 1.34, radius: 0.064, depth: 0.098 },
+    { x: 0.37, y: 1.34, radius: 0.045, depth: 0.070 },
+  ], 64), mats.body, "knight-lower-jaw"));
+  addRoseWindow(group, mats, -0.145, 1.20, 0.181, 0, 0.58, "knight-near-rose-window");
+  addRoseWindow(group, mats, -0.145, 1.20, -0.181, Math.PI, 0.58, "knight-far-rose-window");
+  const manePath = [
+    [-0.30, 0.92, 0.70],
+    [-0.30, 1.05, 0.68],
+    [-0.28, 1.18, 0.65],
+    [-0.24, 1.31, 0.61],
+    [-0.19, 1.43, 0.57],
+    [-0.12, 1.54, 0.52],
+  ];
+  for (let index = 0; index < manePath.length; index += 1) {
+    const [x, y, rotation] = manePath[index];
     const spike = crayonSpike(
       mats,
       index,
-      0.19 + index * 0.012,
-      0.030,
+      0.15 + index * 0.008,
+      0.027,
       `knight-crayon-mane-${index + 1}`,
     );
-    spike.position.set(-0.36 - index * 0.018, 0.94 + index * 0.13, 0);
-    spike.rotation.z = -0.52 + index * 0.04;
+    spike.position.set(x, y, 0);
+    spike.rotation.z = rotation;
     group.add(spike);
   }
-  for (const [index, z] of [-0.10, 0.10].entries()) {
-    const ear = crayonSpike(mats, index + 2, 0.26, 0.033, `knight-crayon-ear-${index + 1}`);
-    ear.position.set(0.04, 1.77, z);
-    ear.rotation.z = index === 0 ? 0.20 : -0.08;
+  const ears = [
+    { x: -0.055, z: -0.085, length: 0.22, rotation: -0.10 },
+    { x: 0.015, z: 0.085, length: 0.20, rotation: 0.09 },
+  ];
+  for (const [index, { x, z, length, rotation }] of ears.entries()) {
+    const ear = crayonSpike(mats, index + 2, length, 0.031, `knight-crayon-ear-${index + 1}`);
+    ear.position.set(x, 1.72, z);
+    ear.rotation.z = rotation;
     group.add(ear);
   }
-  for (const z of [-0.12, 0.12]) {
+  for (const z of [-1, 1]) {
     const eye = mesh(new THREE.OctahedronGeometry(0.028, 2), mats.glass, "knight-glass-eye");
-    eye.position.set(0.43, 1.68, z < 0 ? -0.174 : 0.174);
+    eye.position.set(0.09, 1.65, z * 0.183);
     group.add(eye);
     const nostril = mesh(new THREE.OctahedronGeometry(0.018, 1), mats.dark, "knight-nostril");
-    nostril.position.set(0.455, 1.53, z < 0 ? -0.174 : 0.174);
+    nostril.position.set(0.34, 1.40, z * 0.093);
     group.add(nostril);
+    const mouth = cylinder(0.010, 0.010, 0.19, mats.dark, "knight-mouth-line", 24);
+    mouth.position.set(0.30, 1.345, z * 0.073);
+    mouth.rotation.z = -Math.PI / 2 + 0.08;
+    group.add(mouth);
   }
   return group;
 }
@@ -564,6 +651,9 @@ function king(mats) {
 const BUILDERS = Object.freeze({ pawn, rook, knight, bishop, queen, king });
 
 function consolidatedRole(role = "detail") {
+  if (role === "knight-sculpted-head") {
+    return role;
+  }
   if (role.includes("crayon") || role.includes("battlement") || role.includes("mane")) {
     return "crayon-detail";
   }

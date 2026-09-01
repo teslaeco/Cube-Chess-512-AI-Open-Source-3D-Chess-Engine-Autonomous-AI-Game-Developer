@@ -44,6 +44,27 @@ describe("original Crayon Cathedral chess collection", () => {
     }
   });
 
+  it("keeps the knight head compact and subordinate to its architectural base", () => {
+    const knight = new CrayonCathedralPieceSet().create("knight", "white");
+    knight.updateMatrixWorld(true);
+    const wholeBounds = new THREE.Box3().setFromObject(knight);
+    const wholeSize = wholeBounds.getSize(new THREE.Vector3());
+    let sculptedHead = null;
+    knight.traverse((child) => {
+      if (child.userData?.forgeCrayonCathedralRole === "knight-sculpted-head") {
+        sculptedHead = child;
+      }
+    });
+
+    expect(sculptedHead).not.toBeNull();
+    const headBounds = new THREE.Box3().setFromObject(sculptedHead);
+    const headSize = headBounds.getSize(new THREE.Vector3());
+    expect(headSize.x).toBeLessThan(wholeSize.x * 0.92);
+    expect(headSize.y).toBeLessThan(wholeSize.y * 0.60);
+    expect(headBounds.min.x).toBeGreaterThanOrEqual(wholeBounds.min.x - 1e-6);
+    expect(headBounds.max.x).toBeLessThanOrEqual(wholeBounds.max.x + 1e-6);
+  });
+
   it("shares immutable geometry while keeping per-piece highlight materials independent", () => {
     const set = new CrayonCathedralPieceSet();
     const first = set.create("queen", "white");
