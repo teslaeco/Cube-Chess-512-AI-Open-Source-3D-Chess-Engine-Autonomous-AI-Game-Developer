@@ -27,14 +27,17 @@ a model or texture.
 | --- | ---: | ---: | ---: | ---: |
 | Pawn | 50,348 | 0.66 | 0.583 | 7 |
 | Rook | 110,992 | 0.81 | 0.705 | 17 |
-| Knight | 81,692 | 0.84 | 0.686 × 0.633 | 15 |
+| Knight | 70,752 | 0.84 | 0.686 × 0.686 | 15 |
 | Bishop | 54,544 | 0.87 | 0.667 | 8 |
 | Queen | 111,356 | 0.92 | 0.696 | 15 |
 | King | 100,192 | 0.96 | 0.705 | 12 |
 
 Every type contains both modeled window geometry and modeled crayon geometry.
-The knight includes a sculpted profile, architectural windowed neck, rose
-windows, eyes, nostrils, ears and a crayon mane. The bishop uses a pointed
+The knight uses a compact volumetric S-neck, tapered forehead/muzzle loft,
+separate lower jaw and mouth line, architectural windowed neck, rose windows,
+eyes, nostrils, ears and a crayon mane. Its head remains inside the base
+footprint so the mobile board camera cannot make it spill across adjacent
+fields. The bishop uses a pointed
 Gothic mitre instead of the pawn's lantern orb. Rook, queen and king use
 different window galleries and different crayon crowns or cross structures.
 
@@ -119,7 +122,7 @@ counts below the declared threshold.
 
 Validation performed on 2026-09-01 for this change:
 
-- Vitest: 51 files and 283 tests passed;
+- Vitest: 51 files and 285 tests passed;
 - production TypeScript/Vite build passed;
 - production PWA smoke test passed;
 - targeted real-browser selection/game tests passed on desktop Chromium and a
