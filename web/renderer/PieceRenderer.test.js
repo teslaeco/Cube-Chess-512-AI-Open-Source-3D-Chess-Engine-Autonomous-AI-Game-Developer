@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { requiresPieceObjectReplacement } from "./PieceRenderer.js";
+import { describe, expect, it, vi } from "vitest";
+import { OpenSourceStauntonPieceSet } from "./ForgeMcpPremiumPieceSet.js";
+import { disposeOwnedPieceResources, requiresPieceObjectReplacement } from "./PieceRenderer.js";
 
 describe("PieceRenderer promotion replacement", () => {
   const object = (type, color = "white") => ({
@@ -47,5 +48,23 @@ describe("PieceRenderer promotion replacement", () => {
         color: "white",
       }),
     ).toBe(false);
+  });
+
+  it("does not dispose shared template geometry when one piece is removed", () => {
+    const set = new OpenSourceStauntonPieceSet();
+    const first = set.create("pawn", "white");
+    const second = set.create("pawn", "white");
+    let firstMesh;
+    let secondMesh;
+    first.traverse((child) => { if (!firstMesh && child.isMesh) firstMesh = child; });
+    second.traverse((child) => { if (!secondMesh && child.isMesh) secondMesh = child; });
+    expect(firstMesh.geometry).toBe(secondMesh.geometry);
+    const geometryDispose = vi.spyOn(firstMesh.geometry, "dispose");
+    const materialDispose = vi.spyOn(firstMesh.material, "dispose");
+    disposeOwnedPieceResources(first);
+    expect(geometryDispose).not.toHaveBeenCalled();
+    expect(materialDispose).toHaveBeenCalledOnce();
+    geometryDispose.mockRestore();
+    materialDispose.mockRestore();
   });
 });

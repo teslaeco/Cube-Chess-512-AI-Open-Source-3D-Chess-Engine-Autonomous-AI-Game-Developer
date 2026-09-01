@@ -1,7 +1,8 @@
 import { ForgeMcpPremiumPieceSet, FORGEMCP_PREMIUM_REVISION } from "../renderer/ForgeMcpPremiumPieceSet.js";
+import { OPEN_SOURCE_STAUNTON_V14_SOURCE_ID } from "../renderer/OpenSourceStauntonV14PieceSet.js";
 import { pieceCellEnvelope } from "../renderer/pieceScaleProfile.js";
 
-const TOOL_REVISION = "2026-08-31-real-premium-piece-upgrade-v2";
+const TOOL_REVISION = "2026-09-01-real-model-transition-verification-v3";
 const PREMIUM_PRESET = "FORGEMCP_PREMIUM";
 const LEGACY_PRESET = "LEGACY_COMPACT";
 const PIECE_TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
@@ -22,16 +23,18 @@ function inspectObject(object) {
   const sources = new Set();
   const materialSignatures = new Set();
   object?.traverse?.((child) => {
+    if (child.userData?.forgeVisualSource) sources.add(child.userData.forgeVisualSource);
+    if (child.userData?.meshyModelState) sources.add(`meshy-${child.userData.meshyModelState}`);
+    if (child.userData?.openSourceStauntonRole || child.userData?.forgePremiumRole) {
+      sources.add(OPEN_SOURCE_STAUNTON_V14_SOURCE_ID);
+    }
     if (!child.isMesh || child.userData?.decorative) return;
     meshes += 1;
     triangles += countGeometryTriangles(child.geometry);
     if (child.name?.includes("meshy")) sources.add("compact-meshy-runtime");
-    if (child.userData?.forgePremiumRole) sources.add("forgemcp-premium-procedural");
     const material = Array.isArray(child.material) ? child.material[0] : child.material;
     if (material?.color) materialSignatures.add(`${material.type}:${material.color.getHexString()}`);
   });
-  if (object?.userData?.forgeVisualSource) sources.add(object.userData.forgeVisualSource);
-  if (object?.userData?.meshyModelState) sources.add(`meshy-${object.userData.meshyModelState}`);
   return { triangles, meshes, sources: [...sources], materialSignatures: [...materialSignatures] };
 }
 
@@ -96,7 +99,7 @@ function snapshotPieceVisuals(application) {
       "web/renderer/PieceGeometryFactory.js",
       "web/renderer/MeshyChessModelSet.js",
       "public/assets/meshy-chess-models/*.ccm.b64",
-      "web/renderer/ForgeMcpPremiumPieceSet.js",
+      "web/renderer/OpenSourceStauntonV14PieceSet.js",
       "web/forgemcp/visualTools.js",
     ],
   };
@@ -104,8 +107,11 @@ function snapshotPieceVisuals(application) {
 
 function rememberOriginalFactory(factory) {
   if (!factory || typeof factory.create !== "function") throw new Error("Piece geometry factory is unavailable.");
-  if (!factory.__forgeOriginalCreate) factory.__forgeOriginalCreate = factory.create.bind(factory);
-  if (!factory.__forgePremiumSet) factory.__forgePremiumSet = new ForgeMcpPremiumPieceSet();
+  if (!factory.__forgeOriginalCreate) {
+    const legacyCreate = typeof factory.createLegacy === "function" ? factory.createLegacy : factory.create;
+    factory.__forgeOriginalCreate = legacyCreate.bind(factory);
+  }
+  if (!factory.__forgePremiumSet) factory.__forgePremiumSet = factory.openSourceModels ?? new ForgeMcpPremiumPieceSet();
 }
 
 function rebuildPieceObjects(application) {
@@ -114,14 +120,14 @@ function rebuildPieceObjects(application) {
     const piece = object.userData?.piece;
     if (!piece) continue;
     const replacement = pieceRenderer.replaceObjectForPiece(id, object, piece, pieceRenderer.boardGroup);
-    replacement.userData = { kind: "piece", piece };
+    replacement.userData = { ...replacement.userData, kind: "piece", piece };
     pieceRenderer.pieces.set(id, replacement);
   }
   for (const [id, object] of [...pieceRenderer.captured.entries()]) {
     const piece = object.userData?.piece;
     if (!piece) continue;
     const replacement = pieceRenderer.replaceObjectForPiece(id, object, piece, pieceRenderer.capturedGroup);
-    replacement.userData = { kind: "captured", piece };
+    replacement.userData = { ...replacement.userData, kind: "captured", piece };
     replacement.scale.setScalar(0.82);
     pieceRenderer.addCaptureAura(replacement, piece.color);
     pieceRenderer.captured.set(id, replacement);
@@ -133,7 +139,16 @@ function rebuildPieceObjects(application) {
 function applyPremiumMode(application) {
   const factory = application.renderer.pieceRenderer.factory;
   rememberOriginalFactory(factory);
-  factory.create = (type, color) => factory.__forgePremiumSet.create(type, color);
+  factory.create = (type, color) => {
+    const object = factory.__forgePremiumSet.create(type, color);
+    object.userData = {
+      ...object.userData,
+      forgeVisualSource: OPEN_SOURCE_STAUNTON_V14_SOURCE_ID,
+      forgeVisualPreset: PREMIUM_PRESET,
+      forgeVisualRevision: FORGEMCP_PREMIUM_REVISION,
+    };
+    return object;
+  };
   factory.__forgeVisualMode = PREMIUM_PRESET;
   rebuildPieceObjects(application);
 }
@@ -149,6 +164,37 @@ function restoreLegacyMode(application) {
 function nextFrame() {
   if (typeof requestAnimationFrame === "function") return new Promise((resolve) => requestAnimationFrame(resolve));
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function legacyModelStates(pieceRenderer) {
+  const states = { loading: 0, ready: 0, fallback: 0, unknown: 0 };
+  const objects = [...pieceRenderer.pieces.values(), ...pieceRenderer.captured.values()];
+  for (const object of objects) {
+    const state = object.userData?.meshyModelState;
+    if (Object.hasOwn(states, state)) states[state] += 1;
+    else states.unknown += 1;
+  }
+  return states;
+}
+
+async function waitForLegacyModels(pieceRenderer, timeoutMs = 8_000) {
+  const deadline = Date.now() + timeoutMs;
+  let states = legacyModelStates(pieceRenderer);
+  while (states.loading > 0 && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    states = legacyModelStates(pieceRenderer);
+  }
+  return { ...states, timedOut: states.loading > 0 };
+}
+
+function hasPremiumSource(snapshot) {
+  return snapshot.sources.includes(OPEN_SOURCE_STAUNTON_V14_SOURCE_ID);
+}
+
+function hasReadyLegacySource(snapshot) {
+  return snapshot.sources.includes("compact-meshy-runtime") &&
+    !snapshot.sources.includes("meshy-loading") &&
+    !snapshot.sources.includes("meshy-fallback");
 }
 
 function premiumGeometryQa(factory) {
@@ -212,6 +258,21 @@ export async function upgradePieceVisuals(input = {}) {
   const premiumQa = premiumGeometryQa(pieceRenderer.factory);
   if (premiumQa.result !== "PASS") return structuredResult("FAIL", { status: "QA_BLOCKED", premiumQa, provenance: before.provenance }, "FAIL");
 
+  if (before.preset === PREMIUM_PRESET && hasPremiumSource(before)) {
+    return structuredResult("PASS", {
+      status: "ALREADY_APPLIED",
+      presetBefore: before.preset,
+      presetAfter: before.preset,
+      before,
+      after: before,
+      premiumQa,
+      reversible: true,
+      humanApproved: true,
+      liveMutationPerformed: false,
+      provenance: before.provenance,
+    });
+  }
+
   applyPremiumMode(application);
   await nextFrame();
   const after = snapshotPieceVisuals(application);
@@ -227,6 +288,9 @@ export async function upgradePieceVisuals(input = {}) {
     levelVisibilityPreserved,
     allPremiumPieceTypesValid: premiumQa.result === "PASS",
     triangleCountsMeasured: Number.isFinite(before.totalTriangles) && Number.isFinite(after.totalTriangles) && after.totalTriangles > 0,
+    geometryChanged: after.totalTriangles !== before.totalTriangles,
+    sourceChanged: JSON.stringify([...before.sources].sort()) !== JSON.stringify([...after.sources].sort()),
+    premiumSourceVerified: hasPremiumSource(after),
     whiteBlackMaterialsDiffer: differentPlayerMaterials,
     presetApplied: after.preset === PREMIUM_PRESET,
   };
@@ -257,7 +321,21 @@ export async function rollbackPieceVisuals(input = {}) {
   const application = getApplication();
   if (!application) return structuredResult("WARNING", { status: "NOT_READY", reason: "Cube Chess application instance is not available yet.", provenance: ["web/forgemcp/visualTools.js"] }, "INSUFFICIENT_DATA");
   const before = snapshotPieceVisuals(application);
+  if (before.preset === LEGACY_PRESET && hasReadyLegacySource(before)) {
+    return structuredResult("PASS", {
+      status: "ALREADY_ROLLED_BACK",
+      presetBefore: before.preset,
+      presetAfter: before.preset,
+      before,
+      after: before,
+      reversible: true,
+      humanApproved: true,
+      liveMutationPerformed: false,
+      provenance: before.provenance,
+    });
+  }
   restoreLegacyMode(application);
+  const legacyModels = await waitForLegacyModels(application.renderer.pieceRenderer);
   await nextFrame();
   const after = snapshotPieceVisuals(application);
   const qa = {
@@ -267,6 +345,9 @@ export async function rollbackPieceVisuals(input = {}) {
     selectedPiecePreserved: before.selectedPieceId === after.selectedPieceId,
     levelVisibilityPreserved: JSON.stringify(before.levels) === JSON.stringify(after.levels),
     legacyPresetRestored: after.preset === LEGACY_PRESET,
+    legacyModelsReady: hasReadyLegacySource(after) && legacyModels.loading === 0 && legacyModels.fallback === 0,
+    geometryChanged: after.totalTriangles !== before.totalTriangles,
+    sourceChanged: JSON.stringify([...before.sources].sort()) !== JSON.stringify([...after.sources].sort()),
   };
   qa.result = Object.values(qa).every((value) => value === true || value === "PASS") ? "PASS" : "FAIL";
   return structuredResult(qa.result === "PASS" ? "PASS" : "FAIL", {
@@ -275,6 +356,10 @@ export async function rollbackPieceVisuals(input = {}) {
     presetAfter: after.preset,
     before,
     after,
+    legacyModels,
+    trianglesBefore: before.totalTriangles,
+    trianglesAfter: after.totalTriangles,
+    triangleDelta: after.totalTriangles - before.totalTriangles,
     qa,
     reversible: true,
     humanApproved: true,

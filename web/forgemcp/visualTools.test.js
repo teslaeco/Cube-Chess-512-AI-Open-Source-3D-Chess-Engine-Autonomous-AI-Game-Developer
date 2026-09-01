@@ -118,6 +118,20 @@ describe("ForgeMCP premium visual WebMCP tools", () => {
     expect(rolledBack.state).toBe("PASS");
     expect(rolledBack.data.presetAfter).toBe(FORGEMCP_VISUAL_PRESETS.LEGACY);
     expect(rolledBack.data.qa.legacyPresetRestored).toBe(true);
+    expect(rolledBack.data.qa.geometryChanged).toBe(true);
+    expect(rolledBack.data.qa.sourceChanged).toBe(true);
+    expect(rolledBack.data.qa.legacyModelsReady).toBe(true);
+  });
+
+  it("reports an already-applied premium source without claiming a live mutation", async () => {
+    const app = fakeApplication();
+    globalThis.__forgeMcpCubeApplication = app;
+    const applied = await upgradePieceVisuals({ preset: FORGEMCP_VISUAL_PRESETS.PREMIUM, humanApproved: true });
+    expect(applied.state).toBe("PASS");
+    const repeated = await upgradePieceVisuals({ preset: FORGEMCP_VISUAL_PRESETS.PREMIUM, humanApproved: true });
+    expect(repeated.state).toBe("PASS");
+    expect(repeated.data.status).toBe("ALREADY_APPLIED");
+    expect(repeated.data.liveMutationPerformed).toBe(false);
   });
 
   it("registers four real browser-native tools through document.modelContext.registerTool", async () => {

@@ -34,6 +34,26 @@ export function requiresPieceObjectReplacement(object, piece) {
   );
 }
 
+export function disposeOwnedPieceResources(object) {
+  const geometries = new Set();
+  const materials = new Set();
+  object?.traverse?.((child) => {
+    if (
+      child.geometry &&
+      !child.geometry.userData?.forgeSharedPieceGeometry &&
+      !child.geometry.userData?.compactChessModel
+    ) {
+      geometries.add(child.geometry);
+    }
+    const childMaterials = Array.isArray(child.material) ? child.material : [child.material];
+    for (const material of childMaterials) {
+      if (material && !material.userData?.forgeSharedPieceMaterial) materials.add(material);
+    }
+  });
+  for (const geometry of geometries) geometry.dispose?.();
+  for (const material of materials) material.dispose?.();
+}
+
 export class PieceRenderer {
   constructor(pieces, factory, onAnimationState = () => {}) {
     this.group = new THREE.Group();
@@ -55,19 +75,14 @@ export class PieceRenderer {
 
   createObject(piece, parent = this.boardGroup) {
     const object = this.factory.create(piece.type, piece.color);
-    object.userData = { kind: "piece", piece };
+    object.userData = { ...object.userData, kind: "piece", piece };
     parent.add(object);
     return object;
   }
 
   disposeObject(object) {
     object.removeFromParent();
-    object.traverse((child) => {
-      child.geometry?.dispose();
-      if (child.material && !Array.isArray(child.material)) {
-        child.material.dispose?.();
-      }
-    });
+    disposeOwnedPieceResources(object);
   }
 
   replaceObjectForPiece(id, object, piece, parent = this.boardGroup) {
@@ -88,9 +103,12 @@ export class PieceRenderer {
 
   setBlueHighlight(object, enabled, intensity = 0.95) {
     object.traverse((child) => {
-      if (!child.material?.emissive) return;
-      child.material.emissive.setHex(enabled ? BLUE_HIGHLIGHT : 0x000000);
-      child.material.emissiveIntensity = enabled ? intensity : 0;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      for (const material of materials) {
+        if (!material?.emissive) continue;
+        material.emissive.setHex(enabled ? BLUE_HIGHLIGHT : 0x000000);
+        material.emissiveIntensity = enabled ? intensity : 0;
+      }
     });
   }
 
@@ -147,7 +165,7 @@ export class PieceRenderer {
       if (capturedPiece) {
         this.boardGroup.remove(object);
         this.capturedGroup.add(object);
-        object.userData = { kind: "captured", piece: capturedPiece };
+        object.userData = { ...object.userData, kind: "captured", piece: capturedPiece };
         object.scale.setScalar(0.82);
         this.removeMoveAura(object);
         this.addCaptureAura(object, capturedPiece.color);
@@ -195,7 +213,7 @@ export class PieceRenderer {
       } else if (!this.animations.has(piece.id)) {
         object.position.copy(target);
       }
-      object.userData = { kind: "piece", piece };
+      object.userData = { ...object.userData, kind: "piece", piece };
     }
 
     for (const [id, object] of this.captured) {
@@ -213,7 +231,7 @@ export class PieceRenderer {
           this.addCaptureAura(currentObject, capturedPiece.color);
           this.captured.set(id, currentObject);
         }
-        currentObject.userData = { kind: "captured", piece: capturedPiece };
+        currentObject.userData = { ...currentObject.userData, kind: "captured", piece: capturedPiece };
         if (!this.animations.has(id)) {
           currentObject.position.copy(capturedPosition(capturedPiece));
         }
@@ -229,7 +247,7 @@ export class PieceRenderer {
         continue;
       }
       const object = this.createObject(capturedPiece, this.capturedGroup);
-      object.userData = { kind: "captured", piece: capturedPiece };
+      object.userData = { ...object.userData, kind: "captured", piece: capturedPiece };
       object.scale.setScalar(0.82);
       object.position.copy(capturedPosition(capturedPiece));
       this.addCaptureAura(object, capturedPiece.color);
@@ -315,12 +333,7 @@ export class PieceRenderer {
 
   dispose() {
     this.animations.clear();
-    this.group.traverse((child) => {
-      child.geometry?.dispose();
-      if (child.material && !Array.isArray(child.material)) {
-        child.material.dispose?.();
-      }
-    });
+    disposeOwnedPieceResources(this.group);
     this.group.clear();
     this.pieces.clear();
     this.captured.clear();

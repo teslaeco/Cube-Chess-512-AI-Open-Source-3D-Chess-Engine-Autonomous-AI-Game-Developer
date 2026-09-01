@@ -6,10 +6,8 @@ const HEADER_BYTES = 36;
 const COMPACT_MODEL_MAGIC = "CCM1";
 
 function modelUrl(name) {
-  return new URL(
-    `../../assets/meshy-chess-models/${name}.ccm.b64?v=${MODEL_REVISION}`,
-    import.meta.url,
-  ).href;
+  const base = import.meta.env?.BASE_URL ?? "/";
+  return `${base}assets/meshy-chess-models/${name}.ccm.b64?v=${MODEL_REVISION}`;
 }
 
 export const MESHY_MODEL_URLS = Object.freeze({
@@ -121,6 +119,7 @@ export function parseCompactChessGeometry(payload) {
     triangleCount: indexCount / 3,
     revision: MODEL_REVISION,
   });
+  geometry.userData.forgeSharedPieceGeometry = true;
   return geometry;
 }
 
@@ -165,6 +164,17 @@ function preparePiece(geometry, material, outlineColor, type, color) {
   return normalized;
 }
 
+function releaseFallbackMaterials(fallback) {
+  const materials = new Set();
+  fallback?.traverse?.((child) => {
+    const childMaterials = Array.isArray(child.material) ? child.material : [child.material];
+    for (const material of childMaterials) {
+      if (material?.userData?.forgePieceInstanceMaterial) materials.add(material);
+    }
+  });
+  for (const material of materials) material.dispose();
+}
+
 export class MeshyChessModelSet {
   constructor(materials) {
     this.materials = materials;
@@ -186,7 +196,11 @@ export class MeshyChessModelSet {
   create(type, color, fallback) {
     const holder = new THREE.Group();
     holder.name = `${color}-${type}`;
-    holder.userData.meshyModelState = "loading";
+    holder.userData = {
+      meshyModelState: "loading",
+      forgeVisualSource: "compact-meshy-loading",
+      forgeVisualPreset: "LEGACY_COMPACT",
+    };
     holder.add(fallback);
 
     this.loadGeometry(type)
@@ -198,14 +212,17 @@ export class MeshyChessModelSet {
           type,
           color,
         );
+        releaseFallbackMaterials(fallback);
         holder.clear();
         holder.add(model);
         holder.userData.meshyModelState = "ready";
         holder.userData.meshyModelStats = geometry.userData.compactChessModel;
+        holder.userData.forgeVisualSource = "compact-meshy-runtime";
       })
       .catch((error) => {
         holder.userData.meshyModelState = "fallback";
         holder.userData.meshyModelError = String(error?.message ?? error);
+        holder.userData.forgeVisualSource = fallback?.userData?.forgeVisualSource ?? "open-source-fallback";
         console.warn(`Cube Chess could not load the Meshy ${type} model.`, error);
       });
 

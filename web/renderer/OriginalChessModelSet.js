@@ -5,10 +5,8 @@ import { pieceCellEnvelope } from "./pieceScaleProfile.js";
 const MODEL_REVISION = "20260901-1";
 export const ORIGINAL_CHESS_SOURCE_ID = "original-uploaded-chess-fbx";
 
-export const ORIGINAL_CHESS_MODEL_URL = new URL(
-  `../../assets/original-chess-models/chess.fbx?v=${MODEL_REVISION}`,
-  import.meta.url,
-).href;
+const PUBLIC_BASE = import.meta.env?.BASE_URL ?? "/";
+export const ORIGINAL_CHESS_MODEL_URL = `${PUBLIC_BASE}assets/original-chess-models/chess.fbx?v=${MODEL_REVISION}`;
 
 const MODEL_NAMES = Object.freeze({
   pawn: [/^Pawn(?:\.\d+)?$/i],

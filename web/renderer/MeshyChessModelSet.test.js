@@ -17,6 +17,8 @@ describe("Meshy compact chess model set", () => {
     expect(Object.keys(MESHY_MODEL_URLS)).toEqual(MODEL_NAMES);
     for (const type of MODEL_NAMES) {
       expect(MESHY_MODEL_URLS[type]).toContain(`${type}.ccm.b64`);
+      expect(MESHY_MODEL_URLS[type]).not.toContain("undefined");
+      expect(MESHY_MODEL_URLS[type]).toContain("/assets/meshy-chess-models/");
     }
   });
 
