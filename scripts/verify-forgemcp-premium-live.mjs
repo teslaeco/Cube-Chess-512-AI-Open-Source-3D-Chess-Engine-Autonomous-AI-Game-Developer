@@ -12,6 +12,20 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 1000
 // executes their real callbacks. It is NOT a substitute for final Chrome 149+
 // / ChatGPT WebMCP compatibility testing against the platform-provided API.
 await context.addInitScript(() => {
+  // Vite preview runs the production build, so the DEV-only ?e2e=1 identity
+  // bootstrap in web/main.js is intentionally unavailable. Seed the same guest
+  // identity before application modules execute so visual evidence captures the
+  // actual board rather than the authentication overlay.
+  sessionStorage.setItem(
+    "cubeChessIdentity",
+    JSON.stringify({
+      mode: "guest",
+      provider: "guest",
+      playerId: "guest-forgemcp-visual-ci",
+      displayName: "ForgeMCP Visual CI",
+    }),
+  );
+
   const registered = {};
   Object.defineProperty(window, "__forgemcpRegisteredTools", { value: registered, configurable: false });
   Object.defineProperty(document, "modelContext", {
@@ -31,10 +45,21 @@ page.on("console", (message) => {
 });
 page.on("pageerror", (error) => consoleErrors.push(error.message));
 
+async function captureDesktopAndMobile(name) {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({ path: `${artifactDir}/${name}.png`, fullPage: true });
+  await page.setViewportSize({ width: 675, height: 1500 });
+  await page.waitForTimeout(150);
+  await page.screenshot({ path: `${artifactDir}/${name}-mobile.png`, fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.waitForTimeout(150);
+}
+
 try {
   await page.goto(`${baseUrl}/?e2e=1`, { waitUntil: "networkidle", timeout: 30_000 });
   await page.waitForFunction(() => globalThis.__forgeMcpVisualToolRegistration?.registered === 4, null, { timeout: 20_000 });
   await page.waitForFunction(() => Boolean(globalThis.__forgeMcpCubeApplication?.renderer?.pieceRenderer), null, { timeout: 20_000 });
+  await page.waitForFunction(() => document.querySelector("#app")?.dataset?.authMode === "guest", null, { timeout: 20_000 });
 
   await page.evaluate(() => {
     const app = globalThis.__forgeMcpCubeApplication;
@@ -47,11 +72,16 @@ try {
     });
   });
 
+  await page.waitForFunction(() => {
+    const pieces = globalThis.__forgeMcpCubeApplication?.renderer?.pieceRenderer?.pieces;
+    return pieces instanceof Map && pieces.size === 32;
+  }, null, { timeout: 20_000 });
+
   // Give the real legacy compact Meshy pipeline a chance to fetch/parse its
   // .ccm.b64 browser assets before measuring BEFORE. If any asset fails, the
   // inspect result still records the actual fallback state rather than faking it.
   await page.waitForTimeout(1_500);
-  await page.screenshot({ path: `${artifactDir}/before.png`, fullPage: true });
+  await captureDesktopAndMobile("before");
 
   const before = await page.evaluate(async () => {
     const tool = globalThis.__forgemcpRegisteredTools?.inspect_piece_visuals;
@@ -78,7 +108,7 @@ try {
   if (upgraded?.data?.presetAfter !== "FORGEMCP_PREMIUM") throw new Error("Premium preset was not applied");
   if (upgraded?.data?.qa?.result !== "PASS") throw new Error(`Premium live QA failed: ${JSON.stringify(upgraded.data.qa)}`);
 
-  await page.screenshot({ path: `${artifactDir}/after.png`, fullPage: true });
+  await captureDesktopAndMobile("after");
 
   const rollback = await page.evaluate(async () => {
     const tool = globalThis.__forgemcpRegisteredTools?.rollback_piece_visuals;
@@ -88,11 +118,12 @@ try {
   if (rollback?.data?.presetAfter !== "LEGACY_COMPACT") throw new Error("Legacy preset was not restored");
   if (rollback?.data?.qa?.result !== "PASS") throw new Error(`Rollback QA failed: ${JSON.stringify(rollback.data.qa)}`);
 
-  await page.screenshot({ path: `${artifactDir}/rollback.png`, fullPage: true });
+  await captureDesktopAndMobile("rollback");
 
   const evidence = {
     verification: "PASS",
     harness: "Chromium browser E2E with injected document.modelContext registration collector",
+    visualEvidence: "Desktop 1440x1000 and mobile 675x1500 board screenshots with guest identity seeded before app startup.",
     limitation: "Final compatibility with the platform-provided WebMCP API still requires Chrome 149+ or ChatGPT in-app browser testing.",
     url: page.url(),
     before,
