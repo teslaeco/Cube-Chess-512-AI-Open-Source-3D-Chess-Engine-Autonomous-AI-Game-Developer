@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { MeshyChessModelSet } from "./MeshyChessModelSet.js";
 import { pieceCellEnvelope } from "./pieceScaleProfile.js";
-import { OpenSourceStauntonV12PieceSet } from "./OpenSourceStauntonV12PieceSet.js";
+import { OpenSourceStauntonV13PieceSet } from "./OpenSourceStauntonV13PieceSet.js";
 
 // Shared utility retained for tests and compatibility callers.
 export function fitPieceInsideCell(group, type = "pawn") {
@@ -39,8 +39,8 @@ export class PieceGeometryFactory {
     };
     this.meshyModels = new MeshyChessModelSet(this.materials);
     this.originalModels = this.meshyModels;
-    this.openSourceModels = new OpenSourceStauntonV12PieceSet();
-    this.__forgeVisualMode = "OPEN_SOURCE_STAUNTON_V12";
+    this.openSourceModels = new OpenSourceStauntonV13PieceSet();
+    this.__forgeVisualMode = "OPEN_SOURCE_STAUNTON_V13";
   }
 
   create(type, color) {

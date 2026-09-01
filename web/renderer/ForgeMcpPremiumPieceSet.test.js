@@ -8,7 +8,7 @@ import {
   countObjectTriangles,
   countUniquePieceResources,
 } from "./ForgeMcpPremiumPieceSet.js";
-import { getRoleTexture } from "./OpenSourceStauntonV12PieceSet.js";
+import { getRoleTexture } from "./OpenSourceStauntonV13PieceSet.js";
 
 const TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
 const HEIGHT_ORDER = ["king", "queen", "bishop", "knight", "rook", "pawn"];
@@ -21,7 +21,7 @@ function rolesOf(object) {
   return roles;
 }
 
-describe("Normal public open-source sculpted Staunton v12 set", () => {
+describe("Normal public open-source sculpted Staunton v13 set", () => {
   it.each(TYPES)("builds %s inside one strict 512-cell envelope", (type) => {
     const set = new OpenSourceStauntonPieceSet();
     const object = set.create(type, "white");
@@ -40,7 +40,7 @@ describe("Normal public open-source sculpted Staunton v12 set", () => {
     expect(triangles).toBeGreaterThan(1500);
     expect(triangles).toBeLessThan(30000);
     expect(object.userData.referenceAssetsPolicy).toBe("reference-only-not-runtime");
-    expect(object.userData.forgeVisualSource).toBe("open-source-staunton-v12-sculpt-textured");
+    expect(object.userData.forgeVisualSource).toBe("open-source-staunton-v13-sculpted-silhouette");
   });
 
   it("preserves classical descending height hierarchy", () => {
@@ -55,7 +55,7 @@ describe("Normal public open-source sculpted Staunton v12 set", () => {
     }
   });
 
-  it("sculpts knight as actual horse anatomy with one continuous rear-neck mane", () => {
+  it("sculpts knight as recognizable horse anatomy with one continuous rear-neck mane", () => {
     const knight = new OpenSourceStauntonPieceSet().create("knight", "black");
     const roles = rolesOf(knight);
     expect(roles).toContain("knight-sculpt");
@@ -78,7 +78,7 @@ describe("Normal public open-source sculpted Staunton v12 set", () => {
     expect(roles).toContain("bishop-gem");
   });
 
-  it("gives rook, queen and king recognizable modeled top geometry", () => {
+  it("gives rook queen and king recognizable modeled top geometry", () => {
     const set = new OpenSourceStauntonPieceSet();
     expect(rolesOf(set.create("rook", "black")).filter((r) => r === "rook-battlement")).toHaveLength(8);
     expect(rolesOf(set.create("queen", "black")).filter((r) => r === "queen-crown-point")).toHaveLength(8);
@@ -100,7 +100,7 @@ describe("Normal public open-source sculpted Staunton v12 set", () => {
     expect(new Set(textures.map((texture) => texture.uuid)).size).toBe(12);
   });
 
-  it("uses compact physical PBR maps while keeping resources bounded", () => {
+  it("uses compact physical PBR maps plus bump while keeping resources bounded", () => {
     const set = new OpenSourceStauntonPieceSet();
     for (const side of ["white", "black"]) {
       for (const type of TYPES) {
@@ -114,22 +114,23 @@ describe("Normal public open-source sculpted Staunton v12 set", () => {
     }
   });
 
-  it("reports v12 as the free normal runtime source", () => {
+  it("reports v13 as the free normal runtime source", () => {
     const set = new OpenSourceStauntonPieceSet();
-    expect(OPEN_SOURCE_STAUNTON_REVISION).toContain("staunton-v12-sculpt-textured");
+    expect(OPEN_SOURCE_STAUNTON_REVISION).toContain("staunton-v13-sculpted-silhouette");
     for (const item of set.inspectAll()) {
-      expect(item.runtimePrimarySource).toBe("open-source-staunton-v12-sculpt-textured");
+      expect(item.runtimePrimarySource).toBe("open-source-staunton-v13-sculpted-silhouette");
       expect(item.referenceAssetsPolicy).toBe("reference-only-not-runtime");
       expect(item.freeForPublicRenderer).toBe(true);
       expect(item.triangles).toBeLessThan(30000);
       expect(item.finite).toBe(true);
       expect(item.fitsLevel).toBe(true);
       expect(item.fitsCell).toBe(true);
+      expect(item.bounds.y).toBeLessThanOrEqual(OPEN_SOURCE_STAUNTON_SAFE_FIT[item.type].maxHeight + 1e-6);
     }
   });
 
-  it("keeps historical WebMCP constructor on the same free v12 source", () => {
+  it("keeps historical WebMCP constructor on the same free v13 source", () => {
     const compatible = new ForgeMcpPremiumPieceSet();
-    expect(compatible.inspect("pawn").runtimePrimarySource).toBe("open-source-staunton-v12-sculpt-textured");
+    expect(compatible.inspect("pawn").runtimePrimarySource).toBe("open-source-staunton-v13-sculpted-silhouette");
   });
 });
