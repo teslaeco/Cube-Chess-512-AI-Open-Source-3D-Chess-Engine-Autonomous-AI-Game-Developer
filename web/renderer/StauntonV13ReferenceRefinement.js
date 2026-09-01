@@ -34,6 +34,54 @@ function materialsOf(group) {
   return { body, trim: trim ?? body, inset: inset ?? body };
 }
 
+function loft(sections, radial = 36) {
+  const positions = [];
+  const indices = [];
+  const uvs = [];
+  for (let s = 0; s < sections.length; s += 1) {
+    const section = sections[s];
+    for (let i = 0; i < radial; i += 1) {
+      const a = (i / radial) * Math.PI * 2;
+      positions.push(
+        (section.x ?? 0) + Math.cos(a) * section.rx,
+        section.y,
+        (section.z ?? 0) + Math.sin(a) * section.rz,
+      );
+      uvs.push(i / radial, s / Math.max(1, sections.length - 1));
+    }
+  }
+  for (let s = 0; s < sections.length - 1; s += 1) {
+    for (let i = 0; i < radial; i += 1) {
+      const n = (i + 1) % radial;
+      const a = s * radial + i;
+      const b = s * radial + n;
+      const c = (s + 1) * radial + n;
+      const d = (s + 1) * radial + i;
+      indices.push(a, b, d, b, c, d);
+    }
+  }
+  const cap = (sectionIndex, reverse) => {
+    const section = sections[sectionIndex];
+    const center = positions.length / 3;
+    positions.push(section.x ?? 0, section.y, section.z ?? 0);
+    uvs.push(0.5, sectionIndex === 0 ? 0 : 1);
+    const start = sectionIndex * radial;
+    for (let i = 0; i < radial; i += 1) {
+      const n = (i + 1) % radial;
+      if (reverse) indices.push(center, start + n, start + i);
+      else indices.push(center, start + i, start + n);
+    }
+  };
+  cap(0, true);
+  cap(sections.length - 1, false);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 function enlargeTextureLanguage(group) {
   const touched = new Set();
   group.traverse((child) => {
@@ -59,78 +107,128 @@ function enlargeTextureLanguage(group) {
 
 function refineKnight(group) {
   const { body, trim, inset } = materialsOf(group);
+  removeRoles(group, new Set([
+    "knight-sculpt", "knight-jaw", "knight-cheek", "knight-eye", "knight-nostril", "knight-ear",
+    "knight-mane", "knight-mane-trim", "knight-muzzle-shell", "knight-brow", "knight-mouth",
+    "knight-chest-volume", "knight-upper-neck-volume", "knight-skull-volume", "knight-nose-volume",
+    "knight-nose-bridge", "knight-cheek-refine", "knight-lip-refine", "knight-brow-trim",
+    "knight-mane-ridge-detail",
+  ]));
 
-  // Verified closeups showed a thin seahorse-like neck. Add compact overlapping
-  // anatomical masses so the silhouette reads as a real chess knight at a glance.
-  const chest = mark(new THREE.Mesh(new THREE.SphereGeometry(0.145, 22, 16), body), "knight-chest-volume");
-  chest.position.set(-0.135, 1.155, 0);
-  chest.scale.set(0.92, 1.42, 0.96);
-  group.add(chest);
+  // Build one smooth horse body from chest through S-neck into the skull.
+  const bodySections = [
+    { x: -0.14, y: 0.92, rx: 0.19, rz: 0.17 },
+    { x: -0.18, y: 1.05, rx: 0.20, rz: 0.175 },
+    { x: -0.18, y: 1.18, rx: 0.19, rz: 0.165 },
+    { x: -0.16, y: 1.31, rx: 0.175, rz: 0.155 },
+    { x: -0.12, y: 1.43, rx: 0.158, rz: 0.145 },
+    { x: -0.06, y: 1.54, rx: 0.145, rz: 0.136 },
+    { x: 0.02, y: 1.62, rx: 0.138, rz: 0.130 },
+    { x: 0.11, y: 1.68, rx: 0.145, rz: 0.126 },
+    { x: 0.20, y: 1.69, rx: 0.155, rz: 0.123 },
+    { x: 0.29, y: 1.66, rx: 0.148, rz: 0.116 },
+    { x: 0.35, y: 1.61, rx: 0.132, rz: 0.108 },
+  ];
+  group.add(mark(new THREE.Mesh(loft(bodySections, 40), body), "knight-sculpt"));
 
-  const upperNeck = mark(new THREE.Mesh(new THREE.SphereGeometry(0.126, 22, 16), body), "knight-upper-neck-volume");
-  upperNeck.position.set(-0.045, 1.42, 0);
-  upperNeck.scale.set(0.86, 1.45, 0.92);
-  upperNeck.rotation.z = -0.18;
-  group.add(upperNeck);
+  // A separate short muzzle prevents the beak-like profile seen in the previous closeup.
+  const muzzleSections = [
+    { x: 0.30, y: 1.61, rx: 0.122, rz: 0.104 },
+    { x: 0.39, y: 1.56, rx: 0.112, rz: 0.094 },
+    { x: 0.47, y: 1.51, rx: 0.096, rz: 0.084 },
+    { x: 0.535, y: 1.48, rx: 0.070, rz: 0.070 },
+    { x: 0.575, y: 1.47, rx: 0.042, rz: 0.055 },
+  ];
+  group.add(mark(new THREE.Mesh(loft(muzzleSections, 32), body), "knight-muzzle-refined"));
 
-  const skull = mark(new THREE.Mesh(new THREE.SphereGeometry(0.125, 24, 18), body), "knight-skull-volume");
-  skull.position.set(0.255, 1.625, 0);
-  skull.scale.set(1.12, 0.82, 0.92);
-  group.add(skull);
+  const jawSections = [
+    { x: 0.31, y: 1.56, rx: 0.098, rz: 0.090 },
+    { x: 0.40, y: 1.51, rx: 0.094, rz: 0.082 },
+    { x: 0.49, y: 1.47, rx: 0.073, rz: 0.070 },
+    { x: 0.55, y: 1.455, rx: 0.040, rz: 0.050 },
+  ];
+  group.add(mark(new THREE.Mesh(loft(jawSections, 28), body), "knight-jaw"));
 
-  const nose = mark(new THREE.Mesh(new THREE.SphereGeometry(0.090, 22, 16), body), "knight-nose-volume");
-  nose.position.set(0.505, 1.465, 0);
-  nose.scale.set(1.38, 0.66, 0.78);
-  nose.rotation.z = -0.13;
-  group.add(nose);
+  // Rounded cheek planes and correctly sized eyes.
+  for (const side of [-1, 1]) {
+    const cheek = mark(new THREE.Mesh(new THREE.SphereGeometry(0.074, 20, 14), body), "knight-cheek");
+    cheek.position.set(0.235, 1.63, side * 0.090);
+    cheek.scale.set(1.18, 0.78, 0.55);
+    group.add(cheek);
 
-  const noseBridge = mark(new THREE.Mesh(new THREE.CapsuleGeometry(0.047, 0.15, 5, 10), body), "knight-nose-bridge");
-  noseBridge.position.set(0.395, 1.535, 0);
-  noseBridge.rotation.z = -0.93;
-  group.add(noseBridge);
+    const eye = mark(new THREE.Mesh(new THREE.SphereGeometry(0.020, 16, 10), inset), "knight-eye");
+    eye.position.set(0.292, 1.655, side * 0.118);
+    group.add(eye);
+  }
 
-  // Give the rear mane carved ridges like the supplied reference instead of a
-  // single plastic fin. These sit on top of the existing continuous mane curve.
-  const ridgeGeo = new THREE.ConeGeometry(0.034, 0.115, 5, 1);
+  const nostril = mark(new THREE.Mesh(new THREE.SphereGeometry(0.017, 14, 8), inset), "knight-nostril");
+  nostril.position.set(0.535, 1.49, 0.058);
+  nostril.scale.set(1.0, 0.62, 0.42);
+  group.add(nostril);
+
+  // Short, slightly backward ears replace the oversized twin spikes.
+  const earGeo = new THREE.ConeGeometry(0.036, 0.16, 8, 1);
+  for (const side of [-1, 1]) {
+    const ear = mark(new THREE.Mesh(earGeo, body), "knight-ear");
+    ear.position.set(0.095, 1.80, side * 0.066);
+    ear.rotation.z = 0.10;
+    ear.rotation.x = side * 0.10;
+    ear.scale.z = 0.72;
+    group.add(ear);
+  }
+
+  // One continuous mane tube plus carved ridges creates the reference's horse-mane language
+  // without returning to the old cyan slab.
+  const maneCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-0.205, 1.00, 0),
+    new THREE.Vector3(-0.215, 1.13, 0),
+    new THREE.Vector3(-0.198, 1.27, 0),
+    new THREE.Vector3(-0.168, 1.40, 0),
+    new THREE.Vector3(-0.125, 1.52, 0),
+    new THREE.Vector3(-0.075, 1.63, 0),
+    new THREE.Vector3(-0.020, 1.72, 0),
+    new THREE.Vector3(0.035, 1.77, 0),
+  ]);
+  const mane = mark(new THREE.Mesh(new THREE.TubeGeometry(maneCurve, 36, 0.024, 7, false), body), "knight-mane");
+  mane.scale.z = 0.72;
+  group.add(mane);
+
+  const crest = mark(new THREE.Mesh(new THREE.TubeGeometry(maneCurve, 36, 0.007, 5, false), trim), "knight-mane-trim");
+  crest.position.z = 0.018;
+  group.add(crest);
+
+  const ridgeGeo = new THREE.ConeGeometry(0.030, 0.095, 5, 1);
   const ridges = [
-    [-0.208, 1.11, -0.10],
-    [-0.192, 1.26, -0.05],
-    [-0.152, 1.41, 0.02],
-    [-0.105, 1.55, 0.08],
-    [-0.055, 1.68, 0.14],
+    [-0.198, 1.12, -0.10],
+    [-0.184, 1.25, -0.05],
+    [-0.154, 1.38, 0.00],
+    [-0.118, 1.50, 0.05],
+    [-0.075, 1.61, 0.10],
+    [-0.030, 1.70, 0.14],
   ];
   for (const [x, y, rz] of ridges) {
     const ridge = mark(new THREE.Mesh(ridgeGeo, body), "knight-mane-ridge-detail");
     ridge.position.set(x, y, 0);
     ridge.rotation.z = rz;
-    ridge.scale.z = 0.78;
+    ridge.scale.z = 0.72;
     group.add(ridge);
   }
 
-  // Small cheek and jaw accents give the head readable facial planes.
-  for (const side of [-1, 1]) {
-    const cheek = mark(new THREE.Mesh(new THREE.SphereGeometry(0.052, 18, 12), body), "knight-cheek-refine");
-    cheek.position.set(0.285, 1.59, side * 0.092);
-    cheek.scale.set(1.15, 0.82, 0.50);
-    group.add(cheek);
-  }
-  const lip = mark(new THREE.Mesh(new THREE.BoxGeometry(0.135, 0.010, 0.014), inset), "knight-lip-refine");
-  lip.position.set(0.522, 1.425, 0.067);
-  lip.rotation.z = -0.12;
-  group.add(lip);
+  const mouth = mark(new THREE.Mesh(new THREE.BoxGeometry(0.115, 0.009, 0.014), inset), "knight-mouth");
+  mouth.position.set(0.505, 1.455, 0.058);
+  mouth.rotation.z = -0.10;
+  group.add(mouth);
 
-  const browTrim = mark(new THREE.Mesh(new THREE.TorusGeometry(0.064, 0.008, 6, 20, Math.PI * 0.8), trim), "knight-brow-trim");
-  browTrim.position.set(0.275, 1.645, 0.102);
-  browTrim.rotation.z = -0.42;
-  group.add(browTrim);
+  const brow = mark(new THREE.Mesh(new THREE.TorusGeometry(0.050, 0.007, 6, 18, Math.PI * 0.78), trim), "knight-brow-trim");
+  brow.position.set(0.278, 1.67, 0.105);
+  brow.rotation.z = -0.36;
+  group.add(brow);
 }
 
 function refineBishop(group) {
   const { body, trim, inset } = materialsOf(group);
   removeRoles(group, new Set(["bishop-mitre-left", "bishop-mitre-right", "bishop-slit", "bishop-gem"]));
 
-  // Rebuild the head as two rounded teardrop lobes. The previous closeup read
-  // like two square prongs; these overlapping ellipsoids restore the classical mitre.
   const lobeGeo = new THREE.SphereGeometry(0.145, 28, 20);
   const left = mark(new THREE.Mesh(lobeGeo, body), "bishop-mitre-left");
   left.position.set(-0.047, 1.58, 0);
@@ -161,8 +259,6 @@ function refineBishop(group) {
 
 function refineRook(group) {
   const { body, trim } = materialsOf(group);
-  // Add restrained buttresses beneath the battlements, matching the reference
-  // tower language without changing the required eight crenellations.
   const buttressGeo = new THREE.BoxGeometry(0.052, 0.21, 0.035, 2, 4, 1);
   for (let i = 0; i < 8; i += 1) {
     const a = i * Math.PI / 4;
