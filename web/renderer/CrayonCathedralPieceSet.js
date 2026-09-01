@@ -10,7 +10,7 @@ import {
 
 export { CRAYON_CATHEDRAL_PRESET };
 export const CRAYON_CATHEDRAL_REVISION =
-  "2026-09-01-windowed-crayon-polyhedral-v2-compact-knight";
+  "2026-09-01-windowed-crayon-polyhedral-v3-embossed-knight";
 export const CRAYON_CATHEDRAL_SOURCE_ID =
   "original-procedural-crayon-cathedral";
 
@@ -170,6 +170,29 @@ function sweepLoftGeometry(sections, radialSegments = 64) {
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;
+}
+
+function hardFacetedGeometry(geometry) {
+  const faceted = geometry.index ? geometry.toNonIndexed() : geometry;
+  if (faceted !== geometry) geometry.dispose();
+  faceted.deleteAttribute("normal");
+  faceted.computeVertexNormals();
+  faceted.computeBoundingBox();
+  faceted.computeBoundingSphere();
+  return faceted;
+}
+
+function addFacetedPart(group, geometry, material, role, {
+  position = [0, 0, 0],
+  scale = [1, 1, 1],
+  rotation = [0, 0, 0],
+} = {}) {
+  const part = mesh(hardFacetedGeometry(geometry), material, role);
+  part.position.set(...position);
+  part.scale.set(...scale);
+  part.rotation.set(...rotation);
+  group.add(part);
+  return part;
 }
 
 function archedWindowShape(width, height) {
@@ -463,69 +486,156 @@ function knight(mats) {
   });
   ring(group, mats.dark, 0.82, 0.195, 0.014, "knight-neck-lead-ring");
   group.add(mesh(sweepLoftGeometry([
-    { x: -0.08, y: 0.82, radius: 0.205, depth: 0.175 },
-    { x: -0.15, y: 0.97, radius: 0.215, depth: 0.180 },
-    { x: -0.17, y: 1.13, radius: 0.205, depth: 0.175 },
-    { x: -0.14, y: 1.28, radius: 0.190, depth: 0.168 },
-    { x: -0.08, y: 1.42, radius: 0.178, depth: 0.158 },
-    { x: -0.01, y: 1.53, radius: 0.165, depth: 0.150 },
-  ], 72), mats.body, "knight-s-neck"));
-  group.add(mesh(sweepLoftGeometry([
-    { x: -0.04, y: 1.57, radius: 0.155, depth: 0.150 },
-    { x: 0.05, y: 1.62, radius: 0.190, depth: 0.178 },
-    { x: 0.14, y: 1.59, radius: 0.170, depth: 0.165 },
-    { x: 0.22, y: 1.52, radius: 0.135, depth: 0.140 },
-    { x: 0.30, y: 1.44, radius: 0.105, depth: 0.115 },
-    { x: 0.38, y: 1.38, radius: 0.070, depth: 0.085 },
-  ], 72), mats.body, "knight-sculpted-head"));
-  group.add(mesh(sweepLoftGeometry([
-    { x: 0.09, y: 1.45, radius: 0.085, depth: 0.130 },
-    { x: 0.18, y: 1.39, radius: 0.078, depth: 0.118 },
-    { x: 0.28, y: 1.34, radius: 0.064, depth: 0.098 },
-    { x: 0.37, y: 1.34, radius: 0.045, depth: 0.070 },
-  ], 64), mats.body, "knight-lower-jaw"));
-  addRoseWindow(group, mats, -0.145, 1.20, 0.181, 0, 0.58, "knight-near-rose-window");
-  addRoseWindow(group, mats, -0.145, 1.20, -0.181, Math.PI, 0.58, "knight-far-rose-window");
+    { x: -0.02, y: 0.82, radius: 0.190, depth: 0.165 },
+    { x: -0.080, y: 0.98, radius: 0.200, depth: 0.170 },
+    { x: -0.100, y: 1.14, radius: 0.190, depth: 0.163 },
+    { x: -0.070, y: 1.30, radius: 0.174, depth: 0.154 },
+    { x: -0.010, y: 1.43, radius: 0.158, depth: 0.145 },
+    { x: 0.045, y: 1.52, radius: 0.145, depth: 0.136 },
+  ], 72), mats.body, "knight-upright-neck"));
+
+  // A classical knight reads as four distinct planes: cranium, bridge, muzzle
+  // and lower jaw. Subdivided polyhedra keep those planes visibly sculpted
+  // instead of turning the profile into a smooth bent tube.
+  const headParts = [
+    {
+      geometry: new THREE.DodecahedronGeometry(1, 16),
+      position: [0.035, 1.555, 0],
+      scale: [0.180, 0.185, 0.158],
+      rotation: [0, 0, -0.22],
+    },
+    {
+      geometry: new THREE.DodecahedronGeometry(1, 14),
+      position: [0.180, 1.440, 0],
+      scale: [0.180, 0.108, 0.132],
+      rotation: [0, 0, -0.50],
+    },
+    {
+      geometry: new THREE.CylinderGeometry(0.090, 0.105, 0.16, 10, 10),
+      position: [0.320, 1.335, 0],
+      scale: [0.82, 1, 1],
+      rotation: [0, 0, -Math.PI / 2 - 0.30],
+    },
+    {
+      geometry: new THREE.DodecahedronGeometry(1, 8),
+      position: [0.295, 1.275, 0],
+      scale: [0.120, 0.050, 0.098],
+      rotation: [0, 0, -0.08],
+    },
+  ];
+  for (const part of headParts) {
+    addFacetedPart(group, part.geometry, mats.body, "knight-sculpted-head", part);
+  }
+
+  const ears = [
+    { x: -0.020, z: -0.068, rotation: -0.22 },
+    { x: 0.060, z: 0.068, rotation: 0.04 },
+  ];
+  for (const [index, { x, z, rotation }] of ears.entries()) {
+    addFacetedPart(
+      group,
+      new THREE.OctahedronGeometry(1, 0),
+      mats.body,
+      "knight-sculpted-head",
+      {
+        position: [x, 1.755, z],
+        scale: [0.039, 0.140, 0.036],
+        rotation: [0, 0, rotation],
+      },
+    );
+  }
+
+  addRoseWindow(group, mats, -0.055, 1.16, 0.169, 0, 0.30, "knight-near-rose-window");
+  addRoseWindow(group, mats, -0.055, 1.16, -0.169, Math.PI, 0.30, "knight-far-rose-window");
   const manePath = [
-    [-0.30, 0.92, 0.70],
-    [-0.30, 1.05, 0.68],
-    [-0.28, 1.18, 0.65],
-    [-0.24, 1.31, 0.61],
-    [-0.19, 1.43, 0.57],
-    [-0.12, 1.54, 0.52],
+    [-0.270, 0.94, 0.46],
+    [-0.295, 1.08, 0.42],
+    [-0.285, 1.22, 0.37],
+    [-0.245, 1.36, 0.31],
+    [-0.185, 1.48, 0.25],
+    [-0.110, 1.57, 0.18],
   ];
   for (let index = 0; index < manePath.length; index += 1) {
     const [x, y, rotation] = manePath[index];
-    const spike = crayonSpike(
-      mats,
-      index,
-      0.15 + index * 0.008,
-      0.027,
+    addFacetedPart(
+      group,
+      new THREE.ConeGeometry(0.082, 0.160, 5, 3),
+      mats.crayons[index % mats.crayons.length],
       `knight-crayon-mane-${index + 1}`,
+      {
+        position: [x, y, 0],
+        scale: [1, 1, 0.64],
+        rotation: [0, 0, rotation],
+      },
     );
-    spike.position.set(x, y, 0);
-    spike.rotation.z = rotation;
-    group.add(spike);
   }
-  const ears = [
-    { x: -0.055, z: -0.085, length: 0.22, rotation: -0.10 },
-    { x: 0.015, z: 0.085, length: 0.20, rotation: 0.09 },
-  ];
-  for (const [index, { x, z, length, rotation }] of ears.entries()) {
-    const ear = crayonSpike(mats, index + 2, length, 0.031, `knight-crayon-ear-${index + 1}`);
-    ear.position.set(x, 1.72, z);
-    ear.rotation.z = rotation;
-    group.add(ear);
-  }
-  for (const z of [-1, 1]) {
-    const eye = mesh(new THREE.OctahedronGeometry(0.028, 2), mats.glass, "knight-glass-eye");
-    eye.position.set(0.09, 1.65, z * 0.183);
-    group.add(eye);
-    const nostril = mesh(new THREE.OctahedronGeometry(0.018, 1), mats.dark, "knight-nostril");
-    nostril.position.set(0.34, 1.40, z * 0.093);
-    group.add(nostril);
+
+  for (const side of [-1, 1]) {
+    const cheekZ = side * 0.166;
+    addFacetedPart(
+      group,
+      new THREE.OctahedronGeometry(1, 0),
+      mats.frame,
+      "knight-face-relief",
+      {
+        position: [0.025, 1.475, cheekZ],
+        scale: [0.032, 0.045, 0.009],
+        rotation: [0, 0, 0.10],
+      },
+    );
+    const eyeSocket = mesh(
+      new THREE.TorusGeometry(0.027, 0.008, 14, 48),
+      mats.dark,
+      "knight-face-relief",
+    );
+    eyeSocket.position.set(0.085, 1.585, side * 0.161);
+    eyeSocket.rotation.y = side < 0 ? Math.PI : 0;
+    group.add(eyeSocket);
+    addFacetedPart(
+      group,
+      new THREE.OctahedronGeometry(1, 5),
+      mats.glass,
+      "knight-face-glass",
+      {
+        position: [0.085, 1.585, side * 0.170],
+        scale: [0.018, 0.018, 0.010],
+      },
+    );
+    addFacetedPart(
+      group,
+      new THREE.DodecahedronGeometry(1, 4),
+      mats.frame,
+      "knight-face-relief",
+      {
+        position: [0.080, 1.625, side * 0.160],
+        scale: [0.055, 0.016, 0.010],
+        rotation: [0, 0, -0.10],
+      },
+    );
+    addFacetedPart(
+      group,
+      new THREE.DodecahedronGeometry(1, 4),
+      mats.frame,
+      "knight-face-relief",
+      {
+        position: [0.360, 1.350, side * 0.104],
+        scale: [0.042, 0.026, 0.010],
+        rotation: [0, 0, -0.10],
+      },
+    );
+    addFacetedPart(
+      group,
+      new THREE.OctahedronGeometry(1, 3),
+      mats.dark,
+      "knight-face-relief",
+      {
+        position: [0.377, 1.347, side * 0.112],
+        scale: [0.016, 0.012, 0.007],
+        rotation: [0, 0, -0.12],
+      },
+    );
     const mouth = cylinder(0.010, 0.010, 0.19, mats.dark, "knight-mouth-line", 24);
-    mouth.position.set(0.30, 1.345, z * 0.073);
+    mouth.position.set(0.305, 1.285, side * 0.098);
     mouth.rotation.z = -Math.PI / 2 + 0.08;
     group.add(mouth);
   }
@@ -652,6 +762,9 @@ const BUILDERS = Object.freeze({ pawn, rook, knight, bishop, queen, king });
 
 function consolidatedRole(role = "detail") {
   if (role === "knight-sculpted-head") {
+    return role;
+  }
+  if (role.startsWith("knight-face-")) {
     return role;
   }
   if (role.includes("crayon") || role.includes("battlement") || role.includes("mane")) {

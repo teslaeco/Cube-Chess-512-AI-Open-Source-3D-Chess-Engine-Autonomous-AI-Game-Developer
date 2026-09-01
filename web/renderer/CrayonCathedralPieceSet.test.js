@@ -44,11 +44,14 @@ describe("original Crayon Cathedral chess collection", () => {
     }
   });
 
-  it("keeps the knight head compact and subordinate to its architectural base", () => {
-    const knight = new CrayonCathedralPieceSet().create("knight", "white");
+  it("builds a centered high-vertex polyhedral horse face with modeled relief", () => {
+    const set = new CrayonCathedralPieceSet();
+    const stat = set.inspect("knight", "white");
+    const knight = set.create("knight", "white");
     knight.updateMatrixWorld(true);
     const wholeBounds = new THREE.Box3().setFromObject(knight);
     const wholeSize = wholeBounds.getSize(new THREE.Vector3());
+    const wholeCenter = wholeBounds.getCenter(new THREE.Vector3());
     let sculptedHead = null;
     knight.traverse((child) => {
       if (child.userData?.forgeCrayonCathedralRole === "knight-sculpted-head") {
@@ -59,8 +62,20 @@ describe("original Crayon Cathedral chess collection", () => {
     expect(sculptedHead).not.toBeNull();
     const headBounds = new THREE.Box3().setFromObject(sculptedHead);
     const headSize = headBounds.getSize(new THREE.Vector3());
-    expect(headSize.x).toBeLessThan(wholeSize.x * 0.92);
-    expect(headSize.y).toBeLessThan(wholeSize.y * 0.60);
+    const headCenter = headBounds.getCenter(new THREE.Vector3());
+    expect(stat.triangles).toBeGreaterThanOrEqual(70_000);
+    expect(sculptedHead.geometry.attributes.position.count).toBeGreaterThanOrEqual(60_000);
+    expect(stat.resources.roles).toEqual(expect.arrayContaining([
+      "knight-face-relief",
+      "knight-face-glass",
+      "knight-sculpted-head",
+    ]));
+    expect(wholeCenter.x).toBeCloseTo(0, 6);
+    expect(wholeCenter.z).toBeCloseTo(0, 6);
+    expect(headCenter.x).toBeLessThan(wholeSize.x * 0.18);
+    expect(headCenter.z).toBeCloseTo(0, 6);
+    expect(headSize.x).toBeLessThan(wholeSize.x * 0.70);
+    expect(headSize.y).toBeLessThan(wholeSize.y * 0.50);
     expect(headBounds.min.x).toBeGreaterThanOrEqual(wholeBounds.min.x - 1e-6);
     expect(headBounds.max.x).toBeLessThanOrEqual(wholeBounds.max.x + 1e-6);
   });
