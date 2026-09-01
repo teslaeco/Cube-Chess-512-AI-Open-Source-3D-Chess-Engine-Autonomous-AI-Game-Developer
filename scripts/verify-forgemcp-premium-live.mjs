@@ -94,13 +94,16 @@ async function captureStudioSide(side) {
     for (const object of all) object.visible = false;
     samples.forEach((object, index) => {
       object.visible = true;
-      object.position.set((index - 2.5) * 1.18, 0, 0);
-      object.scale.setScalar(4.0);
+      object.position.set((index - 2.5) * 0.95, 0, 0);
+      // Preserve the fitted runtime scale and enlarge it relatively. Setting an
+      // absolute scale of 4 previously made pieces ~20x too large and clipped
+      // every studio screenshot to giant bases only.
+      object.scale.multiplyScalar(4.0);
     });
 
     cameraController.cancelAutomaticMove();
-    cameraController.camera.position.set(0, 2.35, 7.0);
-    cameraController.controls.target.set(0, 0.72, 0);
+    cameraController.camera.position.set(0, 1.70, 8.30);
+    cameraController.controls.target.set(0, 0.65, 0);
     cameraController.controls.update();
   }, side);
   await page.waitForTimeout(350);
