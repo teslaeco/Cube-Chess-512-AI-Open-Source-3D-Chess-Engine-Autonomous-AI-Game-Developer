@@ -27,17 +27,20 @@ a model or texture.
 | --- | ---: | ---: | ---: | ---: |
 | Pawn | 50,348 | 0.66 | 0.583 | 7 |
 | Rook | 110,992 | 0.81 | 0.705 | 17 |
-| Knight | 70,752 | 0.84 | 0.686 × 0.686 | 15 |
+| Knight | 73,888 | 0.84 | 0.686 × 0.686 | 17 |
 | Bishop | 54,544 | 0.87 | 0.667 | 8 |
 | Queen | 111,356 | 0.92 | 0.696 | 15 |
 | King | 100,192 | 0.96 | 0.705 | 12 |
 
 Every type contains both modeled window geometry and modeled crayon geometry.
-The knight uses a compact volumetric S-neck, tapered forehead/muzzle loft,
-separate lower jaw and mouth line, architectural windowed neck, rose windows,
-eyes, nostrils, ears and a crayon mane. Its head remains inside the base
-footprint so the mobile board camera cannot make it spill across adjacent
-fields. The bishop uses a pointed
+The knight uses an upright centered S-neck and a 21,656-triangle horse head
+assembled from hard-faceted dodecahedral, octahedral and decagonal volumes.
+Its separate cranium, sloping bridge, blunt muzzle and lower jaw are finished
+with raised cheek plates, brow ridges, eye sockets, glass eyes, nasal shields,
+nostrils, mouth lines, pointed ears, rose windows and a five-sided crayon mane.
+The head batch alone contains 64,968 vertices, while the complete figure stays
+inside the architectural base footprint so the mobile camera cannot make it
+spill across adjacent fields. The bishop uses a pointed
 Gothic mitre instead of the pawn's lantern orb. Rook, queen and king use
 different window galleries and different crayon crowns or cross structures.
 
