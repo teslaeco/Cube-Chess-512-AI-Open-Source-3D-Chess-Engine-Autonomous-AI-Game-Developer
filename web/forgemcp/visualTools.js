@@ -515,6 +515,10 @@ export async function upgradePieceVisuals(input = {}) {
     whiteBlackMaterialsDiffer: differentPlayerMaterials,
     presetApplied: after.preset === requestedPreset,
   };
+  // Keep the preset-specific evidence keys consumed by the existing CI harness
+  // while exposing the shared targetSourceVerified key to newer callers.
+  if (requestedPreset === PREMIUM_PRESET) qa.premiumSourceVerified = targetSourceVerified;
+  else qa.crayonCathedralSourceVerified = targetSourceVerified;
   qa.result = Object.values(qa).every((value) => value === true || value === "PASS") ? "PASS" : "FAIL";
   return structuredResult(qa.result === "PASS" ? "PASS" : "FAIL", {
     status: qa.result === "PASS" ? "APPLIED" : "APPLIED_WITH_QA_FAILURE",

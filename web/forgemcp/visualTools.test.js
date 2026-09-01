@@ -203,6 +203,7 @@ describe("ForgeMCP premium visual WebMCP tools", () => {
     expect(result.data.qa.coordinatesPreserved).toBe(true);
     expect(result.data.qa.selectedPiecePreserved).toBe(true);
     expect(result.data.qa.levelVisibilityPreserved).toBe(true);
+    expect(result.data.qa.premiumSourceVerified).toBe(true);
     expect(result.data.trianglesAfter).toBeGreaterThan(result.data.trianglesBefore);
     for (const [id, object] of app.renderer.pieceRenderer.pieces) expect(object.position.equals(beforePositions.get(id))).toBe(true);
   });
@@ -232,6 +233,7 @@ describe("ForgeMCP premium visual WebMCP tools", () => {
     expect(result.state).toBe("PASS");
     expect(result.data.presetAfter).toBe(FORGEMCP_VISUAL_PRESETS.CRAYON_CATHEDRAL);
     expect(result.data.qa.targetSourceVerified).toBe(true);
+    expect(result.data.qa.crayonCathedralSourceVerified).toBe(true);
     expect(result.data.qa.targetTexturesVerified).toBe(true);
     expect(result.data.modelStates).toEqual({ ready: 3, unknown: 0 });
   });
