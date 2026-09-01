@@ -27,20 +27,22 @@ a model or texture.
 | --- | ---: | ---: | ---: | ---: |
 | Pawn | 50,348 | 0.66 | 0.583 | 7 |
 | Rook | 110,992 | 0.81 | 0.705 | 17 |
-| Knight | 73,888 | 0.84 | 0.686 × 0.686 | 17 |
+| Knight | 172,612 | 0.84 | 0.686 × 0.615 | 19 |
 | Bishop | 54,544 | 0.87 | 0.667 | 8 |
 | Queen | 111,356 | 0.92 | 0.696 | 15 |
 | King | 100,192 | 0.96 | 0.705 | 12 |
 
 Every type contains both modeled window geometry and modeled crayon geometry.
-The knight uses an upright centered S-neck and a 21,656-triangle horse head
-assembled from hard-faceted dodecahedral, octahedral and decagonal volumes.
-Its separate cranium, sloping bridge, blunt muzzle and lower jaw are finished
-with raised cheek plates, brow ridges, eye sockets, glass eyes, nasal shields,
-nostrils, mouth lines, pointed ears, rose windows and a five-sided crayon mane.
-The head batch alone contains 64,968 vertices, while the complete figure stays
-inside the architectural base footprint so the mobile camera cannot make it
-spill across adjacent fields. The bishop uses a pointed
+The knight uses an original, continuous classical Staunton profile with a
+vertical S-neck, high poll, sloped equine forehead, closed modeled jaw, blunt
+muzzle and tucked throat. The hard-faceted beveled bust and ears contain
+181,080 vertices in their consolidated batch. Almond eyes, glass pupils,
+nostrils, brow, mouth and an embossed bridle remain real raised geometry.
+Eight complete crayons on each side of the rear neck form the mane: every red,
+orange, yellow, green, blue, violet, magenta and teal crayon keeps its modeled
+shaft, twin wrapper bands and sharpened tip. The complete figure remains
+centered and inside one field so the mobile camera cannot make it spill across
+adjacent fields. The bishop uses a pointed
 Gothic mitre instead of the pawn's lantern orb. Rook, queen and king use
 different window galleries and different crayon crowns or cross structures.
 
@@ -68,7 +70,7 @@ cannot recolor another piece.
 ## Browser and mobile performance
 
 Repeated windows, rings and crayon parts remain full polygonal geometry, but
-are merged by material and role into 7–17 draw batches per type. Immutable
+are merged by material and role into 7–19 draw batches per type. Immutable
 geometry is shared across every instance and across both player palettes; only
 materials differ. This avoids duplicating GPU buffers for 32 pieces while
 preserving the measured triangle counts above.
