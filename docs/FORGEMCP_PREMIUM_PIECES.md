@@ -42,6 +42,10 @@ The page registers real tools through `document.modelContext.registerTool(...)`:
 - `upgrade_piece_visuals`
 - `rollback_piece_visuals`
 
+The same tools now also inspect and apply the separately documented
+[`CRAYON_CATHEDRAL` collection](FORGEMCP_CRAYON_CATHEDRAL_PIECES.md). The
+Premium example below remains valid and backward compatible.
+
 Mutation remains approval-gated:
 
 ```json

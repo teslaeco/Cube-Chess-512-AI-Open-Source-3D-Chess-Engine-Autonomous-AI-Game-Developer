@@ -1,4 +1,12 @@
 import * as THREE from "three";
+import { CrayonCathedralPieceSet } from "./CrayonCathedralPieceSet.js";
+import {
+  CRAYON_CATHEDRAL_PRESET,
+  FORGEMCP_PREMIUM_PRESET,
+  LEGACY_COMPACT_PRESET,
+  PLAYER_SELECTABLE_VISUAL_PRESETS,
+  SUPPORTED_VISUAL_PRESETS,
+} from "../state/pieceVisualPresets.js";
 import {
   HIGH_DETAIL_CHESS_REVISION,
   HIGH_DETAIL_CHESS_SOURCE_ID,
@@ -12,8 +20,13 @@ import {
   OpenSourceStauntonV14PieceSet,
 } from "./OpenSourceStauntonV14PieceSet.js";
 
-export const OPEN_SOURCE_PRESET = "FORGEMCP_PREMIUM";
-export const LEGACY_COMPACT_PRESET = "LEGACY_COMPACT";
+export const OPEN_SOURCE_PRESET = FORGEMCP_PREMIUM_PRESET;
+export {
+  CRAYON_CATHEDRAL_PRESET,
+  LEGACY_COMPACT_PRESET,
+  PLAYER_SELECTABLE_VISUAL_PRESETS,
+  SUPPORTED_VISUAL_PRESETS,
+};
 
 export function fitPieceInsideCell(group, type = "pawn") {
   const envelope = pieceCellEnvelope(type);
@@ -48,11 +61,26 @@ export class PieceGeometryFactory {
     this.highDetailModels = new HighDetailChessModelSet(this.materials);
     this.originalModels = this.highDetailModels;
     this.openSourceModels = new OpenSourceStauntonV14PieceSet();
+    this.crayonCathedralModels = new CrayonCathedralPieceSet();
     this.__forgeVisualMode = OPEN_SOURCE_PRESET;
   }
 
   create(type, color) {
+    if (this.__forgeVisualMode === CRAYON_CATHEDRAL_PRESET) {
+      return this.createCrayonCathedral(type, color);
+    }
+    if (this.__forgeVisualMode === LEGACY_COMPACT_PRESET) {
+      return this.createLegacy(type, color);
+    }
     return this.createPremium(type, color);
+  }
+
+  setVisualMode(preset) {
+    if (!SUPPORTED_VISUAL_PRESETS.includes(preset)) {
+      throw new RangeError(`Unsupported piece visual preset: ${preset}`);
+    }
+    this.__forgeVisualMode = preset;
+    return preset;
   }
 
   createPremium(type, color) {
@@ -89,5 +117,14 @@ export class PieceGeometryFactory {
       forgeVisualRevision: OPEN_SOURCE_STAUNTON_V14_REVISION,
     };
     return holder;
+  }
+
+  createCrayonCathedral(type, color) {
+    const object = this.crayonCathedralModels.create(type, color);
+    object.userData = {
+      ...object.userData,
+      forgeVisualPreset: CRAYON_CATHEDRAL_PRESET,
+    };
+    return object;
   }
 }

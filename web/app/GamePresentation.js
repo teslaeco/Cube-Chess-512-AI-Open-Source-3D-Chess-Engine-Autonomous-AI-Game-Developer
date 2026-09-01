@@ -4,6 +4,7 @@ import {
   createSquareAddress,
 } from "../renderer/coordinates.js";
 import { createInitialPieces } from "../state/initialPosition.js";
+import { normalizePlayerVisualPreset } from "../state/pieceVisualPresets.js";
 import {
   detectInitialLocale,
   resolveLocale,
@@ -33,6 +34,7 @@ function defaultGameConfig() {
     aiSide: null,
     difficulty: "easy",
     clockMinutes: 0,
+    pieceSet: normalizePlayerVisualPreset(),
   };
 }
 
@@ -116,6 +118,9 @@ export class GamePresentation {
         ? config.difficulty
         : "easy",
       clockMinutes: Math.max(0, Number(config.clockMinutes) || 0),
+      pieceSet: normalizePlayerVisualPreset(
+        config.pieceSet ?? this.gameConfig.pieceSet,
+      ),
     };
     this.menuOpen = false;
     this.resetGame({ appState: "playing", preserveMenu: true });
@@ -380,6 +385,9 @@ export class GamePresentation {
     this.gameId = String(serialized.id || createGameId());
     this.startedAt = serialized.startedAt || new Date().toISOString();
     this.gameConfig = { ...defaultGameConfig(), ...clone(serialized.gameConfig) };
+    this.gameConfig.pieceSet = normalizePlayerVisualPreset(
+      this.gameConfig.pieceSet,
+    );
     this.history = clone(serialized.history ?? []);
     this.redoStack = clone(serialized.redoStack ?? []);
     this.restoreState(serialized.state);

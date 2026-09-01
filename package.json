@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && vite build",
+    "capture:crayon": "node scripts/capture-crayon-cathedral.mjs",
     "desktop:build": "tauri build",
     "desktop:dev": "tauri dev",
     "dev": "vite --host 0.0.0.0",

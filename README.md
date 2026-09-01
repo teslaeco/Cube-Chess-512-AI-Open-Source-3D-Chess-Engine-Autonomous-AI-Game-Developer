@@ -93,6 +93,10 @@ collaboration proposals may be directed to the project owner through the
 - a nine-section start menu, local two-player mode and a Web Worker computer
   opponent with three search limits;
 - a legal engine-driven attract demo that stops when a real game starts;
+- two player-selectable 3D collections before game-mode selection: the existing
+  ForgeMCP Premium set and the original procedural, stained-glass
+  [Crayon Cathedral collection](docs/FORGEMCP_CRAYON_CATHEDRAL_PIECES.md), with
+  the choice preserved in local preferences and versioned saves;
 - responsive desktop, phone and tablet layouts, keyboard focus handling, RTL,
   high contrast, large text and reduced-motion preferences;
 - 38 BCP 47 locale choices, including `ar-PS`. Polish and English are complete;
