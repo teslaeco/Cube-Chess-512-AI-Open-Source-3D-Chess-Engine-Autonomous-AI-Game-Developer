@@ -2,8 +2,14 @@ import * as THREE from "three";
 import { decodeBase64Bytes, parseCompactChessGeometry } from "./MeshyChessModelSet.js";
 import { normalizeImportedPiece } from "./OriginalChessModelSet.js";
 import { pieceCellEnvelope } from "./pieceScaleProfile.js";
+import {
+  createHighDetailChessMaterial,
+  ensureHighDetailChessUvs,
+  HIGH_DETAIL_CHESS_TEXTURE_REVISION,
+  HIGH_DETAIL_CHESS_TEXTURE_STYLE,
+} from "./HighDetailChessTextureSet.js";
 
-export const HIGH_DETAIL_CHESS_REVISION = "2026-09-01-uploaded-glb-v1";
+export const HIGH_DETAIL_CHESS_REVISION = "2026-09-01-uploaded-glb-v2-textured";
 export const HIGH_DETAIL_CHESS_SOURCE_ID = "owner-uploaded-meshy-high-detail";
 const MINIMUM_TRIANGLES = 70_000;
 
@@ -48,12 +54,8 @@ function releaseFallbackMaterials(fallback) {
 }
 
 export function prepareHighDetailPiece(geometry, materialTemplate, type, color) {
-  const material = materialTemplate.clone();
-  material.userData = {
-    ...material.userData,
-    forgeSharedPieceMaterial: false,
-    forgePieceInstanceMaterial: true,
-  };
+  ensureHighDetailChessUvs(geometry);
+  const material = createHighDetailChessMaterial(materialTemplate, type, color);
 
   const surface = new THREE.Mesh(geometry, material);
   surface.name = `${color}-${type}-uploaded-high-detail-surface`;
@@ -72,6 +74,8 @@ export function prepareHighDetailPiece(geometry, materialTemplate, type, color) 
   normalized.userData = {
     forgeVisualSource: HIGH_DETAIL_CHESS_SOURCE_ID,
     forgeVisualRevision: HIGH_DETAIL_CHESS_REVISION,
+    forgeTextureStyle: HIGH_DETAIL_CHESS_TEXTURE_STYLE,
+    forgeTextureRevision: HIGH_DETAIL_CHESS_TEXTURE_REVISION,
     ownerUploadedChessAsset: true,
   };
   return normalized;
@@ -81,6 +85,8 @@ function inspectPrepared(object, type, geometry) {
   object.updateMatrixWorld(true);
   const size = new THREE.Box3().setFromObject(object).getSize(new THREE.Vector3());
   const envelope = pieceCellEnvelope(type);
+  const surface = object.getObjectByProperty("isMesh", true);
+  const material = Array.isArray(surface?.material) ? surface.material[0] : surface?.material;
   return {
     type,
     triangles: triangleCount(geometry),
@@ -91,6 +97,16 @@ function inspectPrepared(object, type, geometry) {
     fitsLevel: size.y <= envelope.maxHeight + 1e-6,
     runtimePrimarySource: HIGH_DETAIL_CHESS_SOURCE_ID,
     revision: HIGH_DETAIL_CHESS_REVISION,
+    textureStyle: material?.userData?.forgeTextureStyle ?? null,
+    textureRevision: material?.userData?.forgeTextureRevision ?? null,
+    hasUv: Boolean(geometry.getAttribute("uv")),
+    textureMaps: {
+      color: Boolean(material?.map),
+      roughness: Boolean(material?.roughnessMap),
+      metalness: Boolean(material?.metalnessMap),
+      bump: Boolean(material?.bumpMap),
+      emissive: Boolean(material?.emissiveMap),
+    },
   };
 }
 
@@ -115,6 +131,8 @@ export class HighDetailChessModelSet {
           vertices: geometry.attributes.position.count,
           revision: HIGH_DETAIL_CHESS_REVISION,
           source: HIGH_DETAIL_CHESS_SOURCE_ID,
+          textureStyle: HIGH_DETAIL_CHESS_TEXTURE_STYLE,
+          textureRevision: HIGH_DETAIL_CHESS_TEXTURE_REVISION,
         });
         geometry.userData.forgeSharedPieceGeometry = true;
         return geometry;

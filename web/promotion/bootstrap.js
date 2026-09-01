@@ -5,6 +5,7 @@ import {
   HIGH_DETAIL_CHESS_REVISION,
   HIGH_DETAIL_CHESS_SOURCE_ID,
 } from "../renderer/HighDetailChessModelSet.js";
+import { HIGH_DETAIL_CHESS_TEXTURE_STYLE } from "../renderer/HighDetailChessTextureSet.js";
 import { installPawnPromotion } from "./PawnPromotion.js";
 
 // Keep the old internal preset token for WebMCP backward compatibility.
@@ -34,6 +35,7 @@ function inspectLiveVisuals(application) {
       activePieces: 0,
       openSourcePieces: 0,
       premiumPieces: 0,
+      texturedPieces: 0,
       meshyPieces: 0,
       totalTriangles: 0,
     };
@@ -42,6 +44,7 @@ function inspectLiveVisuals(application) {
   const active = [...pieceRenderer.pieces.values()];
   let openSourcePieces = 0;
   let meshyPieces = 0;
+  let texturedPieces = 0;
   let totalTriangles = 0;
   const sources = new Set();
 
@@ -49,10 +52,19 @@ function inspectLiveVisuals(application) {
     let openSource = object.userData?.forgeVisualSource === HIGH_DETAIL_CHESS_SOURCE_ID &&
       object.userData?.highDetailModelState === "ready";
     let meshy = false;
+    let textured = false;
     totalTriangles += countTriangles(object);
     object.traverse?.((child) => {
       if (child.userData?.ownerUploadedChessMesh) openSource = true;
       if (child.name?.includes("meshy") || child.userData?.meshyModelState) meshy = true;
+      if (!child.isMesh || child.userData?.decorative) return;
+      const material = Array.isArray(child.material) ? child.material[0] : child.material;
+      if (
+        material?.userData?.forgeTextureStyle === HIGH_DETAIL_CHESS_TEXTURE_STYLE &&
+        material.map && material.roughnessMap && material.metalnessMap && material.bumpMap && material.emissiveMap
+      ) {
+        textured = true;
+      }
     });
     if (openSource) {
       openSourcePieces += 1;
@@ -62,6 +74,7 @@ function inspectLiveVisuals(application) {
       meshyPieces += 1;
       sources.add("compact-meshy-runtime");
     }
+    if (textured) texturedPieces += 1;
   }
 
   return {
@@ -71,6 +84,7 @@ function inspectLiveVisuals(application) {
     activePieces: active.length,
     openSourcePieces,
     premiumPieces: openSourcePieces, // compatibility for existing CI evidence consumers
+    texturedPieces,
     meshyPieces,
     totalTriangles,
     sources: [...sources],
@@ -82,12 +96,16 @@ function publishDiagnostics(application) {
   globalThis.__forgeMcpVisualDiagnostics = diagnostics;
   const badge = document.getElementById("forgemcp-visual-runtime-badge");
   if (badge) {
-    const mode = diagnostics.preset === OPEN_SOURCE_PRESET ? "UPLOADED HIGH DETAIL" : diagnostics.preset;
-    badge.textContent = `CUBE VISUAL: ${mode} · ${diagnostics.openSourcePieces}/${diagnostics.activePieces}`;
+    const mode = diagnostics.preset === OPEN_SOURCE_PRESET ? "TEXTURED HIGH DETAIL" : diagnostics.preset;
+    const verifiedPieces = diagnostics.preset === OPEN_SOURCE_PRESET
+      ? diagnostics.texturedPieces
+      : diagnostics.openSourcePieces;
+    badge.textContent = `CUBE VISUAL: ${mode} · ${verifiedPieces}/${diagnostics.activePieces}`;
     badge.dataset.preset = diagnostics.preset;
     badge.dataset.openSourcePieces = String(diagnostics.openSourcePieces);
     badge.dataset.premiumPieces = String(diagnostics.openSourcePieces);
     badge.dataset.meshyPieces = String(diagnostics.meshyPieces);
+    badge.dataset.texturedPieces = String(diagnostics.texturedPieces);
     badge.dataset.revision = diagnostics.revision;
   }
   return diagnostics;

@@ -106,8 +106,10 @@ export class PieceRenderer {
       const materials = Array.isArray(child.material) ? child.material : [child.material];
       for (const material of materials) {
         if (!material?.emissive) continue;
-        material.emissive.setHex(enabled ? BLUE_HIGHLIGHT : 0x000000);
-        material.emissiveIntensity = enabled ? intensity : 0;
+        const baseHex = material.userData?.forgeBaseEmissiveHex ?? 0x000000;
+        const baseIntensity = material.userData?.forgeBaseEmissiveIntensity ?? 0;
+        material.emissive.setHex(enabled ? BLUE_HIGHLIGHT : baseHex);
+        material.emissiveIntensity = enabled ? intensity : baseIntensity;
       }
     });
   }

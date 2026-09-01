@@ -7,6 +7,7 @@ import {
   upgradePieceVisuals,
 } from "./visualTools.js";
 import { HIGH_DETAIL_CHESS_SOURCE_ID } from "../renderer/HighDetailChessModelSet.js";
+import { HIGH_DETAIL_CHESS_TEXTURE_STYLE } from "../renderer/HighDetailChessTextureSet.js";
 import { pieceCellEnvelope } from "../renderer/pieceScaleProfile.js";
 
 function legacyPiece(type, color, id, position) {
@@ -24,6 +25,13 @@ function premiumPiece(type, color, id, position) {
   const group = new THREE.Group();
   const geometry = new THREE.SphereGeometry(0.35, 48, 24);
   const material = new THREE.MeshStandardMaterial({ color: color === "white" ? 0xf4eee0 : 0x1a2837 });
+  const texture = new THREE.Texture();
+  material.map = texture;
+  material.roughnessMap = texture;
+  material.metalnessMap = texture;
+  material.bumpMap = texture;
+  material.emissiveMap = texture;
+  material.userData.forgeTextureStyle = HIGH_DETAIL_CHESS_TEXTURE_STYLE;
   const surface = new THREE.Mesh(geometry, material);
   surface.name = `${color}-${type}-uploaded-high-detail-surface`;
   surface.userData.forgeVisualSource = HIGH_DETAIL_CHESS_SOURCE_ID;
@@ -74,6 +82,9 @@ function fakeApplication() {
           vertices: 40_000,
           bounds: { x: envelope.maxFootprint, y: envelope.maxHeight, z: envelope.maxFootprint },
           finite: true,
+          textureStyle: HIGH_DETAIL_CHESS_TEXTURE_STYLE,
+          hasUv: true,
+          textureMaps: { color: true, roughness: true, metalness: true, bump: true, emissive: true },
         };
       },
     },

@@ -51,6 +51,13 @@ try {
 
   const canvas = page.locator("canvas").first();
   await canvas.waitFor({ state: "visible", timeout: 20_000 });
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: `${artifactDir}/board-desktop.png`, fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: `${artifactDir}/board-mobile.png`, fullPage: true });
+  await page.setViewportSize({ width: 1000, height: 1000 });
+  await page.waitForTimeout(250);
   const evidence = [];
 
   for (const side of sides) {
@@ -70,7 +77,7 @@ try {
         }
         if (!target) throw new Error(`No rendered ${targetSide} ${targetType} was found`);
 
-        const fittedHeights = { pawn: 0.62, rook: 0.76, knight: 0.79, bishop: 0.82, queen: 0.86, king: 0.90 };
+        const fittedHeights = { pawn: 0.66, rook: 0.81, knight: 0.84, bishop: 0.87, queen: 0.92, king: 0.96 };
         target.position.set(0, 0, 0);
         target.scale.setScalar(2.8 / fittedHeights[targetType]);
         target.updateMatrixWorld(true);
@@ -84,6 +91,8 @@ try {
         let meshes = 0;
         let triangles = 0;
         const sources = new Set();
+        const textureStyles = new Set();
+        let fullyTexturedMeshes = 0;
         target.traverse((child) => {
           if (child.userData?.forgeVisualSource) sources.add(child.userData.forgeVisualSource);
           if (!child.isMesh || child.userData?.decorative) return;
@@ -91,6 +100,11 @@ try {
           triangles += child.geometry?.index?.count
             ? Math.floor(child.geometry.index.count / 3)
             : Math.floor((child.geometry?.attributes?.position?.count ?? 0) / 3);
+          const material = Array.isArray(child.material) ? child.material[0] : child.material;
+          if (material?.userData?.forgeTextureStyle) textureStyles.add(material.userData.forgeTextureStyle);
+          if (material?.map && material?.roughnessMap && material?.metalnessMap && material?.bumpMap && material?.emissiveMap) {
+            fullyTexturedMeshes += 1;
+          }
         });
         if (target.userData?.forgeVisualSource) sources.add(target.userData.forgeVisualSource);
         return {
@@ -100,6 +114,8 @@ try {
           triangles,
           modelState: target.userData?.highDetailModelState,
           sources: [...sources],
+          textureStyles: [...textureStyles],
+          fullyTexturedMeshes,
         };
       }, { side, type });
 
@@ -108,6 +124,9 @@ try {
       }
       if (inspection.modelState !== "ready" || inspection.meshes === 0 || inspection.triangles < 70_000) {
         throw new Error(`Close-up ${side} ${type} has invalid model evidence: ${JSON.stringify(inspection)}`);
+      }
+      if (!inspection.textureStyles.includes("reference-marble-obsidian-cyan-gold") || inspection.fullyTexturedMeshes !== inspection.meshes) {
+        throw new Error(`Close-up ${side} ${type} is missing the approved texture stack: ${JSON.stringify(inspection)}`);
       }
       await page.waitForTimeout(100);
       await canvas.screenshot({ path: `${artifactDir}/${side}-${type}.png` });

@@ -2,9 +2,13 @@ import {
   HIGH_DETAIL_CHESS_REVISION,
   HIGH_DETAIL_CHESS_SOURCE_ID,
 } from "../renderer/HighDetailChessModelSet.js";
+import {
+  HIGH_DETAIL_CHESS_TEXTURE_REVISION,
+  HIGH_DETAIL_CHESS_TEXTURE_STYLE,
+} from "../renderer/HighDetailChessTextureSet.js";
 import { pieceCellEnvelope } from "../renderer/pieceScaleProfile.js";
 
-const TOOL_REVISION = "2026-09-01-owner-uploaded-high-detail-verification-v4";
+const TOOL_REVISION = "2026-09-01-owner-uploaded-texture-verification-v5";
 const PREMIUM_PRESET = "FORGEMCP_PREMIUM";
 const LEGACY_PRESET = "LEGACY_COMPACT";
 const PIECE_TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
@@ -24,6 +28,8 @@ function inspectObject(object) {
   let meshes = 0;
   const sources = new Set();
   const materialSignatures = new Set();
+  const textureStyles = new Set();
+  let fullyTexturedMeshes = 0;
   object?.traverse?.((child) => {
     if (child.userData?.forgeVisualSource) sources.add(child.userData.forgeVisualSource);
     if (child.userData?.meshyModelState) sources.add(`meshy-${child.userData.meshyModelState}`);
@@ -33,9 +39,28 @@ function inspectObject(object) {
     triangles += countGeometryTriangles(child.geometry);
     if (child.name?.includes("meshy")) sources.add("compact-meshy-runtime");
     const material = Array.isArray(child.material) ? child.material[0] : child.material;
-    if (material?.color) materialSignatures.add(`${material.type}:${material.color.getHexString()}`);
+    if (material?.color) {
+      materialSignatures.add([
+        material.type,
+        material.color.getHexString(),
+        material.emissive?.getHexString?.() ?? "no-emissive",
+        material.map?.name ?? "no-color-map",
+        material.userData?.forgeTextureStyle ?? "untextured",
+      ].join(":"));
+    }
+    if (material?.userData?.forgeTextureStyle) textureStyles.add(material.userData.forgeTextureStyle);
+    if (material?.map && material?.roughnessMap && material?.metalnessMap && material?.bumpMap && material?.emissiveMap) {
+      fullyTexturedMeshes += 1;
+    }
   });
-  return { triangles, meshes, sources: [...sources], materialSignatures: [...materialSignatures] };
+  return {
+    triangles,
+    meshes,
+    sources: [...sources],
+    materialSignatures: [...materialSignatures],
+    textureStyles: [...textureStyles],
+    fullyTexturedMeshes,
+  };
 }
 
 function clonePieceCoordinates(pieceRenderer) {
@@ -69,6 +94,8 @@ function snapshotPieceVisuals(application) {
   const totalTriangles = inspected.reduce((sum, item) => sum + item.triangles, 0);
   const sourceMeshes = inspected.reduce((sum, item) => sum + item.meshes, 0);
   const sources = [...new Set(inspected.flatMap((item) => item.sources))];
+  const textureStyles = [...new Set(inspected.flatMap((item) => item.textureStyles))];
+  const fullyTexturedMeshes = inspected.reduce((sum, item) => sum + item.fullyTexturedMeshes, 0);
   const typeTriangles = Object.fromEntries(PIECE_TYPES.map((type) => {
     const sample = inspected.find((item) => item.piece?.type === type);
     return [type, sample?.triangles ?? null];
@@ -91,6 +118,9 @@ function snapshotPieceVisuals(application) {
     totalSourceMeshes: sourceMeshes,
     typeTriangles,
     sources,
+    textureStyles,
+    textureRevision: HIGH_DETAIL_CHESS_TEXTURE_REVISION,
+    fullyTexturedMeshes,
     selectedPieceId: pieceRenderer.selectedPieceId ?? null,
     levels: application.presentation.snapshot().levels.map((level) => ({ index: level.index, visible: level.visible })),
     coordinates: clonePieceCoordinates(pieceRenderer),
@@ -98,6 +128,7 @@ function snapshotPieceVisuals(application) {
     provenance: [
       "web/renderer/PieceGeometryFactory.js",
       "web/renderer/HighDetailChessModelSet.js",
+      "web/renderer/HighDetailChessTextureSet.js",
       "public/assets/high-detail-chess-models/*.ccm.b64",
       "scripts/build-high-detail-chess-assets.mjs",
       "web/renderer/MeshyChessModelSet.js",
@@ -240,11 +271,18 @@ async function premiumGeometryQa(factory) {
       finiteBounds: stat.finite,
       highDetailTriangles: stat.triangles >= 70_000,
       fitsCellEnvelope: stat.bounds.y <= envelope.maxHeight + 1e-6 && stat.bounds.x <= envelope.maxFootprint + 1e-6 && stat.bounds.z <= envelope.maxFootprint + 1e-6,
+      approvedTextureStyle: stat.textureStyle === HIGH_DETAIL_CHESS_TEXTURE_STYLE,
+      fullPbrTextureStack: stat.hasUv && Object.values(stat.textureMaps ?? {}).every(Boolean),
       bounds: stat.bounds,
       envelope,
     };
   });
-  return { checks, result: checks.every((item) => item.finiteBounds && item.highDetailTriangles && item.fitsCellEnvelope) ? "PASS" : "FAIL" };
+  return {
+    checks,
+    result: checks.every((item) => item.finiteBounds && item.highDetailTriangles && item.fitsCellEnvelope && item.approvedTextureStyle && item.fullPbrTextureStack)
+      ? "PASS"
+      : "FAIL",
+  };
 }
 
 function structuredResult(state, data, verification = state === "PASS" ? "PASS" : "WARNING") {
@@ -272,7 +310,7 @@ export async function previewPieceVisualUpgrade(input = {}) {
     before,
     proposedPreset: PREMIUM_PRESET,
     premiumGeometry: geometryQa,
-    action: "Rebuild every active and captured piece from the owner-uploaded high-detail GLB derivatives.",
+    action: "Rebuild every active and captured piece from the owner-uploaded high-detail GLB derivatives with the approved marble/obsidian PBR texture stack.",
     reversible: true,
     liveMutationPerformed: false,
     provenance: before.provenance,
@@ -329,6 +367,8 @@ export async function upgradePieceVisuals(input = {}) {
     geometryChanged: after.totalTriangles !== before.totalTriangles,
     sourceChanged: JSON.stringify([...before.sources].sort()) !== JSON.stringify([...after.sources].sort()),
     premiumSourceVerified: hasPremiumSource(after),
+    premiumTexturesVerified: after.textureStyles.includes(HIGH_DETAIL_CHESS_TEXTURE_STYLE) &&
+      after.fullyTexturedMeshes === after.totalSourceMeshes,
     whiteBlackMaterialsDiffer: differentPlayerMaterials,
     presetApplied: after.preset === PREMIUM_PRESET,
   };
@@ -423,9 +463,9 @@ export async function registerVisualWebMcpTools() {
   const modelContext = typeof document !== "undefined" ? document.modelContext : null;
   if (!modelContext || typeof modelContext.registerTool !== "function") return { availability: "WEBMCP_UNAVAILABLE", registered: 0 };
   const tools = [
-    { name: "inspect_piece_visuals", description: "Inspect real Cube Chess Three.js piece geometry, measured triangle counts, premium geometry QA and provenance.", inputSchema: INPUT_NONE, outputSchema: OUTPUT, execute: inspectPieceVisuals },
-    { name: "preview_piece_visual_upgrade", description: "Preview the new ForgeMCP Premium Piece Set and deterministic geometry QA without mutating the live game.", inputSchema: INPUT_PREVIEW, outputSchema: OUTPUT, execute: previewPieceVisualUpgrade },
-    { name: "upgrade_piece_visuals", description: "After explicit human approval, rebuild every live Cube Chess piece with the new ForgeMCP Premium Piece Set and return measured before/after QA.", inputSchema: INPUT_UPGRADE, outputSchema: OUTPUT, execute: upgradePieceVisuals },
+    { name: "inspect_piece_visuals", description: "Inspect real Cube Chess Three.js geometry, PBR texture maps, measured triangle counts, fit QA and provenance.", inputSchema: INPUT_NONE, outputSchema: OUTPUT, execute: inspectPieceVisuals },
+    { name: "preview_piece_visual_upgrade", description: "Preview the uploaded high-detail textured piece set and deterministic geometry/material QA without mutating the live game.", inputSchema: INPUT_PREVIEW, outputSchema: OUTPUT, execute: previewPieceVisualUpgrade },
+    { name: "upgrade_piece_visuals", description: "After explicit human approval, rebuild every live Cube Chess piece with uploaded high-detail meshes and the approved PBR textures, then return measured before/after QA.", inputSchema: INPUT_UPGRADE, outputSchema: OUTPUT, execute: upgradePieceVisuals },
     { name: "rollback_piece_visuals", description: "After explicit human approval, restore the legacy compact Meshy runtime piece pipeline and return measured rollback QA.", inputSchema: INPUT_APPROVAL, outputSchema: OUTPUT, execute: rollbackPieceVisuals },
   ];
   let registered = 0;
