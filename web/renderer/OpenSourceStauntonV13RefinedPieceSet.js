@@ -8,6 +8,7 @@ import {
 } from "./OpenSourceStauntonV13PieceSet.js";
 import { pieceCellEnvelope } from "./pieceScaleProfile.js";
 import { refineReferenceStyleV13 } from "./StauntonV13ReferenceRefinement.js";
+import { applyAnatomyFixV13 } from "./StauntonV13AnatomyFix.js";
 
 const TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
 
@@ -53,6 +54,7 @@ export class OpenSourceStauntonV13RefinedPieceSet {
     if (!this.templates.has(key)) {
       const object = this.base.create(safeType, safeSide);
       refineReferenceStyleV13(object, safeType);
+      applyAnatomyFixV13(object, safeType);
       refit(object, safeType);
       object.userData = {
         ...object.userData,
@@ -60,7 +62,7 @@ export class OpenSourceStauntonV13RefinedPieceSet {
         openSourceStauntonRevision: OPEN_SOURCE_STAUNTON_REVISION,
         referenceAssetsPolicy: "reference-only-not-runtime",
         freeForPublicRenderer: true,
-        visualQaPass: "verified-closeup-reference-refinement",
+        visualQaPass: "verified-closeup-reference-refinement-anatomy-fix",
       };
       this.templates.set(key, object);
       this.stats.set(key, this.inspectObject(object, safeType, safeSide));
@@ -80,7 +82,7 @@ export class OpenSourceStauntonV13RefinedPieceSet {
       type,
       side,
       revision: OPEN_SOURCE_STAUNTON_REVISION,
-      style: "Open-source Staunton v13 verified closeup refinement",
+      style: "Open-source Staunton v13 verified closeup anatomy refinement",
       runtimePrimarySource: OPEN_SOURCE_STAUNTON_SOURCE_ID,
       referenceAssetsPolicy: "reference-only-not-runtime",
       freeForPublicRenderer: true,
