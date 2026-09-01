@@ -1,17 +1,15 @@
 import {
-  OpenSourceStauntonV13PieceSet,
-  OPEN_SOURCE_STAUNTON_REVISION,
+  OpenSourceStauntonV14PieceSet,
+  OPEN_SOURCE_STAUNTON_V14_REVISION,
   countObjectTriangles,
   countUniquePieceResources,
-} from "./OpenSourceStauntonV13PieceSet.js";
+} from "./OpenSourceStauntonV14PieceSet.js";
 import { PIECE_CELL_ENVELOPE } from "./pieceScaleProfile.js";
 
-// Compatibility facade only. There is NO paid/premium visual tier.
-// The normal public game and WebMCP visual tools use the same free v13 renderer.
-const REVISION = OPEN_SOURCE_STAUNTON_REVISION;
+const REVISION = OPEN_SOURCE_STAUNTON_V14_REVISION;
 const TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
 
-export class OpenSourceReferenceGuidedV13PieceSet extends OpenSourceStauntonV13PieceSet {
+export class OpenSourceReferenceGuidedV14PieceSet extends OpenSourceStauntonV14PieceSet {
   inspect(type, color = "white") {
     const object = this.create(type, color);
     return { ...super.inspect(type, color), resources: countUniquePieceResources(object) };
@@ -19,12 +17,11 @@ export class OpenSourceReferenceGuidedV13PieceSet extends OpenSourceStauntonV13P
   inspectAll() { return TYPES.map((type) => this.inspect(type, "white")); }
 }
 
-export class OpenSourceStauntonPieceSet extends OpenSourceReferenceGuidedV13PieceSet {}
+export class OpenSourceStauntonPieceSet extends OpenSourceReferenceGuidedV14PieceSet {}
+export class ForgeMcpPremiumPieceSet extends OpenSourceReferenceGuidedV14PieceSet {}
 
-// Historical constructor name retained only so existing WebMCP imports continue to work.
-export class ForgeMcpPremiumPieceSet extends OpenSourceReferenceGuidedV13PieceSet {}
-
-export { OPEN_SOURCE_STAUNTON_REVISION, countObjectTriangles, countUniquePieceResources };
+export const OPEN_SOURCE_STAUNTON_REVISION = OPEN_SOURCE_STAUNTON_V14_REVISION;
+export { countObjectTriangles, countUniquePieceResources };
 export const FORGEMCP_PREMIUM_REVISION = REVISION;
 export const OPEN_SOURCE_STAUNTON_SAFE_FIT = PIECE_CELL_ENVELOPE;
 export const FORGEMCP_PREMIUM_SAFE_FIT = PIECE_CELL_ENVELOPE;
