@@ -40,8 +40,7 @@ try {
 
   for (const side of sides) {
     for (const type of types) {
-      const metrics = await page.evaluate(async ({ side, type }) => {
-        const THREE = await import("three");
+      const metrics = await page.evaluate(({ side, type }) => {
         const app = globalThis.__forgeMcpCubeApplication;
         const renderer = app?.renderer;
         const pieceRenderer = renderer?.pieceRenderer;
@@ -69,34 +68,74 @@ try {
         for (const object of all) object.visible = object === sample;
         sample.updateMatrixWorld(true);
 
-        const box = new THREE.Box3().setFromObject(sample);
-        const sphere = box.getBoundingSphere(new THREE.Sphere());
-        const size = box.getSize(new THREE.Vector3());
-        if (box.isEmpty() || !Number.isFinite(sphere.radius) || sphere.radius <= 0) throw new Error(`Invalid bounds ${side} ${type}`);
+        // Compute a real world-space AABB directly from rendered mesh vertices.
+        // This deliberately avoids a bare `import("three")` in production preview,
+        // which browsers cannot resolve outside Vite's source-module graph.
+        let minX = Infinity, minY = Infinity, minZ = Infinity;
+        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+        let vertexCount = 0;
+        sample.traverse((child) => {
+          if (!child.isMesh || !child.geometry?.attributes?.position) return;
+          child.updateMatrixWorld(true);
+          const position = child.geometry.attributes.position;
+          const e = child.matrixWorld.elements;
+          for (let i = 0; i < position.count; i += 1) {
+            const x = position.getX(i);
+            const y = position.getY(i);
+            const z = position.getZ(i);
+            const wx = e[0] * x + e[4] * y + e[8] * z + e[12];
+            const wy = e[1] * x + e[5] * y + e[9] * z + e[13];
+            const wz = e[2] * x + e[6] * y + e[10] * z + e[14];
+            minX = Math.min(minX, wx); maxX = Math.max(maxX, wx);
+            minY = Math.min(minY, wy); maxY = Math.max(maxY, wy);
+            minZ = Math.min(minZ, wz); maxZ = Math.max(maxZ, wz);
+            vertexCount += 1;
+          }
+        });
+        if (!vertexCount || ![minX,minY,minZ,maxX,maxY,maxZ].every(Number.isFinite)) {
+          throw new Error(`Invalid bounds ${side} ${type}`);
+        }
+
+        const width = maxX - minX;
+        const height = maxY - minY;
+        const depth = maxZ - minZ;
+        const center = {
+          x: (minX + maxX) / 2,
+          y: (minY + maxY) / 2,
+          z: (minZ + maxZ) / 2,
+        };
+        const radius = Math.hypot(width, height, depth) / 2;
+        if (!Number.isFinite(radius) || radius <= 0) throw new Error(`Invalid radius ${side} ${type}`);
 
         const camera = cameraController.camera;
         const controls = cameraController.controls;
         cameraController.cancelAutomaticMove();
         controls.minDistance = 0.18;
         controls.maxDistance = 12;
-        const verticalFov = THREE.MathUtils.degToRad(camera.fov);
+        const verticalFov = camera.fov * Math.PI / 180;
         const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect);
         const limitingFov = Math.max(0.25, Math.min(verticalFov, horizontalFov));
-        const distance = Math.max(0.55, (sphere.radius / Math.sin(limitingFov / 2)) * 1.55);
-        const direction = new THREE.Vector3(1.35, 0.58, 2.2).normalize();
-        camera.position.copy(sphere.center).addScaledVector(direction, distance);
-        controls.target.copy(sphere.center);
+        const distance = Math.max(0.55, (radius / Math.sin(limitingFov / 2)) * 1.55);
+        const dx = 1.35, dy = 0.58, dz = 2.2;
+        const dLen = Math.hypot(dx, dy, dz);
+        camera.position.set(
+          center.x + (dx / dLen) * distance,
+          center.y + (dy / dLen) * distance,
+          center.z + (dz / dLen) * distance,
+        );
+        controls.target.set(center.x, center.y, center.z);
         controls.update();
         camera.updateMatrixWorld(true);
 
         return {
           type,
           side,
-          width: size.x,
-          height: size.y,
-          depth: size.z,
-          radius: sphere.radius,
+          width,
+          height,
+          depth,
+          radius,
           cameraDistance: distance,
+          vertexCount,
           source: sample.userData?.forgeVisualSource ?? null,
           revision: sample.userData?.openSourceStauntonRevision ?? null,
         };
