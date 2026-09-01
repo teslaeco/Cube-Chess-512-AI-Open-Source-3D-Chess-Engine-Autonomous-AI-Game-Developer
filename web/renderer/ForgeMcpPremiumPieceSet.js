@@ -1,17 +1,17 @@
 import {
-  OpenSourceStauntonV13PieceSet,
+  OpenSourceStauntonV13RefinedPieceSet,
   OPEN_SOURCE_STAUNTON_REVISION,
   countObjectTriangles,
   countUniquePieceResources,
-} from "./OpenSourceStauntonV13PieceSet.js";
+} from "./OpenSourceStauntonV13RefinedPieceSet.js";
 import { PIECE_CELL_ENVELOPE } from "./pieceScaleProfile.js";
 
 // Compatibility facade only. There is NO paid/premium visual tier.
-// The normal public game and WebMCP visual tools use the same free v13 renderer.
+// The normal public game and WebMCP visual tools use the same free refined v13 renderer.
 const REVISION = OPEN_SOURCE_STAUNTON_REVISION;
 const TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
 
-export class OpenSourceReferenceGuidedV13PieceSet extends OpenSourceStauntonV13PieceSet {
+export class OpenSourceReferenceGuidedV13PieceSet extends OpenSourceStauntonV13RefinedPieceSet {
   inspect(type, color = "white") {
     const object = this.create(type, color);
     const stat = super.inspect(type, color);
