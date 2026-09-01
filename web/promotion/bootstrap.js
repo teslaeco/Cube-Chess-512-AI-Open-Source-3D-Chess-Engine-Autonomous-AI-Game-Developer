@@ -1,15 +1,18 @@
 import "./promotion.css";
 import { CubeChessApplication } from "../app/CubeChessApplication.js";
 import { registerVisualWebMcpTools } from "../forgemcp/visualTools.js";
-import { OpenSourceStauntonPieceSet, OPEN_SOURCE_STAUNTON_REVISION } from "../renderer/ForgeMcpPremiumPieceSet.js";
-import { OPEN_SOURCE_STAUNTON_V14_SOURCE_ID } from "../renderer/OpenSourceStauntonV14PieceSet.js";
+import {
+  HIGH_DETAIL_CHESS_REVISION,
+  HIGH_DETAIL_CHESS_SOURCE_ID,
+} from "../renderer/HighDetailChessModelSet.js";
 import { installPawnPromotion } from "./PawnPromotion.js";
 
 // Keep the old internal preset token for WebMCP backward compatibility.
-// Public identity and actual geometry are the current open-source Staunton set.
+// The token remains stable for existing WebMCP clients; the runtime geometry is
+// now derived from the repository owner's uploaded high-detail GLB figures.
 const OPEN_SOURCE_PRESET = "FORGEMCP_PREMIUM";
 const LEGACY_PRESET = "LEGACY_COMPACT";
-const PUBLIC_VISUAL_REVISION = OPEN_SOURCE_STAUNTON_REVISION;
+const PUBLIC_VISUAL_REVISION = HIGH_DETAIL_CHESS_REVISION;
 
 function countTriangles(object) {
   let triangles = 0;
@@ -27,7 +30,7 @@ function inspectLiveVisuals(application) {
     return {
       preset: "NOT_READY",
       revision: PUBLIC_VISUAL_REVISION,
-      modelRevision: OPEN_SOURCE_STAUNTON_REVISION,
+      modelRevision: HIGH_DETAIL_CHESS_REVISION,
       activePieces: 0,
       openSourcePieces: 0,
       premiumPieces: 0,
@@ -43,16 +46,17 @@ function inspectLiveVisuals(application) {
   const sources = new Set();
 
   for (const object of active) {
-    let openSource = object.userData?.forgeVisualSource === OPEN_SOURCE_STAUNTON_V14_SOURCE_ID;
+    let openSource = object.userData?.forgeVisualSource === HIGH_DETAIL_CHESS_SOURCE_ID &&
+      object.userData?.highDetailModelState === "ready";
     let meshy = false;
     totalTriangles += countTriangles(object);
     object.traverse?.((child) => {
-      if (child.userData?.openSourceStauntonRole) openSource = true;
+      if (child.userData?.ownerUploadedChessMesh) openSource = true;
       if (child.name?.includes("meshy") || child.userData?.meshyModelState) meshy = true;
     });
     if (openSource) {
       openSourcePieces += 1;
-      sources.add(OPEN_SOURCE_STAUNTON_V14_SOURCE_ID);
+      sources.add(HIGH_DETAIL_CHESS_SOURCE_ID);
     }
     if (meshy) {
       meshyPieces += 1;
@@ -63,7 +67,7 @@ function inspectLiveVisuals(application) {
   return {
     preset: pieceRenderer.factory?.__forgeVisualMode ?? OPEN_SOURCE_PRESET,
     revision: PUBLIC_VISUAL_REVISION,
-    modelRevision: OPEN_SOURCE_STAUNTON_REVISION,
+    modelRevision: HIGH_DETAIL_CHESS_REVISION,
     activePieces: active.length,
     openSourcePieces,
     premiumPieces: openSourcePieces, // compatibility for existing CI evidence consumers
@@ -78,7 +82,7 @@ function publishDiagnostics(application) {
   globalThis.__forgeMcpVisualDiagnostics = diagnostics;
   const badge = document.getElementById("forgemcp-visual-runtime-badge");
   if (badge) {
-    const mode = diagnostics.preset === OPEN_SOURCE_PRESET ? "OPEN SOURCE STAUNTON" : diagnostics.preset;
+    const mode = diagnostics.preset === OPEN_SOURCE_PRESET ? "UPLOADED HIGH DETAIL" : diagnostics.preset;
     badge.textContent = `CUBE VISUAL: ${mode} · ${diagnostics.openSourcePieces}/${diagnostics.activePieces}`;
     badge.dataset.preset = diagnostics.preset;
     badge.dataset.openSourcePieces = String(diagnostics.openSourcePieces);
@@ -87,6 +91,10 @@ function publishDiagnostics(application) {
     badge.dataset.revision = diagnostics.revision;
   }
   return diagnostics;
+}
+
+function exposeDiagnosticsPublisher(application) {
+  globalThis.__forgeMcpPublishVisualDiagnostics = () => publishDiagnostics(application);
 }
 
 function ensureDiagnosticsBadge() {
@@ -111,18 +119,11 @@ function configureOpenSourceDefault(application) {
   if (!factory.__forgeOriginalCreate && typeof factory.createLegacy === "function") {
     factory.__forgeOriginalCreate = factory.createLegacy.bind(factory);
   }
-  if (!factory.__forgePremiumSet) factory.__forgePremiumSet = new OpenSourceStauntonPieceSet();
-
-  factory.create = (type, color) => {
-    const object = factory.__forgePremiumSet.create(type, color);
-    object.userData = {
-      ...object.userData,
-      forgeVisualSource: OPEN_SOURCE_STAUNTON_V14_SOURCE_ID,
-      forgeVisualPreset: OPEN_SOURCE_PRESET,
-      forgeVisualRevision: PUBLIC_VISUAL_REVISION,
-    };
-    return object;
-  };
+  if (!factory.__forgePremiumCreate) {
+    const premiumCreate = typeof factory.createPremium === "function" ? factory.createPremium : factory.create;
+    factory.__forgePremiumCreate = premiumCreate.bind(factory);
+  }
+  factory.create = factory.__forgePremiumCreate;
   factory.__forgeVisualMode = OPEN_SOURCE_PRESET;
   factory.__forgeLegacyVisualMode = LEGACY_PRESET;
   return true;
@@ -131,6 +132,7 @@ function configureOpenSourceDefault(application) {
 const originalHandleStateChange = CubeChessApplication.prototype.handleStateChange;
 CubeChessApplication.prototype.handleStateChange = function handleStateChangeWithOpenSourceVisuals(state) {
   globalThis.__forgeMcpCubeApplication = this;
+  exposeDiagnosticsPublisher(this);
   const result = originalHandleStateChange.call(this, state);
   queueMicrotask(() => publishDiagnostics(this));
   return result;
@@ -139,10 +141,12 @@ CubeChessApplication.prototype.handleStateChange = function handleStateChangeWit
 const originalStartGame = CubeChessApplication.prototype.startGame;
 CubeChessApplication.prototype.startGame = function startGameWithPromotion(config) {
   globalThis.__forgeMcpCubeApplication = this;
+  exposeDiagnosticsPublisher(this);
   configureOpenSourceDefault(this);
   const result = originalStartGame.call(this, config);
   if (!this.pawnPromotion) this.pawnPromotion = installPawnPromotion(this);
   queueMicrotask(() => publishDiagnostics(this));
+  setTimeout(() => publishDiagnostics(this), 2_500);
   return result;
 };
 
@@ -151,11 +155,14 @@ ensureDiagnosticsBadge();
 void import("../main.js")
   .then(async () => {
     const application = globalThis.__forgeMcpCubeApplication;
-    if (application) publishDiagnostics(application);
+    if (application) {
+      exposeDiagnosticsPublisher(application);
+      publishDiagnostics(application);
+    }
     const registration = await registerVisualWebMcpTools();
     globalThis.__forgeMcpVisualToolRegistration = registration;
     if (registration.availability === "WEBMCP_AVAILABLE") console.info("ForgeMCP visual WebMCP tools registered", registration);
-    console.info("Cube open-source visual diagnostics", globalThis.__forgeMcpVisualDiagnostics);
+    console.info("Cube high-detail visual diagnostics", globalThis.__forgeMcpVisualDiagnostics);
   })
   .catch((error) => {
     console.error("Failed to start Cube Chess 512", error);

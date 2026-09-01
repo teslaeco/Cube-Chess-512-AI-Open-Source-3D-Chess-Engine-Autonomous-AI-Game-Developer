@@ -49,4 +49,5 @@
   .promotion-options { grid-template-columns: 1fr; }
   .promotion-option { min-height: 58px; }
   .promotion-dialog { max-height: calc(100vh - 2rem); overflow: auto; }
+  #forgemcp-visual-runtime-badge { display: none; }
 }

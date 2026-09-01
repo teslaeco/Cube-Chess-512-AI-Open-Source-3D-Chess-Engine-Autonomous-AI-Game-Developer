@@ -85,12 +85,17 @@ export function normalizeImportedPiece(piece, type = "pawn") {
     throw new Error("Original chess model has invalid bounds");
   }
 
-  const scale = Math.min(
-    envelope.maxHeight / size.y,
-    envelope.maxFootprint / size.x,
-    envelope.maxFootprint / size.z,
+  // Preserve the supplied vertical proportions, then use the available square
+  // footprint. This keeps tall source meshes readable on a 1.25-wide field
+  // without allowing them to escape the cell or collide with the next level.
+  const verticalScale = envelope.maxHeight / size.y;
+  const scaledFootprint = Math.max(size.x, size.z) * verticalScale;
+  const horizontalScale = envelope.maxFootprint / scaledFootprint;
+  group.scale.set(
+    verticalScale * horizontalScale,
+    verticalScale,
+    verticalScale * horizontalScale,
   );
-  group.scale.setScalar(scale);
   group.updateMatrixWorld(true);
 
   bounds = new THREE.Box3().setFromObject(group);

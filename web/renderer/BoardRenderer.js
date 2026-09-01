@@ -18,6 +18,7 @@ export class BoardRenderer {
     this.overlays = new Map();
     this.levelGroups = new Map();
     this.levelMaterials = new Map();
+    this.wireMaterials = new Map();
     this.movePaths = new THREE.Group();
     this.movePaths.name = "Cross-level move paths";
     this.group.add(this.movePaths);
@@ -35,12 +36,6 @@ export class BoardRenderer {
     const wireGeometry = new THREE.EdgesGeometry(
       new THREE.BoxGeometry(CELL_SIZE, CELL_SIZE, CELL_SIZE),
     );
-    const wireMaterial = new THREE.LineBasicMaterial({
-      color: GRID_COLOR,
-      transparent: true,
-      opacity: 0.2,
-      depthWrite: false,
-    });
     this.pathMaterial = new THREE.LineDashedMaterial({
       color: LEGAL_MOVE_COLOR,
       transparent: true,
@@ -53,7 +48,6 @@ export class BoardRenderer {
       squareGeometry,
       overlayGeometry,
       wireGeometry,
-      wireMaterial,
       this.pathMaterial,
     );
 
@@ -73,10 +67,10 @@ export class BoardRenderer {
       group.add(tile);
       this.squares.set(square.square3D, tile);
 
-      const wire = new THREE.LineSegments(wireGeometry, wireMaterial);
+      const wire = new THREE.LineSegments(wireGeometry, this.wireMaterials.get(square.z));
       wire.position.set(position.x, position.y + CELL_SIZE / 2, position.z);
       wire.userData = { kind: "grid", square };
-      this.group.add(wire);
+      group.add(wire);
 
       const overlayMaterial = new THREE.MeshBasicMaterial({
         color: SELECTED_COLOR,
@@ -113,7 +107,14 @@ export class BoardRenderer {
         }),
     );
     this.levelMaterials.set(index, materials);
-    this.resources.push(...materials);
+    const wireMaterial = new THREE.LineBasicMaterial({
+      color: GRID_COLOR,
+      transparent: true,
+      opacity: 0.035,
+      depthWrite: false,
+    });
+    this.wireMaterials.set(index, wireMaterial);
+    this.resources.push(...materials, wireMaterial);
   }
 
   setLevels(levels, activeLevel) {
@@ -122,12 +123,13 @@ export class BoardRenderer {
       group.visible = level.visible;
       const active = level.index === activeLevel;
       const opacity = active
-        ? 0.62
-        : Math.min(0.22, visibleLayerOpacity(level.index, activeLevel));
+        ? 0.72
+        : Math.min(0.10, visibleLayerOpacity(level.index, activeLevel) * 0.36);
       for (const material of this.levelMaterials.get(level.index)) {
         material.opacity = opacity;
         material.depthWrite = false;
       }
+      this.wireMaterials.get(level.index).opacity = active ? 0.085 : Math.min(0.018, opacity * 0.22);
       group.renderOrder = active ? 10 : level.index;
     }
   }
@@ -174,6 +176,7 @@ export class BoardRenderer {
     this.overlays.clear();
     this.levelGroups.clear();
     this.levelMaterials.clear();
+    this.wireMaterials.clear();
     this.movePaths.clear();
   }
 }

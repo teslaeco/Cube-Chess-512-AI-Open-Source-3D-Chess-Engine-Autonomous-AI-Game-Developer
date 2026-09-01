@@ -1,13 +1,36 @@
-import { ForgeMcpPremiumPieceSet } from "../web/renderer/ForgeMcpPremiumPieceSet.js";
+import { readFile } from "node:fs/promises";
+import * as THREE from "three";
+import {
+  HIGH_DETAIL_CHESS_REVISION,
+  HIGH_DETAIL_CHESS_SOURCE_ID,
+  prepareHighDetailPiece,
+} from "../web/renderer/HighDetailChessModelSet.js";
+import { decodeBase64Bytes, parseCompactChessGeometry } from "../web/renderer/MeshyChessModelSet.js";
 
-const set = new ForgeMcpPremiumPieceSet();
 const types = ["pawn", "rook", "knight", "bishop", "queen", "king"];
-const measurements = types.map((type) => set.inspect(type, "white"));
+const material = new THREE.MeshPhysicalMaterial({ color: 0xffffff });
+const measurements = [];
 
-const report = {
+for (const type of types) {
+  const asset = new URL(`../public/assets/high-detail-chess-models/${type}.ccm.b64`, import.meta.url);
+  const geometry = parseCompactChessGeometry(decodeBase64Bytes(await readFile(asset, "utf8")));
+  const object = prepareHighDetailPiece(geometry, material, type, "white");
+  object.updateMatrixWorld(true);
+  const size = new THREE.Box3().setFromObject(object).getSize(new THREE.Vector3());
+  measurements.push({
+    type,
+    vertices: geometry.attributes.position.count,
+    triangles: geometry.index.count / 3,
+    width: size.x,
+    height: size.y,
+    depth: size.z,
+    runtimePrimarySource: HIGH_DETAIL_CHESS_SOURCE_ID,
+  });
+}
+
+console.log("FORGEMCP_PREMIUM_METRICS=" + JSON.stringify({
   preset: "FORGEMCP_PREMIUM",
+  revision: HIGH_DETAIL_CHESS_REVISION,
   measuredAt: new Date().toISOString(),
   measurements,
-};
-
-console.log("FORGEMCP_PREMIUM_METRICS=" + JSON.stringify(report));
+}));

@@ -1,4 +1,9 @@
 import * as THREE from "three";
+import {
+  HIGH_DETAIL_CHESS_REVISION,
+  HIGH_DETAIL_CHESS_SOURCE_ID,
+  HighDetailChessModelSet,
+} from "./HighDetailChessModelSet.js";
 import { MeshyChessModelSet } from "./MeshyChessModelSet.js";
 import { pieceCellEnvelope } from "./pieceScaleProfile.js";
 import {
@@ -33,26 +38,39 @@ export function fitPieceInsideCell(group, type = "pawn") {
 export class PieceGeometryFactory {
   constructor() {
     this.materials = {
-      white: new THREE.MeshPhysicalMaterial({ color: 0xf2ede2, metalness: 0.08, roughness: 0.24, clearcoat: 0.65, clearcoatRoughness: 0.22 }),
-      black: new THREE.MeshPhysicalMaterial({ color: 0x151a22, metalness: 0.34, roughness: 0.2, clearcoat: 0.72, clearcoatRoughness: 0.18 }),
+      white: new THREE.MeshPhysicalMaterial({ color: 0xf4eee0, metalness: 0.12, roughness: 0.27, clearcoat: 0.62, clearcoatRoughness: 0.2 }),
+      black: new THREE.MeshPhysicalMaterial({ color: 0x1a2837, metalness: 0.3, roughness: 0.24, clearcoat: 0.68, clearcoatRoughness: 0.18 }),
     };
     for (const material of Object.values(this.materials)) {
       material.userData.forgeSharedPieceMaterial = true;
     }
     this.meshyModels = new MeshyChessModelSet(this.materials);
-    this.originalModels = this.meshyModels;
+    this.highDetailModels = new HighDetailChessModelSet(this.materials);
+    this.originalModels = this.highDetailModels;
     this.openSourceModels = new OpenSourceStauntonV14PieceSet();
     this.__forgeVisualMode = OPEN_SOURCE_PRESET;
   }
 
   create(type, color) {
-    const object = this.openSourceModels.create(type, color);
-    object.userData = {
-      ...object.userData,
+    return this.createPremium(type, color);
+  }
+
+  createPremium(type, color) {
+    const fallback = this.openSourceModels.create(type, color);
+    fallback.userData = {
+      ...fallback.userData,
+      forgeVisualSource: `${OPEN_SOURCE_STAUNTON_V14_SOURCE_ID}-loading-fallback`,
       forgeVisualPreset: OPEN_SOURCE_PRESET,
       forgeVisualRevision: OPEN_SOURCE_STAUNTON_V14_REVISION,
     };
-    return object;
+    const holder = this.highDetailModels.create(type, color, fallback);
+    holder.userData = {
+      ...holder.userData,
+      forgeVisualPreset: OPEN_SOURCE_PRESET,
+      forgeVisualRevision: HIGH_DETAIL_CHESS_REVISION,
+      requestedVisualSource: HIGH_DETAIL_CHESS_SOURCE_ID,
+    };
+    return holder;
   }
 
   createLegacy(type, color) {

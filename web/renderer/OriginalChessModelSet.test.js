@@ -47,12 +47,12 @@ describe("original FBX chess-piece loading", () => {
     expect(center.z).toBeCloseTo(0, 6);
   });
 
-  it("keeps even the king far below the next level", () => {
+  it("keeps even the larger readable king below the next level", () => {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(2, 7, 2));
     const normalized = normalizeImportedPiece(mesh, "king");
     const size = bounds(normalized).getSize(new THREE.Vector3());
     const envelope = pieceCellEnvelope("king");
     expect(size.y).toBeLessThanOrEqual(envelope.maxHeight + 1e-6);
-    expect(LEVEL_SPACING - size.y).toBeGreaterThanOrEqual(0.80 - 1e-6);
+    expect(LEVEL_SPACING - size.y).toBeGreaterThanOrEqual(0.35 - 1e-6);
   });
 });

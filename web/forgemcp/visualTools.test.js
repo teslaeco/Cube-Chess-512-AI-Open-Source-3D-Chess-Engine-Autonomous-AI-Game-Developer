@@ -6,6 +6,8 @@ import {
   rollbackPieceVisuals,
   upgradePieceVisuals,
 } from "./visualTools.js";
+import { HIGH_DETAIL_CHESS_SOURCE_ID } from "../renderer/HighDetailChessModelSet.js";
+import { pieceCellEnvelope } from "../renderer/pieceScaleProfile.js";
 
 function legacyPiece(type, color, id, position) {
   const group = new THREE.Group();
@@ -15,6 +17,23 @@ function legacyPiece(type, color, id, position) {
   surface.name = `${color}-${type}-meshy-surface`;
   group.add(surface);
   group.userData = { kind: "piece", piece: { id, type, color, position } };
+  return group;
+}
+
+function premiumPiece(type, color, id, position) {
+  const group = new THREE.Group();
+  const geometry = new THREE.SphereGeometry(0.35, 48, 24);
+  const material = new THREE.MeshStandardMaterial({ color: color === "white" ? 0xf4eee0 : 0x1a2837 });
+  const surface = new THREE.Mesh(geometry, material);
+  surface.name = `${color}-${type}-uploaded-high-detail-surface`;
+  surface.userData.forgeVisualSource = HIGH_DETAIL_CHESS_SOURCE_ID;
+  group.add(surface);
+  group.userData = {
+    kind: "piece",
+    piece: { id, type, color, position },
+    highDetailModelState: "ready",
+    forgeVisualSource: HIGH_DETAIL_CHESS_SOURCE_ID,
+  };
   return group;
 }
 
@@ -40,6 +59,24 @@ function fakeApplication() {
     create(type, color) {
       return legacyPiece(type, color, `new-${type}`, { x: 0, y: 0, z: 0 });
     },
+    createLegacy(type, color) {
+      return legacyPiece(type, color, `legacy-${type}`, { x: 0, y: 0, z: 0 });
+    },
+    createPremium(type, color) {
+      return premiumPiece(type, color, `premium-${type}`, { x: 0, y: 0, z: 0 });
+    },
+    highDetailModels: {
+      async inspect(type) {
+        const envelope = pieceCellEnvelope(type);
+        return {
+          type,
+          triangles: 80_000,
+          vertices: 40_000,
+          bounds: { x: envelope.maxFootprint, y: envelope.maxHeight, z: envelope.maxFootprint },
+          finite: true,
+        };
+      },
+    },
   };
 
   const pieceRenderer = {
@@ -54,7 +91,11 @@ function fakeApplication() {
       const scale = object.scale.clone();
       object.removeFromParent();
       const replacement = this.factory.create(piece.type, piece.color);
-      replacement.userData = { kind: parent === capturedGroup ? "captured" : "piece", piece };
+      replacement.userData = {
+        ...replacement.userData,
+        kind: parent === capturedGroup ? "captured" : "piece",
+        piece,
+      };
       replacement.position.copy(position);
       replacement.scale.copy(scale);
       parent.add(replacement);

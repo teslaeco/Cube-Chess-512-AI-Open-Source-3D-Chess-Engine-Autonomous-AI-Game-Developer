@@ -1,0 +1,62 @@
+[
+  {
+    "type": "pawn",
+    "source": "Meshy_AI_Steel_Pawn_0803204718_generate(1).glb",
+    "grid": 128,
+    "sourceVertices": 131264,
+    "sourceTriangles": 262528,
+    "runtimeVertices": 39304,
+    "runtimeTriangles": 78941,
+    "binaryBytes": 709506
+  },
+  {
+    "type": "rook",
+    "source": "Meshy_AI_Titanium_Rook_0803204411_generate(1).glb",
+    "grid": 144,
+    "sourceVertices": 172077,
+    "sourceTriangles": 344150,
+    "runtimeVertices": 53276,
+    "runtimeTriangles": 106798,
+    "binaryBytes": 960480
+  },
+  {
+    "type": "knight",
+    "source": "Meshy_AI_Faceted_Knight_0803200730_generate(1).glb",
+    "grid": 160,
+    "sourceVertices": 151922,
+    "sourceTriangles": 303848,
+    "runtimeVertices": 55406,
+    "runtimeTriangles": 112072,
+    "binaryBytes": 1004904
+  },
+  {
+    "type": "bishop",
+    "source": "Meshy_AI_Gunmetal_Bishop_0803204615_generate(1).glb",
+    "grid": 144,
+    "sourceVertices": 115500,
+    "sourceTriangles": 231000,
+    "runtimeVertices": 44818,
+    "runtimeTriangles": 90134,
+    "binaryBytes": 809748
+  },
+  {
+    "type": "queen",
+    "source": "Meshy_AI_Obsidian_King_0808103127_generate.glb",
+    "grid": 144,
+    "sourceVertices": 128073,
+    "sourceTriangles": 256142,
+    "runtimeVertices": 45546,
+    "runtimeTriangles": 91668,
+    "binaryBytes": 823320
+  },
+  {
+    "type": "king",
+    "source": "Meshy_AI_Steel_King_0803204608_generate(1).glb",
+    "grid": 144,
+    "sourceVertices": 112116,
+    "sourceTriangles": 224228,
+    "runtimeVertices": 38451,
+    "runtimeTriangles": 77848,
+    "binaryBytes": 697830
+  }
+]
