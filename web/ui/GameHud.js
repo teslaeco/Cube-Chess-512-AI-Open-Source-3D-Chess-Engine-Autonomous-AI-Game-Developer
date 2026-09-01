@@ -4,6 +4,11 @@ import {
   getLocaleMeta,
   translate,
 } from "../i18n/locales.js";
+import {
+  CRAYON_CATHEDRAL_PRESET,
+  FORGEMCP_PREMIUM_PRESET,
+  normalizePlayerVisualPreset,
+} from "../state/pieceVisualPresets.js";
 
 const MENU_ITEMS = [
   ["newGame", "newGame"],
@@ -52,6 +57,11 @@ export class GameHud {
     this.renderedLanguage = null;
     this.lastMenuOpen = null;
     this.audioUrl = null;
+    this.selectedPieceSet = normalizePlayerVisualPreset(
+      typeof localStorage === "undefined"
+        ? undefined
+        : localStorage.getItem("cubeChessPieceSet"),
+    );
     this.element = document.createElement("aside");
     this.element.className = "hud";
     this.element.innerHTML = `
@@ -192,6 +202,10 @@ export class GameHud {
       } else if (target.matches("[data-large-text]")) {
         document.documentElement.classList.toggle("large-text", target.checked);
         localStorage.setItem("cubeChessLargeText", target.checked ? "1" : "0");
+      } else if (target.matches("[data-piece-set]")) {
+        this.selectedPieceSet = normalizePlayerVisualPreset(target.value);
+        localStorage.setItem("cubeChessPieceSet", this.selectedPieceSet);
+        this.actions.previewPieceSet(this.selectedPieceSet);
       } else if (target.matches("[data-audio-file]")) {
         this.loadLocalAudio(target.files?.[0]);
       }
@@ -209,6 +223,7 @@ export class GameHud {
           humanSide: data.get("humanSide"),
           difficulty: data.get("difficulty"),
           clockMinutes: data.get("clockMinutes"),
+          pieceSet: data.get("pieceSet"),
         });
       } else if (event.target.matches("[data-browser-form]")) {
         event.preventDefault();
@@ -357,11 +372,24 @@ export class GameHud {
 
   panelMarkup(panel) {
     switch (panel) {
-      case "newGame":
+      case "newGame": {
+        const selectedPieceSet = normalizePlayerVisualPreset(this.selectedPieceSet);
         return `
           <div class="panel-heading"><span>01</span><div><h2>${this.t("newGame")}</h2><p>${this.t("newGameIntro")}</p></div></div>
           <form class="new-game-form" data-new-game-form data-testid="new-game-form">
-            <fieldset><legend>${this.t("chooseMode")}</legend>
+            <fieldset class="piece-set-picker"><legend>${this.t("choosePieceSet")}</legend>
+              <label class="piece-set-card" data-testid="piece-set-premium">
+                <input data-piece-set type="radio" name="pieceSet" value="${FORGEMCP_PREMIUM_PRESET}" ${selectedPieceSet === FORGEMCP_PREMIUM_PRESET ? "checked" : ""}>
+                <span class="piece-set-preview premium-preview" aria-hidden="true"><span>♛</span><i></i></span>
+                <span class="piece-set-copy"><strong>${this.t("premiumPieceSet")}</strong><small>${this.t("premiumPieceSetDescription")}</small></span>
+              </label>
+              <label class="piece-set-card" data-testid="piece-set-crayon">
+                <input data-piece-set type="radio" name="pieceSet" value="${CRAYON_CATHEDRAL_PRESET}" ${selectedPieceSet === CRAYON_CATHEDRAL_PRESET ? "checked" : ""}>
+                <span class="piece-set-preview cathedral-preview" aria-hidden="true"><span class="mini-window"></span><i></i><i></i><i></i><b></b></span>
+                <span class="piece-set-copy"><strong>${this.t("crayonCathedralPieceSet")}</strong><small>${this.t("crayonCathedralPieceSetDescription")}</small></span>
+              </label>
+            </fieldset>
+            <fieldset class="game-mode-picker"><legend>${this.t("chooseMode")}</legend>
               <label><input type="radio" name="mode" value="local" checked> ${this.t("localTwoPlayers")}</label>
               <label><input type="radio" name="mode" value="computer"> ${this.t("versusComputer")}</label>
               <label><input type="radio" name="mode" value="tutorial"> ${this.t("tutorialAi")}</label>
@@ -375,6 +403,7 @@ export class GameHud {
             </div>
             <button class="primary-action" type="submit" data-testid="start-game">${this.t("startGame")} <span aria-hidden="true">→</span></button>
           </form>`;
+      }
       case "save":
         return `
           <div class="panel-heading"><span>02</span><div><h2>${this.t("save")}</h2><p>${this.t("localPrivacy")}</p></div></div>

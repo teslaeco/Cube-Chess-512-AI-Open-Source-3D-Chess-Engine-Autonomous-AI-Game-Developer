@@ -2,11 +2,29 @@ import {
   HIGH_DETAIL_CHESS_REVISION,
   HIGH_DETAIL_CHESS_SOURCE_ID,
 } from "../renderer/HighDetailChessModelSet.js";
+import {
+  HIGH_DETAIL_CHESS_TEXTURE_REVISION,
+  HIGH_DETAIL_CHESS_TEXTURE_STYLE,
+} from "../renderer/HighDetailChessTextureSet.js";
+import {
+  CRAYON_CATHEDRAL_REVISION,
+  CRAYON_CATHEDRAL_SOURCE_ID,
+} from "../renderer/CrayonCathedralPieceSet.js";
+import {
+  CRAYON_CATHEDRAL_TEXTURE_REVISION,
+  CRAYON_CATHEDRAL_TEXTURE_STYLE,
+} from "../renderer/CrayonCathedralTextureSet.js";
 import { pieceCellEnvelope } from "../renderer/pieceScaleProfile.js";
+import {
+  CRAYON_CATHEDRAL_PRESET,
+  FORGEMCP_PREMIUM_PRESET,
+  LEGACY_COMPACT_PRESET,
+  PLAYER_SELECTABLE_VISUAL_PRESETS,
+} from "../state/pieceVisualPresets.js";
 
-const TOOL_REVISION = "2026-09-01-owner-uploaded-high-detail-verification-v4";
-const PREMIUM_PRESET = "FORGEMCP_PREMIUM";
-const LEGACY_PRESET = "LEGACY_COMPACT";
+const TOOL_REVISION = "2026-09-01-multi-piece-set-verification-v6";
+const PREMIUM_PRESET = FORGEMCP_PREMIUM_PRESET;
+const LEGACY_PRESET = LEGACY_COMPACT_PRESET;
 const PIECE_TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
 
 function getApplication() {
@@ -24,18 +42,40 @@ function inspectObject(object) {
   let meshes = 0;
   const sources = new Set();
   const materialSignatures = new Set();
+  const textureStyles = new Set();
+  let fullyTexturedMeshes = 0;
   object?.traverse?.((child) => {
     if (child.userData?.forgeVisualSource) sources.add(child.userData.forgeVisualSource);
     if (child.userData?.meshyModelState) sources.add(`meshy-${child.userData.meshyModelState}`);
     if (child.userData?.highDetailModelState) sources.add(`high-detail-${child.userData.highDetailModelState}`);
+    if (child.userData?.crayonCathedralModelState) sources.add(`crayon-cathedral-${child.userData.crayonCathedralModelState}`);
     if (!child.isMesh || child.userData?.decorative) return;
     meshes += 1;
     triangles += countGeometryTriangles(child.geometry);
     if (child.name?.includes("meshy")) sources.add("compact-meshy-runtime");
     const material = Array.isArray(child.material) ? child.material[0] : child.material;
-    if (material?.color) materialSignatures.add(`${material.type}:${material.color.getHexString()}`);
+    if (material?.color) {
+      materialSignatures.add([
+        material.type,
+        material.color.getHexString(),
+        material.emissive?.getHexString?.() ?? "no-emissive",
+        material.map?.name ?? "no-color-map",
+        material.userData?.forgeTextureStyle ?? "untextured",
+      ].join(":"));
+    }
+    if (material?.userData?.forgeTextureStyle) textureStyles.add(material.userData.forgeTextureStyle);
+    if (material?.map && material?.roughnessMap && material?.metalnessMap && material?.bumpMap && material?.emissiveMap) {
+      fullyTexturedMeshes += 1;
+    }
   });
-  return { triangles, meshes, sources: [...sources], materialSignatures: [...materialSignatures] };
+  return {
+    triangles,
+    meshes,
+    sources: [...sources],
+    materialSignatures: [...materialSignatures],
+    textureStyles: [...textureStyles],
+    fullyTexturedMeshes,
+  };
 }
 
 function clonePieceCoordinates(pieceRenderer) {
@@ -69,6 +109,8 @@ function snapshotPieceVisuals(application) {
   const totalTriangles = inspected.reduce((sum, item) => sum + item.triangles, 0);
   const sourceMeshes = inspected.reduce((sum, item) => sum + item.meshes, 0);
   const sources = [...new Set(inspected.flatMap((item) => item.sources))];
+  const textureStyles = [...new Set(inspected.flatMap((item) => item.textureStyles))];
+  const fullyTexturedMeshes = inspected.reduce((sum, item) => sum + item.fullyTexturedMeshes, 0);
   const typeTriangles = Object.fromEntries(PIECE_TYPES.map((type) => {
     const sample = inspected.find((item) => item.piece?.type === type);
     return [type, sample?.triangles ?? null];
@@ -82,6 +124,7 @@ function snapshotPieceVisuals(application) {
     state: "PASS",
     revision: TOOL_REVISION,
     premiumRevision: HIGH_DETAIL_CHESS_REVISION,
+    crayonCathedralRevision: CRAYON_CATHEDRAL_REVISION,
     preset: factory.__forgeVisualMode ?? LEGACY_PRESET,
     activePieces: activeEntries.length,
     capturedPieces: capturedEntries.length,
@@ -91,6 +134,12 @@ function snapshotPieceVisuals(application) {
     totalSourceMeshes: sourceMeshes,
     typeTriangles,
     sources,
+    textureStyles,
+    textureRevisions: {
+      premium: HIGH_DETAIL_CHESS_TEXTURE_REVISION,
+      crayonCathedral: CRAYON_CATHEDRAL_TEXTURE_REVISION,
+    },
+    fullyTexturedMeshes,
     selectedPieceId: pieceRenderer.selectedPieceId ?? null,
     levels: application.presentation.snapshot().levels.map((level) => ({ index: level.index, visible: level.visible })),
     coordinates: clonePieceCoordinates(pieceRenderer),
@@ -98,6 +147,9 @@ function snapshotPieceVisuals(application) {
     provenance: [
       "web/renderer/PieceGeometryFactory.js",
       "web/renderer/HighDetailChessModelSet.js",
+      "web/renderer/HighDetailChessTextureSet.js",
+      "web/renderer/CrayonCathedralPieceSet.js",
+      "web/renderer/CrayonCathedralTextureSet.js",
       "public/assets/high-detail-chess-models/*.ccm.b64",
       "scripts/build-high-detail-chess-assets.mjs",
       "web/renderer/MeshyChessModelSet.js",
@@ -117,10 +169,18 @@ function rememberOriginalFactory(factory) {
     const premiumCreate = typeof factory.createPremium === "function" ? factory.createPremium : factory.create;
     factory.__forgePremiumCreate = premiumCreate.bind(factory);
   }
+  if (!factory.__forgeCrayonCathedralCreate && typeof factory.createCrayonCathedral === "function") {
+    factory.__forgeCrayonCathedralCreate = factory.createCrayonCathedral.bind(factory);
+  }
 }
 
 function rebuildPieceObjects(application) {
   const pieceRenderer = application.renderer.pieceRenderer;
+  if (typeof pieceRenderer.rebuildAll === "function") {
+    pieceRenderer.rebuildAll();
+    pieceRenderer.setLevelVisibility(application.presentation.snapshot().levels);
+    return;
+  }
   for (const [id, object] of [...pieceRenderer.pieces.entries()]) {
     const piece = object.userData?.piece;
     if (!piece) continue;
@@ -141,20 +201,36 @@ function rebuildPieceObjects(application) {
   pieceRenderer.setLevelVisibility(application.presentation.snapshot().levels);
 }
 
-function applyPremiumMode(application) {
+function applyVisualMode(application, preset) {
   const factory = application.renderer.pieceRenderer.factory;
   rememberOriginalFactory(factory);
-  factory.create = factory.__forgePremiumCreate;
-  factory.__forgeVisualMode = PREMIUM_PRESET;
+  if (typeof factory.setVisualMode === "function") {
+    factory.setVisualMode(preset);
+  } else if (preset === PREMIUM_PRESET) {
+    factory.create = factory.__forgePremiumCreate;
+    factory.__forgeVisualMode = PREMIUM_PRESET;
+  } else if (preset === CRAYON_CATHEDRAL_PRESET && factory.__forgeCrayonCathedralCreate) {
+    factory.create = factory.__forgeCrayonCathedralCreate;
+    factory.__forgeVisualMode = CRAYON_CATHEDRAL_PRESET;
+  } else if (preset === LEGACY_PRESET) {
+    factory.create = factory.__forgeOriginalCreate;
+    factory.__forgeVisualMode = LEGACY_PRESET;
+  } else {
+    throw new Error(`Visual preset ${preset} is unavailable in this renderer.`);
+  }
   rebuildPieceObjects(application);
 }
 
+function applyPremiumMode(application) {
+  applyVisualMode(application, PREMIUM_PRESET);
+}
+
+function applyCrayonCathedralMode(application) {
+  applyVisualMode(application, CRAYON_CATHEDRAL_PRESET);
+}
+
 function restoreLegacyMode(application) {
-  const factory = application.renderer.pieceRenderer.factory;
-  rememberOriginalFactory(factory);
-  factory.create = factory.__forgeOriginalCreate;
-  factory.__forgeVisualMode = LEGACY_PRESET;
-  rebuildPieceObjects(application);
+  applyVisualMode(application, LEGACY_PRESET);
 }
 
 function nextFrame() {
@@ -201,6 +277,16 @@ function highDetailModelStates(pieceRenderer) {
   return states;
 }
 
+function crayonCathedralModelStates(pieceRenderer) {
+  const states = { ready: 0, unknown: 0 };
+  const objects = [...pieceRenderer.pieces.values(), ...pieceRenderer.captured.values()];
+  for (const object of objects) {
+    if (object.userData?.crayonCathedralModelState === "ready") states.ready += 1;
+    else states.unknown += 1;
+  }
+  return states;
+}
+
 async function waitForHighDetailModels(pieceRenderer, timeoutMs = 20_000) {
   const deadline = Date.now() + timeoutMs;
   let states = highDetailModelStates(pieceRenderer);
@@ -224,6 +310,12 @@ function hasReadyLegacySource(snapshot) {
     !snapshot.sources.includes("meshy-fallback");
 }
 
+function hasCrayonCathedralSource(snapshot) {
+  return snapshot.sources.includes(CRAYON_CATHEDRAL_SOURCE_ID) &&
+    snapshot.sources.includes("crayon-cathedral-ready") &&
+    snapshot.textureStyles.includes(CRAYON_CATHEDRAL_TEXTURE_STYLE);
+}
+
 async function premiumGeometryQa(factory) {
   rememberOriginalFactory(factory);
   if (!factory.highDetailModels?.inspect) {
@@ -240,11 +332,65 @@ async function premiumGeometryQa(factory) {
       finiteBounds: stat.finite,
       highDetailTriangles: stat.triangles >= 70_000,
       fitsCellEnvelope: stat.bounds.y <= envelope.maxHeight + 1e-6 && stat.bounds.x <= envelope.maxFootprint + 1e-6 && stat.bounds.z <= envelope.maxFootprint + 1e-6,
+      approvedTextureStyle: stat.textureStyle === HIGH_DETAIL_CHESS_TEXTURE_STYLE,
+      fullPbrTextureStack: stat.hasUv && Object.values(stat.textureMaps ?? {}).every(Boolean),
       bounds: stat.bounds,
       envelope,
     };
   });
-  return { checks, result: checks.every((item) => item.finiteBounds && item.highDetailTriangles && item.fitsCellEnvelope) ? "PASS" : "FAIL" };
+  return {
+    checks,
+    result: checks.every((item) => item.finiteBounds && item.highDetailTriangles && item.fitsCellEnvelope && item.approvedTextureStyle && item.fullPbrTextureStack)
+      ? "PASS"
+      : "FAIL",
+  };
+}
+
+async function crayonCathedralGeometryQa(factory) {
+  if (!factory.crayonCathedralModels?.inspect) {
+    return { checks: [], result: "FAIL", reason: "Crayon Cathedral model set is unavailable." };
+  }
+  const stats = PIECE_TYPES.map((type) =>
+    factory.crayonCathedralModels.inspect(type, "white"),
+  );
+  const checks = stats.map((stat) => {
+    const envelope = pieceCellEnvelope(stat.type);
+    return {
+      type: stat.type,
+      triangles: stat.triangles,
+      finiteBounds: stat.finite,
+      detailedGeometry: stat.triangles >= 45_000,
+      hasWindowAndCrayonGeometry: stat.resources.roles.some((role) => role.includes("window")) &&
+        stat.resources.roles.some((role) => role.includes("crayon")),
+      fitsCellEnvelope: stat.bounds.y <= envelope.maxHeight + 1e-6 &&
+        stat.bounds.x <= envelope.maxFootprint + 1e-6 &&
+        stat.bounds.z <= envelope.maxFootprint + 1e-6,
+      approvedTextureStyle: stat.textureStyle === CRAYON_CATHEDRAL_TEXTURE_STYLE,
+      fullPbrTextureStack: stat.resources.fullyTexturedMeshes === stat.resources.meshes,
+      bounds: stat.bounds,
+      envelope,
+      resources: stat.resources,
+    };
+  });
+  return {
+    checks,
+    result: checks.every((item) =>
+      item.finiteBounds &&
+      item.detailedGeometry &&
+      item.hasWindowAndCrayonGeometry &&
+      item.fitsCellEnvelope &&
+      item.approvedTextureStyle &&
+      item.fullPbrTextureStack)
+      ? "PASS"
+      : "FAIL",
+  };
+}
+
+async function geometryQaForPreset(factory, preset) {
+  if (preset === CRAYON_CATHEDRAL_PRESET) {
+    return crayonCathedralGeometryQa(factory);
+  }
+  return premiumGeometryQa(factory);
 }
 
 function structuredResult(state, data, verification = state === "PASS" ? "PASS" : "WARNING") {
@@ -254,25 +400,39 @@ function structuredResult(state, data, verification = state === "PASS" ? "PASS" 
 export async function inspectPieceVisuals() {
   const application = getApplication();
   if (!application) return structuredResult("WARNING", { status: "NOT_READY", reason: "Start or display Cube Chess before inspecting piece visuals.", provenance: ["web/forgemcp/visualTools.js"] }, "INSUFFICIENT_DATA");
-  const geometryQa = await premiumGeometryQa(application.renderer.pieceRenderer.factory);
+  const [premiumGeometryQaResult, crayonCathedralGeometryQaResult] = await Promise.all([
+    premiumGeometryQa(application.renderer.pieceRenderer.factory),
+    crayonCathedralGeometryQa(application.renderer.pieceRenderer.factory),
+  ]);
   const snapshot = snapshotPieceVisuals(application);
-  return structuredResult("PASS", { ...snapshot, premiumGeometryQa: geometryQa });
+  return structuredResult("PASS", {
+    ...snapshot,
+    availablePlayerPresets: PLAYER_SELECTABLE_VISUAL_PRESETS,
+    premiumGeometryQa: premiumGeometryQaResult,
+    crayonCathedralGeometryQa: crayonCathedralGeometryQaResult,
+  });
 }
 
 export async function previewPieceVisualUpgrade(input = {}) {
-  if (input?.preset !== undefined && input.preset !== PREMIUM_PRESET) {
-    return structuredResult("FAIL", { error: `Unsupported visual preset: ${input.preset}`, allowed: [PREMIUM_PRESET], provenance: ["web/forgemcp/visualTools.js"] }, "FAIL");
+  const requestedPreset = input?.preset ?? PREMIUM_PRESET;
+  if (!PLAYER_SELECTABLE_VISUAL_PRESETS.includes(requestedPreset)) {
+    return structuredResult("FAIL", { error: `Unsupported visual preset: ${requestedPreset}`, allowed: PLAYER_SELECTABLE_VISUAL_PRESETS, provenance: ["web/forgemcp/visualTools.js"] }, "FAIL");
   }
   const application = getApplication();
   if (!application) return structuredResult("WARNING", { status: "NOT_READY", reason: "Cube Chess application instance is not available yet.", provenance: ["web/forgemcp/visualTools.js"] }, "INSUFFICIENT_DATA");
   const before = snapshotPieceVisuals(application);
-  const geometryQa = await premiumGeometryQa(application.renderer.pieceRenderer.factory);
+  const geometryQa = await geometryQaForPreset(
+    application.renderer.pieceRenderer.factory,
+    requestedPreset,
+  );
   return structuredResult(geometryQa.result === "PASS" ? "PASS" : "FAIL", {
     status: "AWAITING_HUMAN_APPROVAL",
     before,
-    proposedPreset: PREMIUM_PRESET,
-    premiumGeometry: geometryQa,
-    action: "Rebuild every active and captured piece from the owner-uploaded high-detail GLB derivatives.",
+    proposedPreset: requestedPreset,
+    proposedGeometry: geometryQa,
+    action: requestedPreset === CRAYON_CATHEDRAL_PRESET
+      ? "Rebuild every active and captured piece with the original windowed Crayon Cathedral geometry and its stained-glass five-map PBR materials."
+      : "Rebuild every active and captured piece from the owner-uploaded high-detail GLB derivatives with the approved marble/obsidian PBR texture stack.",
     reversible: true,
     liveMutationPerformed: false,
     provenance: before.provenance,
@@ -280,24 +440,28 @@ export async function previewPieceVisualUpgrade(input = {}) {
 }
 
 export async function upgradePieceVisuals(input = {}) {
-  if (input?.preset !== PREMIUM_PRESET) return structuredResult("FAIL", { error: `preset must equal ${PREMIUM_PRESET}`, requiredInput: { preset: PREMIUM_PRESET, humanApproved: true }, provenance: ["web/forgemcp/visualTools.js"] }, "FAIL");
-  if (input?.humanApproved !== true) return structuredResult("FAIL", { error: "Human approval is required before mutating live game visuals.", requiredInput: { preset: PREMIUM_PRESET, humanApproved: true }, provenance: ["web/forgemcp/visualTools.js"] }, "FAIL");
+  const requestedPreset = input?.preset;
+  if (!PLAYER_SELECTABLE_VISUAL_PRESETS.includes(requestedPreset)) return structuredResult("FAIL", { error: `preset must be one of: ${PLAYER_SELECTABLE_VISUAL_PRESETS.join(", ")}`, requiredInput: { preset: PLAYER_SELECTABLE_VISUAL_PRESETS, humanApproved: true }, provenance: ["web/forgemcp/visualTools.js"] }, "FAIL");
+  if (input?.humanApproved !== true) return structuredResult("FAIL", { error: "Human approval is required before mutating live game visuals.", requiredInput: { preset: requestedPreset, humanApproved: true }, provenance: ["web/forgemcp/visualTools.js"] }, "FAIL");
   const application = getApplication();
   if (!application) return structuredResult("WARNING", { status: "NOT_READY", reason: "Cube Chess application instance is not available yet.", provenance: ["web/forgemcp/visualTools.js"] }, "INSUFFICIENT_DATA");
 
   const pieceRenderer = application.renderer.pieceRenderer;
   const before = snapshotPieceVisuals(application);
-  const premiumQa = await premiumGeometryQa(pieceRenderer.factory);
-  if (premiumQa.result !== "PASS") return structuredResult("FAIL", { status: "QA_BLOCKED", premiumQa, provenance: before.provenance }, "FAIL");
+  const targetQa = await geometryQaForPreset(pieceRenderer.factory, requestedPreset);
+  if (targetQa.result !== "PASS") return structuredResult("FAIL", { status: "QA_BLOCKED", requestedPreset, targetQa, provenance: before.provenance }, "FAIL");
 
-  if (before.preset === PREMIUM_PRESET && hasPremiumSource(before)) {
+  const targetAlreadyReady = requestedPreset === PREMIUM_PRESET
+    ? hasPremiumSource(before)
+    : hasCrayonCathedralSource(before);
+  if (before.preset === requestedPreset && targetAlreadyReady) {
     return structuredResult("PASS", {
       status: "ALREADY_APPLIED",
       presetBefore: before.preset,
       presetAfter: before.preset,
       before,
       after: before,
-      premiumQa,
+      targetQa,
       reversible: true,
       humanApproved: true,
       liveMutationPerformed: false,
@@ -305,8 +469,16 @@ export async function upgradePieceVisuals(input = {}) {
     });
   }
 
-  applyPremiumMode(application);
-  const highDetailModels = await waitForHighDetailModels(pieceRenderer);
+  if (requestedPreset === CRAYON_CATHEDRAL_PRESET) applyCrayonCathedralMode(application);
+  else applyPremiumMode(application);
+  const modelStates = requestedPreset === PREMIUM_PRESET
+    ? await waitForHighDetailModels(pieceRenderer)
+    : crayonCathedralModelStates(pieceRenderer);
+  if (application.presentation?.gameConfig) {
+    application.presentation.gameConfig.pieceSet = requestedPreset;
+  }
+  if (application.hud) application.hud.selectedPieceSet = requestedPreset;
+  if (typeof localStorage !== "undefined") localStorage.setItem("cubeChessPieceSet", requestedPreset);
   refreshPublishedDiagnostics();
   await nextFrame();
   const after = snapshotPieceVisuals(application);
@@ -314,24 +486,39 @@ export async function upgradePieceVisuals(input = {}) {
   const levelVisibilityPreserved = JSON.stringify(before.levels) === JSON.stringify(after.levels);
   const selectedPiecePreserved = before.selectedPieceId === after.selectedPieceId;
   const differentPlayerMaterials = JSON.stringify(after.colorMaterials.white) !== JSON.stringify(after.colorMaterials.black);
+  const targetSourceVerified = requestedPreset === PREMIUM_PRESET
+    ? hasPremiumSource(after)
+    : hasCrayonCathedralSource(after);
+  const expectedTextureStyle = requestedPreset === PREMIUM_PRESET
+    ? HIGH_DETAIL_CHESS_TEXTURE_STYLE
+    : CRAYON_CATHEDRAL_TEXTURE_STYLE;
+  const modelsReady = requestedPreset === PREMIUM_PRESET
+    ? modelStates.loading === 0 &&
+      modelStates.fallback === 0 &&
+      modelStates.unknown === 0 &&
+      modelStates.ready === after.renderedPieceObjects
+    : modelStates.unknown === 0 && modelStates.ready === after.renderedPieceObjects;
   const qa = {
     activePieceCountPreserved: after.activePieces === before.activePieces,
     capturedPieceCountPreserved: after.capturedPieces === before.capturedPieces,
     coordinatesPreserved,
     selectedPiecePreserved,
     levelVisibilityPreserved,
-    allPremiumPieceTypesValid: premiumQa.result === "PASS",
-    highDetailModelsReady: highDetailModels.loading === 0 &&
-      highDetailModels.fallback === 0 &&
-      highDetailModels.unknown === 0 &&
-      highDetailModels.ready === after.renderedPieceObjects,
+    allTargetPieceTypesValid: targetQa.result === "PASS",
+    targetModelsReady: modelsReady,
     triangleCountsMeasured: Number.isFinite(before.totalTriangles) && Number.isFinite(after.totalTriangles) && after.totalTriangles > 0,
     geometryChanged: after.totalTriangles !== before.totalTriangles,
     sourceChanged: JSON.stringify([...before.sources].sort()) !== JSON.stringify([...after.sources].sort()),
-    premiumSourceVerified: hasPremiumSource(after),
+    targetSourceVerified,
+    targetTexturesVerified: after.textureStyles.includes(expectedTextureStyle) &&
+      after.fullyTexturedMeshes === after.totalSourceMeshes,
     whiteBlackMaterialsDiffer: differentPlayerMaterials,
-    presetApplied: after.preset === PREMIUM_PRESET,
+    presetApplied: after.preset === requestedPreset,
   };
+  // Keep the preset-specific evidence keys consumed by the existing CI harness
+  // while exposing the shared targetSourceVerified key to newer callers.
+  if (requestedPreset === PREMIUM_PRESET) qa.premiumSourceVerified = targetSourceVerified;
+  else qa.crayonCathedralSourceVerified = targetSourceVerified;
   qa.result = Object.values(qa).every((value) => value === true || value === "PASS") ? "PASS" : "FAIL";
   return structuredResult(qa.result === "PASS" ? "PASS" : "FAIL", {
     status: qa.result === "PASS" ? "APPLIED" : "APPLIED_WITH_QA_FAILURE",
@@ -345,8 +532,9 @@ export async function upgradePieceVisuals(input = {}) {
     trianglesAfter: after.totalTriangles,
     triangleDelta: after.totalTriangles - before.totalTriangles,
     pieceTypesInspected: PIECE_TYPES,
-    perTypePremiumTriangles: after.typeTriangles,
-    highDetailModels,
+    perTypeTriangles: after.typeTriangles,
+    modelStates,
+    targetQa,
     qa,
     reversible: true,
     humanApproved: true,
@@ -409,10 +597,10 @@ export async function rollbackPieceVisuals(input = {}) {
 }
 
 const INPUT_NONE = { type: "object", properties: {}, additionalProperties: false };
-const INPUT_PREVIEW = { type: "object", properties: { preset: { type: "string", enum: [PREMIUM_PRESET] } }, additionalProperties: false };
+const INPUT_PREVIEW = { type: "object", properties: { preset: { type: "string", enum: PLAYER_SELECTABLE_VISUAL_PRESETS } }, additionalProperties: false };
 const INPUT_UPGRADE = {
   type: "object",
-  properties: { preset: { type: "string", const: PREMIUM_PRESET }, humanApproved: { type: "boolean", const: true } },
+  properties: { preset: { type: "string", enum: PLAYER_SELECTABLE_VISUAL_PRESETS }, humanApproved: { type: "boolean", const: true } },
   required: ["preset", "humanApproved"],
   additionalProperties: false,
 };
@@ -423,14 +611,18 @@ export async function registerVisualWebMcpTools() {
   const modelContext = typeof document !== "undefined" ? document.modelContext : null;
   if (!modelContext || typeof modelContext.registerTool !== "function") return { availability: "WEBMCP_UNAVAILABLE", registered: 0 };
   const tools = [
-    { name: "inspect_piece_visuals", description: "Inspect real Cube Chess Three.js piece geometry, measured triangle counts, premium geometry QA and provenance.", inputSchema: INPUT_NONE, outputSchema: OUTPUT, execute: inspectPieceVisuals },
-    { name: "preview_piece_visual_upgrade", description: "Preview the new ForgeMCP Premium Piece Set and deterministic geometry QA without mutating the live game.", inputSchema: INPUT_PREVIEW, outputSchema: OUTPUT, execute: previewPieceVisualUpgrade },
-    { name: "upgrade_piece_visuals", description: "After explicit human approval, rebuild every live Cube Chess piece with the new ForgeMCP Premium Piece Set and return measured before/after QA.", inputSchema: INPUT_UPGRADE, outputSchema: OUTPUT, execute: upgradePieceVisuals },
+    { name: "inspect_piece_visuals", description: "Inspect real Cube Chess Three.js geometry, PBR texture maps, measured triangle counts, fit QA and provenance.", inputSchema: INPUT_NONE, outputSchema: OUTPUT, execute: inspectPieceVisuals },
+    { name: "preview_piece_visual_upgrade", description: "Preview either selectable 3D piece collection—ForgeMCP Premium or Crayon Cathedral—and run deterministic geometry/material QA without mutating the live game.", inputSchema: INPUT_PREVIEW, outputSchema: OUTPUT, execute: previewPieceVisualUpgrade },
+    { name: "upgrade_piece_visuals", description: "After explicit human approval, rebuild every live Cube Chess piece with the selected Premium or Crayon Cathedral geometry and PBR textures, then return measured before/after QA.", inputSchema: INPUT_UPGRADE, outputSchema: OUTPUT, execute: upgradePieceVisuals },
     { name: "rollback_piece_visuals", description: "After explicit human approval, restore the legacy compact Meshy runtime piece pipeline and return measured rollback QA.", inputSchema: INPUT_APPROVAL, outputSchema: OUTPUT, execute: rollbackPieceVisuals },
   ];
   let registered = 0;
   for (const tool of tools) { await modelContext.registerTool(tool); registered += 1; }
-  return { availability: "WEBMCP_AVAILABLE", registered, revision: TOOL_REVISION, preset: PREMIUM_PRESET };
+  return { availability: "WEBMCP_AVAILABLE", registered, revision: TOOL_REVISION, presets: PLAYER_SELECTABLE_VISUAL_PRESETS };
 }
 
-export const FORGEMCP_VISUAL_PRESETS = Object.freeze({ LEGACY: LEGACY_PRESET, PREMIUM: PREMIUM_PRESET });
+export const FORGEMCP_VISUAL_PRESETS = Object.freeze({
+  LEGACY: LEGACY_PRESET,
+  PREMIUM: PREMIUM_PRESET,
+  CRAYON_CATHEDRAL: CRAYON_CATHEDRAL_PRESET,
+});

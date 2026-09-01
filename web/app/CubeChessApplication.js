@@ -39,6 +39,7 @@ export class CubeChessApplication {
     this.hud = new GameHud(root, {
       reset: () => this.renderer.resetCamera(),
       startGame: (config) => this.startGame(config),
+      previewPieceSet: (preset) => this.previewPieceSet(preset),
       undo: () => this.renderer.undo(),
       redo: () => this.renderer.redo(),
       openMenu: () => this.renderer.openMenu(),
@@ -69,6 +70,10 @@ export class CubeChessApplication {
       exportSave: (id) => this.exportSave(id),
       importSave: (file) => this.importSave(file),
     });
+    // Build the first 32 objects directly in the persisted collection. This
+    // avoids decoding Premium assets only to replace them immediately when the
+    // player previously chose Crayon Cathedral.
+    this.presentation.gameConfig.pieceSet = this.hud.selectedPieceSet;
     this.renderer = new ChessRenderer(
       this.stage,
       this.presentation,
@@ -79,6 +84,7 @@ export class CubeChessApplication {
       this.renderer,
     );
     this.renderer.setFog(localStorage.getItem("cubeChessFog") === "1");
+    this.previewPieceSet(this.hud.selectedPieceSet);
     this.attractMode.start();
   }
 
@@ -108,6 +114,14 @@ export class CubeChessApplication {
     this.ai.cancel();
     this.aiRequestPending = false;
     this.renderer.startGame(config);
+    this.root.dataset.pieceSet = this.presentation.gameConfig.pieceSet;
+  }
+
+  previewPieceSet(preset) {
+    const changed = this.renderer.setPieceVisualPreset(preset);
+    this.root.dataset.pieceSet = this.renderer.pieceRenderer.factory.__forgeVisualMode;
+    globalThis.__forgeMcpPublishVisualDiagnostics?.();
+    return changed;
   }
 
   handleStateChange(state) {
@@ -245,6 +259,9 @@ export class CubeChessApplication {
     this.ai.cancel();
     this.aiRequestPending = false;
     this.renderer.loadGame(record.payload);
+    this.hud.selectedPieceSet = this.presentation.gameConfig.pieceSet;
+    localStorage.setItem("cubeChessPieceSet", this.hud.selectedPieceSet);
+    this.root.dataset.pieceSet = this.presentation.gameConfig.pieceSet;
     this.presentation.message = "saveLoaded";
     this.renderer.refresh();
     return true;

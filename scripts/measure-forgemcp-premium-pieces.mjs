@@ -6,6 +6,7 @@ import {
   prepareHighDetailPiece,
 } from "../web/renderer/HighDetailChessModelSet.js";
 import { decodeBase64Bytes, parseCompactChessGeometry } from "../web/renderer/MeshyChessModelSet.js";
+import { HIGH_DETAIL_CHESS_TEXTURE_STYLE } from "../web/renderer/HighDetailChessTextureSet.js";
 
 const types = ["pawn", "rook", "knight", "bishop", "queen", "king"];
 const material = new THREE.MeshPhysicalMaterial({ color: 0xffffff });
@@ -17,6 +18,17 @@ for (const type of types) {
   const object = prepareHighDetailPiece(geometry, material, type, "white");
   object.updateMatrixWorld(true);
   const size = new THREE.Box3().setFromObject(object).getSize(new THREE.Vector3());
+  const surface = object.getObjectByProperty("isMesh", true);
+  const textureMaps = {
+    color: Boolean(surface.material.map),
+    roughness: Boolean(surface.material.roughnessMap),
+    metalness: Boolean(surface.material.metalnessMap),
+    bump: Boolean(surface.material.bumpMap),
+    emissive: Boolean(surface.material.emissiveMap),
+  };
+  if (!geometry.getAttribute("uv") || surface.material.userData.forgeTextureStyle !== HIGH_DETAIL_CHESS_TEXTURE_STYLE || !Object.values(textureMaps).every(Boolean)) {
+    throw new Error(`${type} is missing the approved PBR texture stack`);
+  }
   measurements.push({
     type,
     vertices: geometry.attributes.position.count,
@@ -25,6 +37,8 @@ for (const type of types) {
     height: size.y,
     depth: size.z,
     runtimePrimarySource: HIGH_DETAIL_CHESS_SOURCE_ID,
+    textureStyle: surface.material.userData.forgeTextureStyle,
+    textureMaps,
   });
 }
 

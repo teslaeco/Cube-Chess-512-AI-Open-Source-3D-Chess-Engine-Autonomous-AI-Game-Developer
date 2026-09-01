@@ -7,6 +7,9 @@ import {
   upgradePieceVisuals,
 } from "./visualTools.js";
 import { HIGH_DETAIL_CHESS_SOURCE_ID } from "../renderer/HighDetailChessModelSet.js";
+import { HIGH_DETAIL_CHESS_TEXTURE_STYLE } from "../renderer/HighDetailChessTextureSet.js";
+import { CRAYON_CATHEDRAL_SOURCE_ID } from "../renderer/CrayonCathedralPieceSet.js";
+import { CRAYON_CATHEDRAL_TEXTURE_STYLE } from "../renderer/CrayonCathedralTextureSet.js";
 import { pieceCellEnvelope } from "../renderer/pieceScaleProfile.js";
 
 function legacyPiece(type, color, id, position) {
@@ -24,6 +27,13 @@ function premiumPiece(type, color, id, position) {
   const group = new THREE.Group();
   const geometry = new THREE.SphereGeometry(0.35, 48, 24);
   const material = new THREE.MeshStandardMaterial({ color: color === "white" ? 0xf4eee0 : 0x1a2837 });
+  const texture = new THREE.Texture();
+  material.map = texture;
+  material.roughnessMap = texture;
+  material.metalnessMap = texture;
+  material.bumpMap = texture;
+  material.emissiveMap = texture;
+  material.userData.forgeTextureStyle = HIGH_DETAIL_CHESS_TEXTURE_STYLE;
   const surface = new THREE.Mesh(geometry, material);
   surface.name = `${color}-${type}-uploaded-high-detail-surface`;
   surface.userData.forgeVisualSource = HIGH_DETAIL_CHESS_SOURCE_ID;
@@ -33,6 +43,30 @@ function premiumPiece(type, color, id, position) {
     piece: { id, type, color, position },
     highDetailModelState: "ready",
     forgeVisualSource: HIGH_DETAIL_CHESS_SOURCE_ID,
+  };
+  return group;
+}
+
+function crayonCathedralPiece(type, color, id, position) {
+  const group = new THREE.Group();
+  const geometry = new THREE.IcosahedronGeometry(0.36, 4);
+  const material = new THREE.MeshStandardMaterial({ color: color === "white" ? 0x37d9ca : 0xef5f3b });
+  const texture = new THREE.Texture();
+  material.map = texture;
+  material.roughnessMap = texture;
+  material.metalnessMap = texture;
+  material.bumpMap = texture;
+  material.emissiveMap = texture;
+  material.userData.forgeTextureStyle = CRAYON_CATHEDRAL_TEXTURE_STYLE;
+  const surface = new THREE.Mesh(geometry, material);
+  surface.name = `${color}-${type}-crayon-cathedral-surface`;
+  surface.userData.forgeVisualSource = CRAYON_CATHEDRAL_SOURCE_ID;
+  group.add(surface);
+  group.userData = {
+    kind: "piece",
+    piece: { id, type, color, position },
+    crayonCathedralModelState: "ready",
+    forgeVisualSource: CRAYON_CATHEDRAL_SOURCE_ID,
   };
   return group;
 }
@@ -65,6 +99,9 @@ function fakeApplication() {
     createPremium(type, color) {
       return premiumPiece(type, color, `premium-${type}`, { x: 0, y: 0, z: 0 });
     },
+    createCrayonCathedral(type, color) {
+      return crayonCathedralPiece(type, color, `crayon-${type}`, { x: 0, y: 0, z: 0 });
+    },
     highDetailModels: {
       async inspect(type) {
         const envelope = pieceCellEnvelope(type);
@@ -74,6 +111,26 @@ function fakeApplication() {
           vertices: 40_000,
           bounds: { x: envelope.maxFootprint, y: envelope.maxHeight, z: envelope.maxFootprint },
           finite: true,
+          textureStyle: HIGH_DETAIL_CHESS_TEXTURE_STYLE,
+          hasUv: true,
+          textureMaps: { color: true, roughness: true, metalness: true, bump: true, emissive: true },
+        };
+      },
+    },
+    crayonCathedralModels: {
+      inspect(type) {
+        const envelope = pieceCellEnvelope(type);
+        return {
+          type,
+          triangles: 50_000,
+          bounds: { x: envelope.maxFootprint, y: envelope.maxHeight, z: envelope.maxFootprint },
+          finite: true,
+          textureStyle: CRAYON_CATHEDRAL_TEXTURE_STYLE,
+          resources: {
+            roles: ["window-glass-detail", "crayon-detail"],
+            meshes: 2,
+            fullyTexturedMeshes: 2,
+          },
         };
       },
     },
@@ -146,6 +203,7 @@ describe("ForgeMCP premium visual WebMCP tools", () => {
     expect(result.data.qa.coordinatesPreserved).toBe(true);
     expect(result.data.qa.selectedPiecePreserved).toBe(true);
     expect(result.data.qa.levelVisibilityPreserved).toBe(true);
+    expect(result.data.qa.premiumSourceVerified).toBe(true);
     expect(result.data.trianglesAfter).toBeGreaterThan(result.data.trianglesBefore);
     for (const [id, object] of app.renderer.pieceRenderer.pieces) expect(object.position.equals(beforePositions.get(id))).toBe(true);
   });
@@ -162,6 +220,22 @@ describe("ForgeMCP premium visual WebMCP tools", () => {
     expect(rolledBack.data.qa.geometryChanged).toBe(true);
     expect(rolledBack.data.qa.sourceChanged).toBe(true);
     expect(rolledBack.data.qa.legacyModelsReady).toBe(true);
+  });
+
+  it("applies the Crayon Cathedral preset through the same approval-gated WebMCP path", async () => {
+    const app = fakeApplication();
+    globalThis.__forgeMcpCubeApplication = app;
+    const result = await upgradePieceVisuals({
+      preset: FORGEMCP_VISUAL_PRESETS.CRAYON_CATHEDRAL,
+      humanApproved: true,
+    });
+
+    expect(result.state).toBe("PASS");
+    expect(result.data.presetAfter).toBe(FORGEMCP_VISUAL_PRESETS.CRAYON_CATHEDRAL);
+    expect(result.data.qa.targetSourceVerified).toBe(true);
+    expect(result.data.qa.crayonCathedralSourceVerified).toBe(true);
+    expect(result.data.qa.targetTexturesVerified).toBe(true);
+    expect(result.data.modelStates).toEqual({ ready: 3, unknown: 0 });
   });
 
   it("reports an already-applied premium source without claiming a live mutation", async () => {
@@ -188,5 +262,9 @@ describe("ForgeMCP premium visual WebMCP tools", () => {
       "rollback_piece_visuals",
     ]);
     expect(typeof tools.find((tool) => tool.name === "upgrade_piece_visuals").execute).toBe("function");
+    expect(tools.find((tool) => tool.name === "upgrade_piece_visuals").inputSchema.properties.preset.enum).toEqual([
+      FORGEMCP_VISUAL_PRESETS.PREMIUM,
+      FORGEMCP_VISUAL_PRESETS.CRAYON_CATHEDRAL,
+    ]);
   });
 });

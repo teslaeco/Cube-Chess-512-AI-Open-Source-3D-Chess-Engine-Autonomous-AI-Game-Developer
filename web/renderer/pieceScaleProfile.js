@@ -1,13 +1,16 @@
-// Readable envelopes for the normal public 8x8x8 renderer.
-// LEVEL_SPACING is 1.25, so even a selected 1.1x king remains below the next
-// board. The previous 0.23-0.45 heights made the pieces illegible in gameplay.
+// Readable envelopes for the normal public 8x8x8 renderer. This pass is only a
+// 6-8% increase over the accepted high-detail set. A selected 1.1x king is
+// still below the next 1.25-spaced level and every selected base remains well
+// inside the 1.19-wide rendered square.
+export const PIECE_RENDER_SCALE_REVISION = "2026-09-01-safe-size-plus-7-percent";
+
 export const PIECE_CELL_ENVELOPE = Object.freeze({
-  pawn: Object.freeze({ maxHeight: 0.62, maxFootprint: 0.58 }),
-  rook: Object.freeze({ maxHeight: 0.76, maxFootprint: 0.70 }),
-  knight: Object.freeze({ maxHeight: 0.79, maxFootprint: 0.68 }),
-  bishop: Object.freeze({ maxHeight: 0.82, maxFootprint: 0.66 }),
-  queen: Object.freeze({ maxHeight: 0.86, maxFootprint: 0.69 }),
-  king: Object.freeze({ maxHeight: 0.90, maxFootprint: 0.70 }),
+  pawn: Object.freeze({ maxHeight: 0.66, maxFootprint: 0.62 }),
+  rook: Object.freeze({ maxHeight: 0.81, maxFootprint: 0.75 }),
+  knight: Object.freeze({ maxHeight: 0.84, maxFootprint: 0.73 }),
+  bishop: Object.freeze({ maxHeight: 0.87, maxFootprint: 0.71 }),
+  queen: Object.freeze({ maxHeight: 0.92, maxFootprint: 0.74 }),
+  king: Object.freeze({ maxHeight: 0.96, maxFootprint: 0.75 }),
 });
 
 export function pieceCellEnvelope(type) {

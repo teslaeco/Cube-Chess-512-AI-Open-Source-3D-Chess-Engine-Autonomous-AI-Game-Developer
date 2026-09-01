@@ -8,7 +8,12 @@ import {
   HIGH_DETAIL_CHESS_SOURCE_ID,
   prepareHighDetailPiece,
 } from "./HighDetailChessModelSet.js";
+import {
+  HIGH_DETAIL_CHESS_TEXTURE_REVISION,
+  HIGH_DETAIL_CHESS_TEXTURE_STYLE,
+} from "./HighDetailChessTextureSet.js";
 import { pieceCellEnvelope } from "./pieceScaleProfile.js";
+import { CELL_RENDER_SIZE, LEVEL_SPACING } from "./coordinates.js";
 
 const TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
 
@@ -49,6 +54,15 @@ describe("owner-uploaded high-detail chess models", () => {
       expect(size.y, `${type} height`).toBeCloseTo(envelope.maxHeight, 5);
       expect(Math.max(size.x, size.z), `${type} footprint`).toBeCloseTo(envelope.maxFootprint, 5);
       expect(bounds.min.y, `${type} rests on board`).toBeCloseTo(0, 6);
+      const surface = object.getObjectByProperty("isMesh", true);
+      expect(surface.geometry.getAttribute("uv"), `${type} UVs`).toBeTruthy();
+      expect(surface.material.userData.forgeTextureStyle).toBe(HIGH_DETAIL_CHESS_TEXTURE_STYLE);
+      expect(surface.material.userData.forgeTextureRevision).toBe(HIGH_DETAIL_CHESS_TEXTURE_REVISION);
+      expect(surface.material.map).toBeTruthy();
+      expect(surface.material.roughnessMap).toBeTruthy();
+      expect(surface.material.metalnessMap).toBeTruthy();
+      expect(surface.material.bumpMap).toBeTruthy();
+      expect(surface.material.emissiveMap).toBeTruthy();
     }
   });
 
@@ -63,13 +77,18 @@ describe("owner-uploaded high-detail chess models", () => {
     expect(firstMesh.material).not.toBe(secondMesh.material);
     expect(firstMesh.material.userData.forgeSharedPieceMaterial).toBe(false);
     expect(firstMesh.material.userData.forgePieceInstanceMaterial).toBe(true);
+    expect(firstMesh.material.map).toBe(secondMesh.material.map);
+    const secondBaseEmissive = secondMesh.material.userData.forgeBaseEmissiveHex;
     firstMesh.material.emissive.setHex(0x2f7dff);
-    expect(secondMesh.material.emissive.getHex()).toBe(0x000000);
+    expect(secondMesh.material.emissive.getHex()).toBe(secondBaseEmissive);
+    expect(secondMesh.material.emissive.getHex()).not.toBe(firstMesh.material.emissive.getHex());
   });
 
-  it("keeps a selected 1.1x king below the following level", () => {
-    const king = pieceCellEnvelope("king");
-    expect(king.maxHeight * 1.1).toBeLessThan(1.25);
-    expect(king.maxFootprint * 1.1).toBeLessThan(1.2);
+  it("keeps every selected 1.1x piece inside its square and below the following level", () => {
+    for (const type of TYPES) {
+      const envelope = pieceCellEnvelope(type);
+      expect(envelope.maxHeight * 1.1, `${type} selected height`).toBeLessThan(LEVEL_SPACING);
+      expect(envelope.maxFootprint * 1.1, `${type} selected footprint`).toBeLessThan(CELL_RENDER_SIZE);
+    }
   });
 });

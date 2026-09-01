@@ -101,13 +101,49 @@ export class PieceRenderer {
     return replacement;
   }
 
+  rebuildAll() {
+    for (const [id, object] of [...this.pieces.entries()]) {
+      const piece = object.userData?.piece;
+      if (!piece) continue;
+      const replacement = this.replaceObjectForPiece(
+        id,
+        object,
+        piece,
+        this.boardGroup,
+      );
+      replacement.userData = { ...replacement.userData, kind: "piece", piece };
+      this.pieces.set(id, replacement);
+    }
+    for (const [id, object] of [...this.captured.entries()]) {
+      const piece = object.userData?.piece;
+      if (!piece) continue;
+      const replacement = this.replaceObjectForPiece(
+        id,
+        object,
+        piece,
+        this.capturedGroup,
+      );
+      replacement.userData = { ...replacement.userData, kind: "captured", piece };
+      replacement.scale.setScalar(0.82);
+      this.addCaptureAura(replacement, piece.color);
+      this.captured.set(id, replacement);
+    }
+    this.setSelected(this.selectedPieceId);
+    return {
+      activePieces: this.pieces.size,
+      capturedPieces: this.captured.size,
+    };
+  }
+
   setBlueHighlight(object, enabled, intensity = 0.95) {
     object.traverse((child) => {
       const materials = Array.isArray(child.material) ? child.material : [child.material];
       for (const material of materials) {
         if (!material?.emissive) continue;
-        material.emissive.setHex(enabled ? BLUE_HIGHLIGHT : 0x000000);
-        material.emissiveIntensity = enabled ? intensity : 0;
+        const baseHex = material.userData?.forgeBaseEmissiveHex ?? 0x000000;
+        const baseIntensity = material.userData?.forgeBaseEmissiveIntensity ?? 0;
+        material.emissive.setHex(enabled ? BLUE_HIGHLIGHT : baseHex);
+        material.emissiveIntensity = enabled ? intensity : baseIntensity;
       }
     });
   }

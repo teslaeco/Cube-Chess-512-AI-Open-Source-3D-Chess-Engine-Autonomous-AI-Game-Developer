@@ -53,6 +53,6 @@ describe("original FBX chess-piece loading", () => {
     const size = bounds(normalized).getSize(new THREE.Vector3());
     const envelope = pieceCellEnvelope("king");
     expect(size.y).toBeLessThanOrEqual(envelope.maxHeight + 1e-6);
-    expect(LEVEL_SPACING - size.y).toBeGreaterThanOrEqual(0.35 - 1e-6);
+    expect(LEVEL_SPACING - size.y * 1.1).toBeGreaterThanOrEqual(0.19 - 1e-6);
   });
 });

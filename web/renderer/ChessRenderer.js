@@ -1,6 +1,10 @@
 import { BoardRenderer } from "./BoardRenderer.js";
 import { CameraController } from "./CameraController.js";
-import { PieceGeometryFactory } from "./PieceGeometryFactory.js";
+import {
+  OPEN_SOURCE_PRESET,
+  PieceGeometryFactory,
+  PLAYER_SELECTABLE_VISUAL_PRESETS,
+} from "./PieceGeometryFactory.js";
 import { PieceRenderer } from "./PieceRenderer.js";
 import { SceneController } from "./SceneController.js";
 import { SelectionController } from "./SelectionController.js";
@@ -13,10 +17,16 @@ export class ChessRenderer {
     this.sceneController = new SceneController(container);
     this.cameraController = new CameraController(this.sceneController.renderer.domElement);
     const state = presentation.snapshot();
+    const pieceFactory = new PieceGeometryFactory();
+    pieceFactory.setVisualMode(
+      PLAYER_SELECTABLE_VISUAL_PRESETS.includes(state.gameConfig?.pieceSet)
+        ? state.gameConfig.pieceSet
+        : OPEN_SOURCE_PRESET,
+    );
     this.boardRenderer = new BoardRenderer(state.squares);
     this.pieceRenderer = new PieceRenderer(
       state.pieces,
-      new PieceGeometryFactory(),
+      pieceFactory,
       (active) => this.handleAnimationState(active),
     );
     this.sceneController.scene.add(this.boardRenderer.group, this.pieceRenderer.group);
@@ -39,7 +49,9 @@ export class ChessRenderer {
     this.cameraController.setBoardObject(this.boardRenderer.group);
     this.running = true;
     this.lastFrameTime = performance.now();
-    this.frame = requestAnimationFrame((time) => this.animate(time));
+    this.frame = null;
+    this.frameTimer = null;
+    this.scheduleNextFrame();
   }
 
   select(metadata) {
@@ -80,6 +92,9 @@ export class ChessRenderer {
   startGame(config) {
     this.selection.clearPendingSelection();
     this.presentation.startGame(config);
+    this.setPieceVisualPreset(this.presentation.gameConfig.pieceSet, {
+      refresh: false,
+    });
     this.lastFollowedMove = null;
     this.refresh();
     this.cameraController.activeLayerView(this.presentation.activeLevel, true);
@@ -111,9 +126,25 @@ export class ChessRenderer {
   loadGame(serialized) {
     this.selection.clearPendingSelection();
     this.presentation.load(serialized);
+    this.setPieceVisualPreset(this.presentation.gameConfig.pieceSet, {
+      refresh: false,
+    });
     this.lastFollowedMove = null;
     this.refresh();
     this.cameraController.activeLayerView(this.presentation.activeLevel, true);
+  }
+
+  setPieceVisualPreset(preset, { refresh = true } = {}) {
+    const requested = PLAYER_SELECTABLE_VISUAL_PRESETS.includes(preset)
+      ? preset
+      : OPEN_SOURCE_PRESET;
+    const factory = this.pieceRenderer.factory;
+    if (factory.__forgeVisualMode === requested) return false;
+    factory.setVisualMode(requested);
+    this.pieceRenderer.rebuildAll();
+    this.pieceRenderer.setLevelVisibility(this.presentation.snapshot().levels);
+    if (refresh) this.refresh();
+    return true;
   }
 
   undo() { if (this.presentation.undo()) this.refresh(); }
@@ -138,6 +169,24 @@ export class ChessRenderer {
 
   resetCamera() { this.cameraController.activeLayerView(this.presentation.activeLevel, false); }
 
+  scheduleNextFrame() {
+    if (!this.running) return;
+    const mobileViewport = window.innerWidth <= 700 ||
+      window.matchMedia?.("(pointer: coarse)")?.matches;
+    if (mobileViewport) {
+      // A short yield caps the turn-based scene near 25–30 fps on phones and
+      // leaves the main thread responsive even with the optional 2M-triangle
+      // collection. Desktop keeps native requestAnimationFrame cadence.
+      this.frameTimer = window.setTimeout(() => {
+        if (this.running) {
+          this.frame = requestAnimationFrame((time) => this.animate(time));
+        }
+      }, 24);
+      return;
+    }
+    this.frame = requestAnimationFrame((time) => this.animate(time));
+  }
+
   animate(time) {
     if (!this.running) return;
     const delta = Math.min(0.05, Math.max(0, (time - this.lastFrameTime) / 1000));
@@ -145,12 +194,13 @@ export class ChessRenderer {
     this.pieceRenderer.update(delta);
     this.cameraController.update();
     this.sceneController.render(this.cameraController.camera);
-    this.frame = requestAnimationFrame((nextTime) => this.animate(nextTime));
+    this.scheduleNextFrame();
   }
 
   dispose() {
     this.running = false;
-    cancelAnimationFrame(this.frame);
+    if (this.frame != null) cancelAnimationFrame(this.frame);
+    window.clearTimeout(this.frameTimer);
     this.resizeObserver.disconnect();
     this.selection.dispose();
     this.cameraController.dispose();

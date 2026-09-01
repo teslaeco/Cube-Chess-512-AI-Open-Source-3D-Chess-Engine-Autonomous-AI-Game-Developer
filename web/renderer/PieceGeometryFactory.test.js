@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { PieceGeometryFactory } from "./PieceGeometryFactory.js";
+import {
+  CRAYON_CATHEDRAL_PRESET,
+  FORGEMCP_PREMIUM_PRESET,
+} from "../state/pieceVisualPresets.js";
+import { CRAYON_CATHEDRAL_SOURCE_ID } from "./CrayonCathedralPieceSet.js";
 import { fitObjectInsideCell } from "./ExternalKnightModel.js";
 import { pieceCellEnvelope } from "./pieceScaleProfile.js";
 
@@ -50,5 +55,21 @@ describe("piece cell fitting", () => {
     expect(bounds.min.y).toBeCloseTo(0, 6);
     expect(center.x).toBeCloseTo(0, 6);
     expect(center.z).toBeCloseTo(0, 6);
+  });
+
+  it("switches between Premium and Crayon Cathedral without replacing the factory", () => {
+    const factory = new PieceGeometryFactory();
+    factory.setVisualMode(CRAYON_CATHEDRAL_PRESET);
+    const cathedral = factory.create("king", "white");
+    expect(factory.__forgeVisualMode).toBe(CRAYON_CATHEDRAL_PRESET);
+    expect(cathedral.userData.forgeVisualSource).toBe(CRAYON_CATHEDRAL_SOURCE_ID);
+
+    factory.setVisualMode(FORGEMCP_PREMIUM_PRESET);
+    expect(factory.__forgeVisualMode).toBe(FORGEMCP_PREMIUM_PRESET);
+  });
+
+  it("rejects unknown visual presets", () => {
+    const factory = new PieceGeometryFactory();
+    expect(() => factory.setVisualMode("UNKNOWN_SET")).toThrow(RangeError);
   });
 });

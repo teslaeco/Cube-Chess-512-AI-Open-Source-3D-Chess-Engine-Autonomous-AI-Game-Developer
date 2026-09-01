@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import * as THREE from "three";
 import { OpenSourceStauntonPieceSet } from "./ForgeMcpPremiumPieceSet.js";
-import { disposeOwnedPieceResources, requiresPieceObjectReplacement } from "./PieceRenderer.js";
+import { disposeOwnedPieceResources, PieceRenderer, requiresPieceObjectReplacement } from "./PieceRenderer.js";
 
 describe("PieceRenderer promotion replacement", () => {
   const object = (type, color = "white") => ({
@@ -66,5 +67,23 @@ describe("PieceRenderer promotion replacement", () => {
     expect(materialDispose).toHaveBeenCalledOnce();
     geometryDispose.mockRestore();
     materialDispose.mockRestore();
+  });
+
+  it("restores the cyan texture glow after a selection highlight is removed", () => {
+    const renderer = new PieceRenderer([], { create: vi.fn() });
+    const material = new THREE.MeshPhysicalMaterial({ emissive: 0x62f4ff, emissiveIntensity: 1.05 });
+    material.userData = {
+      forgeBaseEmissiveHex: 0x62f4ff,
+      forgeBaseEmissiveIntensity: 1.05,
+    };
+    const object = new THREE.Group();
+    object.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material));
+
+    renderer.setBlueHighlight(object, true, 0.95);
+    expect(material.emissive.getHex()).toBe(0x2f7dff);
+    expect(material.emissiveIntensity).toBe(0.95);
+    renderer.setBlueHighlight(object, false);
+    expect(material.emissive.getHex()).toBe(0x62f4ff);
+    expect(material.emissiveIntensity).toBe(1.05);
   });
 });

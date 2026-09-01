@@ -1,0 +1,19 @@
+export const FORGEMCP_PREMIUM_PRESET = "FORGEMCP_PREMIUM";
+export const CRAYON_CATHEDRAL_PRESET = "CRAYON_CATHEDRAL";
+export const LEGACY_COMPACT_PRESET = "LEGACY_COMPACT";
+
+export const PLAYER_SELECTABLE_VISUAL_PRESETS = Object.freeze([
+  FORGEMCP_PREMIUM_PRESET,
+  CRAYON_CATHEDRAL_PRESET,
+]);
+
+export const SUPPORTED_VISUAL_PRESETS = Object.freeze([
+  ...PLAYER_SELECTABLE_VISUAL_PRESETS,
+  LEGACY_COMPACT_PRESET,
+]);
+
+export function normalizePlayerVisualPreset(value) {
+  return PLAYER_SELECTABLE_VISUAL_PRESETS.includes(value)
+    ? value
+    : FORGEMCP_PREMIUM_PRESET;
+}

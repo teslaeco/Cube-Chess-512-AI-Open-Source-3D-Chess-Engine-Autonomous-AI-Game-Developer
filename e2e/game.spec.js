@@ -13,9 +13,7 @@ async function projectedPoint(page, kind, id) {
       renderer.sceneController.scene.updateMatrixWorld(true);
       renderer.cameraController.camera.updateMatrixWorld(true);
 
-      // Pieces now occupy only ~0.23–0.45 world units vertically. The historical
-      // +0.72 sample point sat above the intended pawn and could raycast a piece behind it.
-      // Keep the click inside the lower-middle body where every current piece has geometry.
+      // Keep the click inside the lower body shared by every selectable figure set.
       const position = kind === "piece"
         ? object.localToWorld(object.position.clone().set(0, 0.10, 0))
         : object.getWorldPosition(object.position.clone().set(0, 0, 0));
@@ -104,6 +102,42 @@ test("starts a local game and executes a real raycast pawn move", async ({ page 
   await expect(page.locator("[data-legal]")).not.toHaveText("0");
   await clickProjected(page, "square", "A:e3");
   await expect(page.locator("[data-turn]")).toHaveText("Czarne");
+});
+
+test("chooses Crayon Cathedral before player mode and uses it in the real game", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.locator("[data-language]").selectOption("pl");
+  const pickerOrder = await page.locator("[data-new-game-form]").evaluate((form) => {
+    const sets = form.querySelector(".piece-set-picker");
+    const modes = form.querySelector(".game-mode-picker");
+    return Boolean(sets && modes && (sets.compareDocumentPosition(modes) & Node.DOCUMENT_POSITION_FOLLOWING));
+  });
+  expect(pickerOrder).toBe(true);
+
+  await page.locator('input[name="pieceSet"][value="CRAYON_CATHEDRAL"]').check();
+  await expect(page.locator("#app")).toHaveAttribute("data-piece-set", "CRAYON_CATHEDRAL");
+  await expect.poll(() => page.evaluate(() => {
+    const app = window.__cubeChessApplication;
+    const objects = [...app.renderer.pieceRenderer.pieces.values()];
+    return {
+      preset: app.renderer.pieceRenderer.factory.__forgeVisualMode,
+      ready: objects.filter((object) => object.userData.crayonCathedralModelState === "ready").length,
+    };
+  }), { timeout: 30_000 }).toEqual({ preset: "CRAYON_CATHEDRAL", ready: 32 });
+
+  await page.locator('input[name="mode"][value="computer"]').check();
+  await page.getByTestId("start-game").click();
+  await expect(page.locator("[data-start-menu]")).not.toHaveClass(/open/);
+  const gameConfig = await page.evaluate(() => ({
+    pieceSet: window.__cubeChessApplication.presentation.gameConfig.pieceSet,
+    mode: window.__cubeChessApplication.presentation.gameConfig.mode,
+    persisted: localStorage.getItem("cubeChessPieceSet"),
+  }));
+  expect(gameConfig).toEqual({
+    pieceSet: "CRAYON_CATHEDRAL",
+    mode: "computer",
+    persisted: "CRAYON_CATHEDRAL",
+  });
 });
 
 test("keeps selection while a White pawn moves from level A to B", async ({ page }) => {

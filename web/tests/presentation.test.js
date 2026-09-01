@@ -10,6 +10,10 @@ import {
 import { visibleLayerOpacity } from "../renderer/layerVisibility.js";
 import { GamePresentation } from "../app/GamePresentation.js";
 import { createInitialPieces } from "../state/initialPosition.js";
+import {
+  CRAYON_CATHEDRAL_PRESET,
+  FORGEMCP_PREMIUM_PRESET,
+} from "../state/pieceVisualPresets.js";
 
 describe("browser presentation data", () => {
   it("maps a board square into a centered 3D position", () => {
@@ -140,6 +144,26 @@ describe("browser presentation data", () => {
     expect(restored.history).toHaveLength(1);
     expect(restored.pieces.find((piece) => piece.id === pawn.id).position.square3D).toBe("A:a3");
     expect(restored.menuOpen).toBe(false);
+  });
+
+  it("persists the selected figure collection and normalizes damaged saves", () => {
+    const source = new GamePresentation();
+    source.startGame({ mode: "computer", pieceSet: CRAYON_CATHEDRAL_PRESET });
+    const saved = source.serialize();
+    const restored = new GamePresentation();
+    restored.load(saved);
+    expect(restored.gameConfig.pieceSet).toBe(CRAYON_CATHEDRAL_PRESET);
+
+    saved.gameConfig.pieceSet = "UNKNOWN_SET";
+    restored.load(saved);
+    expect(restored.gameConfig.pieceSet).toBe(FORGEMCP_PREMIUM_PRESET);
+  });
+
+  it("keeps the current figure collection when an internal game start omits it", () => {
+    const presentation = new GamePresentation();
+    presentation.startGame({ mode: "local", pieceSet: CRAYON_CATHEDRAL_PRESET });
+    presentation.startGame({ mode: "computer" });
+    expect(presentation.gameConfig.pieceSet).toBe(CRAYON_CATHEDRAL_PRESET);
   });
 
   it("tracks eight level visibility states and can isolate the active level", () => {

@@ -175,6 +175,24 @@ button { border: 0; }
 .new-game-form fieldset { display: grid; grid-template-columns: repeat(3, 1fr); gap: .55rem; margin: 0 0 1rem; padding: .9rem; border: 1px solid var(--line); border-radius: .7rem; }
 .new-game-form legend { padding: 0 .4rem; color: var(--muted); font-size: .76rem; }
 .new-game-form fieldset label { display: flex; align-items: center; gap: .45rem; min-height: 48px; padding: .55rem; border: 1px solid var(--line); border-radius: .55rem; background: rgba(24, 52, 69, .42); cursor: pointer; }
+.new-game-form .piece-set-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.new-game-form .piece-set-card { position: relative; display: grid; grid-template-columns: auto 72px minmax(0, 1fr); gap: .7rem; min-height: 94px; padding: .65rem; overflow: hidden; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
+.piece-set-card:has(input:checked) { border-color: var(--cyan); background: linear-gradient(135deg, rgba(38, 139, 176, .42), rgba(68, 39, 112, .34)); box-shadow: inset 0 0 22px rgba(62, 212, 239, .12), 0 0 20px rgba(40, 188, 221, .10); }
+.piece-set-card > input { width: 18px; height: 18px; margin: 0; accent-color: var(--cyan-strong); }
+.piece-set-copy { display: grid; align-content: center; gap: .3rem; min-width: 0; }
+.piece-set-copy strong { color: #f3fbff; font-size: .82rem; }
+.piece-set-copy small { color: var(--muted); font-size: .67rem; line-height: 1.35; }
+.piece-set-preview { position: relative; width: 66px; height: 66px; display: grid; place-items: center; overflow: hidden; border: 1px solid rgba(127, 226, 245, .42); border-radius: .65rem; background: radial-gradient(circle at 50% 40%, #244e67, #07121c 72%); box-shadow: inset 0 0 18px #0008; }
+.premium-preview span { position: relative; z-index: 2; color: #f8f1df; font-size: 2.9rem; line-height: 1; text-shadow: 0 0 9px #55dfff, 2px 2px #aa7c2d; }
+.premium-preview i { position: absolute; inset: auto 9px 7px; height: 5px; border-radius: 50%; background: #64ecff; box-shadow: 0 0 10px #45e7ff; }
+.cathedral-preview { background: linear-gradient(145deg, #063c32, #35145d 58%, #07121c); }
+.cathedral-preview .mini-window { position: absolute; inset: 21px 10px 7px; border: 4px solid #19a984; border-radius: 30px 30px 7px 7px; background: conic-gradient(from 45deg, #1dbac7, #803fd0, #dd3aae, #22d79d, #1dbac7); box-shadow: inset 0 0 0 3px #081518, 0 0 8px #47f6e0; }
+.cathedral-preview i { position: absolute; z-index: 2; top: 4px; width: 9px; height: 29px; border: 2px solid #140c14; border-radius: 5px 5px 2px 2px; background: #ff435a; transform-origin: 50% 100%; }
+.cathedral-preview i::before { content: ""; position: absolute; inset: -7px -2px auto; border-inline: 4px solid transparent; border-block-end: 7px solid currentColor; color: inherit; }
+.cathedral-preview i:nth-of-type(1) { left: 17px; color: #ff8d28; background: #ff8d28; transform: rotate(-18deg); }
+.cathedral-preview i:nth-of-type(2) { left: 29px; color: #ef3e74; background: #ef3e74; }
+.cathedral-preview i:nth-of-type(3) { right: 16px; color: #41c962; background: #41c962; transform: rotate(18deg); }
+.cathedral-preview b { position: absolute; z-index: 3; inset: auto 8px 5px; height: 4px; border-radius: 999px; background: #67f3ff; box-shadow: 0 0 8px #67f3ff; }
 .form-grid, .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
 .form-grid label, .settings-grid label, .menu-footer label { display: grid; gap: .35rem; color: var(--muted); font-size: .75rem; }
 .form-grid input, .form-grid select, .menu-footer select, .browser-bar input, .settings-grid input[type="range"] { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: .5rem; color: #fff; background: #10283a; padding: .55rem .7rem; }
@@ -307,6 +325,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .menu-list button { min-height: 49px; }
   .form-grid, .settings-grid { grid-template-columns: 1fr; }
   .new-game-form fieldset { grid-template-columns: 1fr; }
+  .new-game-form .piece-set-picker { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 700px) {
@@ -330,6 +349,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .menu-number { width: 24px; border: 0; font-size: .6rem; }
   .menu-arrow { display: none; }
   .menu-panel { padding: .8rem; }
+  .new-game-form .piece-set-card { grid-template-columns: auto 58px minmax(0, 1fr); min-height: 80px; padding: .5rem; }
+  .piece-set-preview { width: 54px; height: 54px; }
+  .premium-preview span { font-size: 2.35rem; }
+  .piece-set-copy small { font-size: .62rem; }
   .panel-heading { gap: .55rem; margin-bottom: .8rem; }
   .panel-heading > span { font-size: 1.1rem; }
   .panel-heading p { font-size: .75rem; }

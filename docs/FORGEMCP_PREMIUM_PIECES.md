@@ -12,20 +12,24 @@ The public `FORGEMCP_PREMIUM` preset now renders geometry derived from the owner
 
 | Piece | Runtime triangles | Runtime vertices | Readable height |
 | --- | ---: | ---: | ---: |
-| Pawn | 78,941 | 39,304 | 0.62 |
-| Rook | 106,798 | 53,276 | 0.76 |
-| Knight | 112,072 | 55,406 | 0.79 |
-| Bishop | 90,134 | 44,818 | 0.82 |
-| Queen | 91,668 | 45,546 | 0.86 |
-| King | 77,848 | 38,451 | 0.90 |
+| Pawn | 78,941 | 39,304 | 0.66 |
+| Rook | 106,798 | 53,276 | 0.81 |
+| Knight | 112,072 | 55,406 | 0.84 |
+| Bishop | 90,134 | 44,818 | 0.87 |
+| Queen | 91,668 | 45,546 | 0.92 |
+| King | 77,848 | 38,451 | 0.96 |
 
 `scripts/build-high-detail-chess-assets.mjs` clusters the source surfaces on a fine grid, averages positions inside each occupied cell, removes degenerate and duplicate triangles, then writes versioned `CCM1` assets under `public/assets/high-detail-chess-models/`. This preserves the supplied classical silhouettes and 77k–112k triangles per type without shipping the 29 MB raw GLBs.
 
 `HighDetailChessModelSet` validates and decodes each unique geometry once. Board instances share immutable geometry but clone white/black materials so selection highlighting stays local to one piece. The procedural v14 object is visible only while the asynchronous uploaded model is loading or if validation fails; a fallback is never reported as a successful premium load.
 
+## Reference-inspired PBR textures
+
+`HighDetailChessTextureSet` adds deterministic planar UVs to the supplied meshes and builds a five-map 256×256 PBR stack for every type and side: base color, roughness, metalness, bump and emissive. White pieces use an ivory marble/porcelain field with gold inlays and blue-cyan gems. Black pieces use glossy faceted obsidian with cyan emissive rings and inlays. Texture maps are cached per type/side and shared; only the material instance is cloned for each live piece. Selection blue temporarily overrides the emissive color and restores the original cyan glow afterwards.
+
 ## Scale and camera correction
 
-The rejected 0.23–0.45 height profile made every figure too small. The new 0.62–0.90 profile still leaves clearance below the next 1.25-spaced level, including the selected-piece 1.1× scale. Horizontal fitting uses the available 0.58–0.70 footprint so the figures remain readable on full-board views.
+The rejected 0.23–0.45 height profile made every figure too small. The accepted high-detail profile is increased by only 6–8%, from 0.62–0.90 to 0.66–0.96. It still leaves clearance below the next 1.25-spaced level, including the selected-piece 1.1× scale. Horizontal fitting uses a 0.62–0.75 footprint; even a selected 1.1× king remains inside the 1.19-wide rendered square.
 
 The gameplay camera is fitted only after the real canvas aspect is known. Starting, loading, resetting, or beginning a new game opens an active-layer gameplay composition; the explicit “Fit entire board” action retains the full-cube view. Portrait framing uses a near-axis, steeper camera to keep the board inside the narrow viewport. Inactive levels and cell wires remain visible but much fainter so they do not obscure the pieces.
 
@@ -38,6 +42,10 @@ The page registers real tools through `document.modelContext.registerTool(...)`:
 - `upgrade_piece_visuals`
 - `rollback_piece_visuals`
 
+The same tools now also inspect and apply the separately documented
+[`CRAYON_CATHEDRAL` collection](FORGEMCP_CRAYON_CATHEDRAL_PIECES.md). The
+Premium example below remains valid and backward compatible.
+
 Mutation remains approval-gated:
 
 ```json
@@ -47,7 +55,7 @@ Mutation remains approval-gated:
 }
 ```
 
-The upgrade waits until every live active and captured holder reports `highDetailModelState: "ready"`. QA measures live triangle counts, source identity, material separation, coordinates, piece counts, selection and level visibility. It fails on loading timeouts, fallbacks, wrong provenance, fewer than 70,000 triangles for any type, invalid bounds, or a no-op transition. Rollback independently waits for all compact models and verifies the reverse mutation.
+The upgrade waits until every live active and captured holder reports `highDetailModelState: "ready"`. QA measures live triangle counts, source identity, the complete five-map texture stack, approved texture revision, material separation, coordinates, piece counts, selection and level visibility. It fails on loading timeouts, fallbacks, missing texture maps, wrong provenance, fewer than 70,000 triangles for any type, invalid bounds, or a no-op transition. Rollback independently waits for all compact models and verifies the reverse mutation.
 
 The Chromium evidence job performs `LEGACY_COMPACT → FORGEMCP_PREMIUM → LEGACY_COMPACT`, captures board screenshots and twelve white/black close-ups, and rejects browser console errors. This visual workflow does not modify movement rules, AI policy, serialized game state, or multiplayer authority.
 
