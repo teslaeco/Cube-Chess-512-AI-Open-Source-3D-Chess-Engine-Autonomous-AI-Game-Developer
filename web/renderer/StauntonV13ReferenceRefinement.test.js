@@ -11,16 +11,18 @@ function rolesOf(object) {
 }
 
 describe("verified closeup reference refinement", () => {
-  it("adds real horse volumes and carved mane ridges without replacing the continuous mane", () => {
+  it("rebuilds knight as one smooth horse body with short muzzle, ears and carved mane", () => {
     const knight = new OpenSourceStauntonV13RefinedPieceSet().create("knight", "white");
     const roles = rolesOf(knight);
-    expect(roles).toContain("knight-chest-volume");
-    expect(roles).toContain("knight-upper-neck-volume");
-    expect(roles).toContain("knight-skull-volume");
-    expect(roles).toContain("knight-nose-volume");
-    expect(roles).toContain("knight-nose-bridge");
-    expect(roles.filter((role) => role === "knight-mane-ridge-detail")).toHaveLength(5);
+    expect(roles.filter((role) => role === "knight-sculpt")).toHaveLength(1);
+    expect(roles.filter((role) => role === "knight-muzzle-refined")).toHaveLength(1);
+    expect(roles.filter((role) => role === "knight-jaw")).toHaveLength(1);
+    expect(roles.filter((role) => role === "knight-ear")).toHaveLength(2);
+    expect(roles.filter((role) => role === "knight-eye")).toHaveLength(2);
+    expect(roles.filter((role) => role === "knight-nostril")).toHaveLength(1);
+    expect(roles.filter((role) => role === "knight-mane-ridge-detail")).toHaveLength(6);
     expect(roles.filter((role) => role === "knight-mane")).toHaveLength(1);
+    expect(roles.filter((role) => role === "knight-mane-trim")).toHaveLength(1);
   });
 
   it("rebuilds bishop head as rounded mitre lobes with one narrow slit", () => {
