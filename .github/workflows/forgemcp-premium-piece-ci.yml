@@ -7,6 +7,7 @@ on:
       - "web/forgemcp/**"
       - "web/promotion/**"
       - "scripts/measure-forgemcp-premium-pieces.mjs"
+      - "scripts/capture-staunton-closeups.mjs"
       - "scripts/verify-forgemcp-premium-live.mjs"
       - "docs/FORGEMCP_PREMIUM_PIECES.md"
       - "package.json"
@@ -55,6 +56,8 @@ jobs:
           exit 1
       - name: Live Chromium WebMCP before-after verification
         run: node scripts/verify-forgemcp-premium-live.mjs
+      - name: Capture authenticated v14 model close-ups
+        run: node scripts/capture-staunton-closeups.mjs
       - name: Upload live before-after evidence
         if: always()
         uses: actions/upload-artifact@v4

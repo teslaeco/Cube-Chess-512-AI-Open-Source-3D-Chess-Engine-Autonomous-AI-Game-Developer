@@ -20,20 +20,22 @@ This change adds a new `FORGEMCP_PREMIUM` visual preset and a new browser-native
 
 ### New premium geometry
 
-`web/renderer/ForgeMcpPremiumPieceSet.js` constructs a new coherent six-piece set with Three.js geometry committed as code:
+`web/renderer/OpenSourceStauntonV14PieceSet.js` constructs the current coherent six-piece set with Three.js geometry committed as code. `ForgeMcpPremiumPieceSet.js` remains a compatibility facade for the established WebMCP preset name.
 
 - Pawn — layered sculpted base, tapered body, collar, faceted head and accent cap.
 - Rook — architectural tower body, upper ring, crown recess and eight modeled battlements.
-- Knight — a true multi-part 3D horse form using a curved tube neck, faceted chest/head, muzzle, paired ears, mane ridge, cheek and eyes rather than a flat extruded silhouette.
-- Bishop — tall body, faceted mitre, modeled diagonal cut and accent tip.
-- Queen — elongated body, collar, crown ring, ten crown points, jewels and center orb.
+- Knight — a multi-part extruded horse profile with connected base support, muzzle, paired ears, mane, cheek and eyes.
+- Bishop — tall carved body, paired mitre lobes, modeled diagonal inset and accent tip.
+- Queen — elongated body, collar, crown points, jewels and center gem.
 - King — heavy body, crown base, orb and an actual 3D cross made from geometry.
 
-White pieces use an ivory/ceramic-light-metal physical material family with a warm metallic accent. Black pieces use obsidian/gunmetal materials with brighter secondary surfaces and a copper-like accent so details remain readable on stacked transparent levels.
+White pieces use an ivory physical material family with a warm metallic accent. Black pieces use readable dark-slate texture values with turquoise trim so their silhouettes and carved details remain visible against the dark scene.
 
 ### Runtime preset and rollback
 
-The existing piece factory remains the legacy path. ForgeMCP stores the original factory function and can temporarily replace it with the new premium set for the currently running game. The change rebuilds active and captured Three.js piece objects while preserving game state, piece identity, board coordinates, selection and level visibility. Rollback restores the previous legacy factory path.
+The normal public renderer uses v14 directly. The legacy compact Meshy path is explicit as `PieceGeometryFactory.createLegacy()` and is retained only for rollback and provenance verification. ForgeMCP rebuilds active and captured Three.js piece objects while preserving game state, piece identity, board coordinates, selection and level visibility.
+
+The fitted v14 content lives below an identity transform root. Board placement, selection scaling, capture scaling and animation therefore no longer overwrite the cell-fit transform. Twelve type/side templates share immutable geometry and textures, while every rendered piece receives its own cloned materials so highlighting one piece cannot change another.
 
 ### Browser-native WebMCP tools
 
@@ -59,7 +61,9 @@ Without explicit approval, live mutation is rejected.
 
 The tool measures actual Three.js `BufferGeometry` triangle counts from live objects. It records before/after active and captured piece counts, coordinates, selected piece, level visibility, per-type triangle counts, material signatures, preset state and provenance. Deterministic QA blocks the upgrade if the six premium models do not have finite non-zero geometry or do not fit their configured cell envelope.
 
-This is geometry/configuration/runtime verification. It is not a claim of photorealistic user-study validation or screenshot-based perceptual QA.
+The production Chromium verifier authenticates a guest before application startup, checks that the login gate is hidden and that a canvas is visible, establishes a real compact-Meshy baseline, then runs `LEGACY_COMPACT → FORGEMCP_PREMIUM → LEGACY_COMPACT`. A PASS requires both geometry counts and provenance to change in each direction. Compact-model loading failures and no-op transitions fail verification. CI also captures twelve authenticated type/side close-ups for human review.
+
+This is geometry/configuration/runtime verification plus screenshot evidence for human review. It is not a claim of photorealistic user-study validation or automated perceptual QA.
 
 ### Safety boundary
 

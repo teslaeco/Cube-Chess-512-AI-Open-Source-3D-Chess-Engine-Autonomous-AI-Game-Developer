@@ -2,14 +2,14 @@ import "./promotion.css";
 import { CubeChessApplication } from "../app/CubeChessApplication.js";
 import { registerVisualWebMcpTools } from "../forgemcp/visualTools.js";
 import { OpenSourceStauntonPieceSet, OPEN_SOURCE_STAUNTON_REVISION } from "../renderer/ForgeMcpPremiumPieceSet.js";
-import { PieceGeometryFactory } from "../renderer/PieceGeometryFactory.js";
+import { OPEN_SOURCE_STAUNTON_V14_SOURCE_ID } from "../renderer/OpenSourceStauntonV14PieceSet.js";
 import { installPawnPromotion } from "./PawnPromotion.js";
 
 // Keep the old internal preset token for WebMCP backward compatibility.
-// Public identity and actual geometry are OPEN SOURCE STAUNTON v6.
+// Public identity and actual geometry are the current open-source Staunton set.
 const OPEN_SOURCE_PRESET = "FORGEMCP_PREMIUM";
 const LEGACY_PRESET = "LEGACY_COMPACT";
-const PUBLIC_VISUAL_REVISION = "2026-08-31-public-opensource-staunton-v6";
+const PUBLIC_VISUAL_REVISION = OPEN_SOURCE_STAUNTON_REVISION;
 
 function countTriangles(object) {
   let triangles = 0;
@@ -43,7 +43,7 @@ function inspectLiveVisuals(application) {
   const sources = new Set();
 
   for (const object of active) {
-    let openSource = object.userData?.forgeVisualSource === "open-source-staunton-v6";
+    let openSource = object.userData?.forgeVisualSource === OPEN_SOURCE_STAUNTON_V14_SOURCE_ID;
     let meshy = false;
     totalTriangles += countTriangles(object);
     object.traverse?.((child) => {
@@ -52,7 +52,7 @@ function inspectLiveVisuals(application) {
     });
     if (openSource) {
       openSourcePieces += 1;
-      sources.add("open-source-staunton-v6");
+      sources.add(OPEN_SOURCE_STAUNTON_V14_SOURCE_ID);
     }
     if (meshy) {
       meshyPieces += 1;
@@ -105,38 +105,19 @@ function ensureDiagnosticsBadge() {
   return badge;
 }
 
-// PieceGeometryFactory renders pieces during application construction, so install
-// the open-source Staunton factory before main.js constructs CubeChessApplication.
-// The legacy Meshy path stays available for WebMCP rollback and regression evidence.
-const legacyPrototypeCreate = PieceGeometryFactory.prototype.create;
-PieceGeometryFactory.prototype.create = function createOpenSourceProductionPiece(type, color) {
-  if (!this.__forgeOriginalCreate) this.__forgeOriginalCreate = legacyPrototypeCreate.bind(this);
-  if (!this.__forgePremiumSet) this.__forgePremiumSet = new OpenSourceStauntonPieceSet();
-  if (!this.__forgeVisualMode) this.__forgeVisualMode = OPEN_SOURCE_PRESET;
-
-  if (this.__forgeVisualMode === LEGACY_PRESET) return this.__forgeOriginalCreate(type, color);
-
-  const object = this.__forgePremiumSet.create(type, color);
-  object.userData = {
-    ...object.userData,
-    forgeVisualSource: "open-source-staunton-v6",
-    forgeVisualPreset: OPEN_SOURCE_PRESET,
-    forgeVisualRevision: PUBLIC_VISUAL_REVISION,
-  };
-  return object;
-};
-
 function configureOpenSourceDefault(application) {
   const factory = application?.renderer?.pieceRenderer?.factory;
   if (!factory || typeof factory.create !== "function") return false;
-  if (!factory.__forgeOriginalCreate) factory.__forgeOriginalCreate = legacyPrototypeCreate.bind(factory);
+  if (!factory.__forgeOriginalCreate && typeof factory.createLegacy === "function") {
+    factory.__forgeOriginalCreate = factory.createLegacy.bind(factory);
+  }
   if (!factory.__forgePremiumSet) factory.__forgePremiumSet = new OpenSourceStauntonPieceSet();
 
   factory.create = (type, color) => {
     const object = factory.__forgePremiumSet.create(type, color);
     object.userData = {
       ...object.userData,
-      forgeVisualSource: "open-source-staunton-v6",
+      forgeVisualSource: OPEN_SOURCE_STAUNTON_V14_SOURCE_ID,
       forgeVisualPreset: OPEN_SOURCE_PRESET,
       forgeVisualRevision: PUBLIC_VISUAL_REVISION,
     };
