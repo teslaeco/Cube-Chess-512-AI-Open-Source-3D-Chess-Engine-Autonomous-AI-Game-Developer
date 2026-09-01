@@ -66,7 +66,7 @@ describe("Normal public open-source Staunton v13 silhouette pass", () => {
     expect(roles).toContain("knight-nostril");
     expect(roles.filter((role) => role === "knight-mane")).toHaveLength(1);
     expect(roles.filter((role) => role === "knight-mane-trim")).toHaveLength(1);
-    expect(roles).toContain("knight-muzzle-shell");
+    expect(roles).toContain("knight-muzzle-refined");
     expect(roles).toContain("knight-mouth");
     expect(roles).not.toContain("mane-plate");
     expect(roles).not.toContain("mane-ridge");
