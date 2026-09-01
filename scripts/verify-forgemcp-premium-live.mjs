@@ -55,6 +55,78 @@ async function captureDesktopAndMobile(name) {
   await page.waitForTimeout(150);
 }
 
+// Visual QA needs more than a full-board screenshot: the strict 8x8x8 scale makes
+// individual pieces too small to judge anatomy. This studio pass temporarily hides
+// the board and non-sample pieces, enlarges one live runtime instance of each role,
+// and photographs all six roles for each side. It mutates only transient Three.js
+// presentation state inside CI and restores every transform/visibility afterwards.
+async function captureStudioSide(side) {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.evaluate((requestedSide) => {
+    const app = globalThis.__forgeMcpCubeApplication;
+    const renderer = app?.renderer;
+    const pieceRenderer = renderer?.pieceRenderer;
+    const cameraController = renderer?.cameraController;
+    if (!pieceRenderer || !cameraController) throw new Error("Studio QA renderer is unavailable");
+
+    const types = ["pawn", "rook", "knight", "bishop", "queen", "king"];
+    const all = [...pieceRenderer.pieces.values()];
+    const samples = types.map((type) => all.find((object) => {
+      const piece = object.userData?.piece;
+      return piece?.type === type && piece?.color === requestedSide;
+    }));
+    if (samples.some((sample) => !sample)) throw new Error(`Missing ${requestedSide} studio sample`);
+
+    const restore = {
+      boardVisible: renderer.boardRenderer.group.visible,
+      cameraPosition: cameraController.camera.position.clone(),
+      cameraTarget: cameraController.controls.target.clone(),
+      pieces: all.map((object) => ({
+        object,
+        visible: object.visible,
+        position: object.position.clone(),
+        scale: object.scale.clone(),
+      })),
+    };
+    globalThis.__forgeStudioRestore = restore;
+
+    renderer.boardRenderer.group.visible = false;
+    for (const object of all) object.visible = false;
+    samples.forEach((object, index) => {
+      object.visible = true;
+      object.position.set((index - 2.5) * 1.18, 0, 0);
+      object.scale.setScalar(4.0);
+    });
+
+    cameraController.cancelAutomaticMove();
+    cameraController.camera.position.set(0, 2.35, 7.0);
+    cameraController.controls.target.set(0, 0.72, 0);
+    cameraController.controls.update();
+  }, side);
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: `${artifactDir}/studio-${side}.png`, fullPage: true });
+
+  await page.evaluate(() => {
+    const app = globalThis.__forgeMcpCubeApplication;
+    const renderer = app?.renderer;
+    const cameraController = renderer?.cameraController;
+    const restore = globalThis.__forgeStudioRestore;
+    if (!restore || !renderer || !cameraController) throw new Error("Studio QA restore state is unavailable");
+    renderer.boardRenderer.group.visible = restore.boardVisible;
+    for (const item of restore.pieces) {
+      item.object.visible = item.visible;
+      item.object.position.copy(item.position);
+      item.object.scale.copy(item.scale);
+    }
+    cameraController.cancelAutomaticMove();
+    cameraController.camera.position.copy(restore.cameraPosition);
+    cameraController.controls.target.copy(restore.cameraTarget);
+    cameraController.controls.update();
+    delete globalThis.__forgeStudioRestore;
+  });
+  await page.waitForTimeout(250);
+}
+
 try {
   await page.goto(`${baseUrl}/?e2e=1`, { waitUntil: "networkidle", timeout: 30_000 });
   await page.waitForFunction(() => globalThis.__forgeMcpVisualToolRegistration?.registered === 4, null, { timeout: 20_000 });
@@ -109,6 +181,8 @@ try {
   if (upgraded?.data?.qa?.result !== "PASS") throw new Error(`Premium live QA failed: ${JSON.stringify(upgraded.data.qa)}`);
 
   await captureDesktopAndMobile("after");
+  await captureStudioSide("black");
+  await captureStudioSide("white");
 
   const rollback = await page.evaluate(async () => {
     const tool = globalThis.__forgemcpRegisteredTools?.rollback_piece_visuals;
@@ -123,7 +197,7 @@ try {
   const evidence = {
     verification: "PASS",
     harness: "Chromium browser E2E with injected document.modelContext registration collector",
-    visualEvidence: "Desktop 1440x1000 and mobile 675x1500 board screenshots with guest identity seeded before app startup.",
+    visualEvidence: "Desktop 1440x1000 and mobile 675x1500 board screenshots plus isolated 6-role black/white studio screenshots from the live runtime objects.",
     limitation: "Final compatibility with the platform-provided WebMCP API still requires Chrome 149+ or ChatGPT in-app browser testing.",
     url: page.url(),
     before,
