@@ -44,7 +44,7 @@ describe("original Crayon Cathedral chess collection", () => {
     }
   });
 
-  it("builds a centered high-vertex polyhedral horse face with modeled relief", () => {
+  it("builds a centered classical Staunton profile with a complete eight-colour crayon mane", () => {
     const set = new CrayonCathedralPieceSet();
     const stat = set.inspect("knight", "white");
     const knight = set.create("knight", "white");
@@ -52,32 +52,59 @@ describe("original Crayon Cathedral chess collection", () => {
     const wholeBounds = new THREE.Box3().setFromObject(knight);
     const wholeSize = wholeBounds.getSize(new THREE.Vector3());
     const wholeCenter = wholeBounds.getCenter(new THREE.Vector3());
-    let sculptedHead = null;
+    let stauntonBust = null;
+    const maneMeshes = [];
     knight.traverse((child) => {
-      if (child.userData?.forgeCrayonCathedralRole === "knight-sculpted-head") {
-        sculptedHead = child;
+      if (child.userData?.forgeCrayonCathedralRole === "knight-classic-staunton-bust") {
+        stauntonBust = child;
+      }
+      if (child.userData?.forgeCrayonCathedralRole === "knight-crayon-mane") {
+        maneMeshes.push(child);
       }
     });
 
-    expect(sculptedHead).not.toBeNull();
-    const headBounds = new THREE.Box3().setFromObject(sculptedHead);
-    const headSize = headBounds.getSize(new THREE.Vector3());
-    const headCenter = headBounds.getCenter(new THREE.Vector3());
-    expect(stat.triangles).toBeGreaterThanOrEqual(70_000);
-    expect(sculptedHead.geometry.attributes.position.count).toBeGreaterThanOrEqual(60_000);
+    expect(stauntonBust).not.toBeNull();
+    expect(maneMeshes).toHaveLength(9);
+    const bustBounds = new THREE.Box3().setFromObject(stauntonBust);
+    const bustSize = bustBounds.getSize(new THREE.Vector3());
+    const bustCenter = bustBounds.getCenter(new THREE.Vector3());
+    const maneBounds = maneMeshes.reduce(
+      (bounds, child) => bounds.union(new THREE.Box3().setFromObject(child)),
+      new THREE.Box3(),
+    );
+    const maneSize = maneBounds.getSize(new THREE.Vector3());
+    const maneColors = new Set(maneMeshes.map((child) => child.material.color.getHex()));
+    const expectedCrayonColors = [
+      0xff354f,
+      0xff8a22,
+      0xffd72e,
+      0x58d35b,
+      0x1baee8,
+      0x784ee8,
+      0xe842b3,
+      0x24d6bd,
+    ];
+
+    expect(stat.triangles).toBeGreaterThanOrEqual(150_000);
+    expect(stauntonBust.geometry.attributes.position.count).toBeGreaterThanOrEqual(150_000);
     expect(stat.resources.roles).toEqual(expect.arrayContaining([
       "knight-face-relief",
       "knight-face-glass",
-      "knight-sculpted-head",
+      "knight-classic-staunton-bust",
+      "knight-crayon-mane",
     ]));
+    for (const color of expectedCrayonColors) expect(maneColors.has(color)).toBe(true);
     expect(wholeCenter.x).toBeCloseTo(0, 6);
     expect(wholeCenter.z).toBeCloseTo(0, 6);
-    expect(headCenter.x).toBeLessThan(wholeSize.x * 0.18);
-    expect(headCenter.z).toBeCloseTo(0, 6);
-    expect(headSize.x).toBeLessThan(wholeSize.x * 0.70);
-    expect(headSize.y).toBeLessThan(wholeSize.y * 0.50);
-    expect(headBounds.min.x).toBeGreaterThanOrEqual(wholeBounds.min.x - 1e-6);
-    expect(headBounds.max.x).toBeLessThanOrEqual(wholeBounds.max.x + 1e-6);
+    expect(bustCenter.x).toBeLessThan(wholeSize.x * 0.18);
+    expect(bustCenter.z).toBeCloseTo(0, 6);
+    expect(bustSize.y).toBeGreaterThan(bustSize.x);
+    expect(bustSize.x).toBeLessThan(wholeSize.x * 0.72);
+    expect(bustSize.y).toBeLessThan(wholeSize.y * 0.62);
+    expect(maneBounds.min.x).toBeLessThan(bustBounds.min.x);
+    expect(maneSize.y).toBeGreaterThan(bustSize.y * 0.75);
+    expect(bustBounds.min.x).toBeGreaterThanOrEqual(wholeBounds.min.x - 1e-6);
+    expect(bustBounds.max.x).toBeLessThanOrEqual(wholeBounds.max.x + 1e-6);
   });
 
   it("shares immutable geometry while keeping per-piece highlight materials independent", () => {
