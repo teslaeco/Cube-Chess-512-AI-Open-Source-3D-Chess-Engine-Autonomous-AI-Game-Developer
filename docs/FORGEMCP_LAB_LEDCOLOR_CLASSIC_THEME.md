@@ -72,6 +72,22 @@ inspect runtime material and lighting metadata, start a game and verify local
 preference persistence. These are repository QA checks, not a jury decision or
 evidence of AI-training improvement.
 
+Validation performed on 2026-09-02 for this change:
+
+- Vitest: 53 files and 294 tests passed;
+- production and server TypeScript checks passed;
+- production Vite build and PWA smoke test passed;
+- the two targeted real-browser scenarios passed in Chromium desktop and the
+  mobile Chrome profile;
+- desktop and mobile layouts were visually inspected from real rendered
+  screenshots.
+
+The automated WebMCP tests cover schemas, registration, approval gates,
+mutation QA and rollback behavior. A final manual call through a browser build
+that exposes the experimental native `document.modelContext` API remains a
+submission-environment check; the pinned Playwright Chromium used here does not
+expose that API.
+
 ## Main implementation files
 
 - `web/state/labLedColorSettings.js`
