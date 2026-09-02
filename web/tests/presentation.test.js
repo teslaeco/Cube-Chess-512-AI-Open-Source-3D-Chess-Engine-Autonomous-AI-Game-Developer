@@ -11,9 +11,11 @@ import { visibleLayerOpacity } from "../renderer/layerVisibility.js";
 import { GamePresentation } from "../app/GamePresentation.js";
 import { createInitialPieces } from "../state/initialPosition.js";
 import {
+  CLASSIC_BLACK_WHITE_PRESET,
   CRAYON_CATHEDRAL_PRESET,
   FORGEMCP_PREMIUM_PRESET,
 } from "../state/pieceVisualPresets.js";
+import { DEFAULT_LAB_LED_COLOR_SETTINGS } from "../state/labLedColorSettings.js";
 
 describe("browser presentation data", () => {
   it("maps a board square into a centered 3D position", () => {
@@ -164,6 +166,25 @@ describe("browser presentation data", () => {
     presentation.startGame({ mode: "local", pieceSet: CRAYON_CATHEDRAL_PRESET });
     presentation.startGame({ mode: "computer" });
     expect(presentation.gameConfig.pieceSet).toBe(CRAYON_CATHEDRAL_PRESET);
+  });
+
+  it("persists Classic Black & White and normalized Lab LEDColor settings", () => {
+    const presentation = new GamePresentation();
+    presentation.startGame({
+      mode: "local",
+      pieceSet: CLASSIC_BLACK_WHITE_PRESET,
+      labLedColorSettings: {
+        ...DEFAULT_LAB_LED_COLOR_SETTINGS,
+        ledColor: "#FF3366",
+        lightIntensity: 4,
+      },
+    });
+    const restored = new GamePresentation();
+    restored.load(presentation.serialize());
+
+    expect(restored.gameConfig.pieceSet).toBe(CLASSIC_BLACK_WHITE_PRESET);
+    expect(restored.gameConfig.labLedColorSettings.ledColor).toBe("#ff3366");
+    expect(restored.gameConfig.labLedColorSettings.lightIntensity).toBe(1.5);
   });
 
   it("tracks eight level visibility states and can isolate the active level", () => {

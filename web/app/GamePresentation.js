@@ -6,6 +6,10 @@ import {
 import { createInitialPieces } from "../state/initialPosition.js";
 import { normalizePlayerVisualPreset } from "../state/pieceVisualPresets.js";
 import {
+  DEFAULT_LAB_LED_COLOR_SETTINGS,
+  normalizeLabLedColorSettings,
+} from "../state/labLedColorSettings.js";
+import {
   detectInitialLocale,
   resolveLocale,
 } from "../i18n/locales.js";
@@ -35,6 +39,9 @@ function defaultGameConfig() {
     difficulty: "easy",
     clockMinutes: 0,
     pieceSet: normalizePlayerVisualPreset(),
+    labLedColorSettings: normalizeLabLedColorSettings(
+      DEFAULT_LAB_LED_COLOR_SETTINGS,
+    ),
   };
 }
 
@@ -81,7 +88,16 @@ export class GamePresentation {
   }
 
   startDemo() {
-    this.gameConfig = { ...defaultGameConfig(), mode: "demo" };
+    const pieceSet = normalizePlayerVisualPreset(this.gameConfig?.pieceSet);
+    const labLedColorSettings = normalizeLabLedColorSettings(
+      this.gameConfig?.labLedColorSettings,
+    );
+    this.gameConfig = {
+      ...defaultGameConfig(),
+      mode: "demo",
+      pieceSet,
+      labLedColorSettings,
+    };
     this.menuOpen = true;
     this.resetGame({ appState: "demo", preserveMenu: true });
   }
@@ -120,6 +136,10 @@ export class GamePresentation {
       clockMinutes: Math.max(0, Number(config.clockMinutes) || 0),
       pieceSet: normalizePlayerVisualPreset(
         config.pieceSet ?? this.gameConfig.pieceSet,
+      ),
+      labLedColorSettings: normalizeLabLedColorSettings(
+        config.labLedColorSettings ??
+          this.gameConfig.labLedColorSettings,
       ),
     };
     this.menuOpen = false;
@@ -387,6 +407,9 @@ export class GamePresentation {
     this.gameConfig = { ...defaultGameConfig(), ...clone(serialized.gameConfig) };
     this.gameConfig.pieceSet = normalizePlayerVisualPreset(
       this.gameConfig.pieceSet,
+    );
+    this.gameConfig.labLedColorSettings = normalizeLabLedColorSettings(
+      this.gameConfig.labLedColorSettings,
     );
     this.history = clone(serialized.history ?? []);
     this.redoStack = clone(serialized.redoStack ?? []);

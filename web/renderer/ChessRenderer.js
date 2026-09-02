@@ -9,6 +9,7 @@ import { PieceRenderer } from "./PieceRenderer.js";
 import { SceneController } from "./SceneController.js";
 import { SelectionController } from "./SelectionController.js";
 import { executeAutomatedMovePreservingLevel } from "./automatedMove.js";
+import { normalizeLabLedColorSettings } from "../state/labLedColorSettings.js";
 
 export class ChessRenderer {
   constructor(container, presentation, onStateChange) {
@@ -18,11 +19,14 @@ export class ChessRenderer {
     this.cameraController = new CameraController(this.sceneController.renderer.domElement);
     const state = presentation.snapshot();
     const pieceFactory = new PieceGeometryFactory();
-    pieceFactory.setVisualMode(
+    const initialPreset =
       PLAYER_SELECTABLE_VISUAL_PRESETS.includes(state.gameConfig?.pieceSet)
         ? state.gameConfig.pieceSet
-        : OPEN_SOURCE_PRESET,
+        : OPEN_SOURCE_PRESET;
+    pieceFactory.setLabLedColorSettings(
+      state.gameConfig?.labLedColorSettings,
     );
+    pieceFactory.setVisualMode(initialPreset);
     this.boardRenderer = new BoardRenderer(state.squares);
     this.pieceRenderer = new PieceRenderer(
       state.pieces,
@@ -30,6 +34,14 @@ export class ChessRenderer {
       (active) => this.handleAnimationState(active),
     );
     this.sceneController.scene.add(this.boardRenderer.group, this.pieceRenderer.group);
+    this.boardRenderer.setVisualTheme(
+      initialPreset,
+      state.gameConfig?.labLedColorSettings,
+    );
+    this.sceneController.setVisualTheme(
+      initialPreset,
+      state.gameConfig?.labLedColorSettings,
+    );
     this.selection = new SelectionController(
       this.sceneController.renderer.domElement,
       this.cameraController.camera,
@@ -94,6 +106,8 @@ export class ChessRenderer {
     this.presentation.startGame(config);
     this.setPieceVisualPreset(this.presentation.gameConfig.pieceSet, {
       refresh: false,
+      labLedColorSettings:
+        this.presentation.gameConfig.labLedColorSettings,
     });
     this.lastFollowedMove = null;
     this.refresh();
@@ -105,6 +119,11 @@ export class ChessRenderer {
   startDemo() {
     this.selection.clearPendingSelection();
     this.presentation.startDemo();
+    this.setPieceVisualPreset(this.presentation.gameConfig.pieceSet, {
+      refresh: false,
+      labLedColorSettings:
+        this.presentation.gameConfig.labLedColorSettings,
+    });
     this.lastFollowedMove = null;
     this.refresh();
     this.cameraController.fitBoard(false);
@@ -128,23 +147,52 @@ export class ChessRenderer {
     this.presentation.load(serialized);
     this.setPieceVisualPreset(this.presentation.gameConfig.pieceSet, {
       refresh: false,
+      labLedColorSettings:
+        this.presentation.gameConfig.labLedColorSettings,
     });
     this.lastFollowedMove = null;
     this.refresh();
     this.cameraController.activeLayerView(this.presentation.activeLevel, true);
   }
 
-  setPieceVisualPreset(preset, { refresh = true } = {}) {
+  setPieceVisualPreset(
+    preset,
+    {
+      refresh = true,
+      labLedColorSettings =
+        this.presentation.gameConfig?.labLedColorSettings,
+    } = {},
+  ) {
     const requested = PLAYER_SELECTABLE_VISUAL_PRESETS.includes(preset)
       ? preset
       : OPEN_SOURCE_PRESET;
     const factory = this.pieceRenderer.factory;
-    if (factory.__forgeVisualMode === requested) return false;
-    factory.setVisualMode(requested);
-    this.pieceRenderer.rebuildAll();
-    this.pieceRenderer.setLevelVisibility(this.presentation.snapshot().levels);
+    const normalizedSettings = normalizeLabLedColorSettings(
+      labLedColorSettings,
+    );
+    const settingsChange = factory.setLabLedColorSettings(normalizedSettings);
+    const presetChanged = factory.__forgeVisualMode !== requested;
+    if (presetChanged) factory.setVisualMode(requested);
+    const piecesChanged =
+      presetChanged ||
+      (requested === OPEN_SOURCE_PRESET && settingsChange.piecesChanged);
+    if (piecesChanged) {
+      this.pieceRenderer.rebuildAll();
+      this.pieceRenderer.setLevelVisibility(this.presentation.snapshot().levels);
+    }
+    this.boardRenderer.setVisualTheme(requested, normalizedSettings);
+    this.sceneController.setVisualTheme(requested, normalizedSettings);
     if (refresh) this.refresh();
-    return true;
+    return presetChanged || settingsChange.changed;
+  }
+
+  setLabLedColorSettings(settings, { refresh = true } = {}) {
+    const normalized = normalizeLabLedColorSettings(settings);
+    this.presentation.gameConfig.labLedColorSettings = normalized;
+    return this.setPieceVisualPreset(this.presentation.gameConfig.pieceSet, {
+      refresh,
+      labLedColorSettings: normalized,
+    });
   }
 
   undo() { if (this.presentation.undo()) this.refresh(); }

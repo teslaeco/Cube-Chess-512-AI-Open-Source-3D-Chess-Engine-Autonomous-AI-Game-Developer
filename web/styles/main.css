@@ -175,7 +175,7 @@ button { border: 0; }
 .new-game-form fieldset { display: grid; grid-template-columns: repeat(3, 1fr); gap: .55rem; margin: 0 0 1rem; padding: .9rem; border: 1px solid var(--line); border-radius: .7rem; }
 .new-game-form legend { padding: 0 .4rem; color: var(--muted); font-size: .76rem; }
 .new-game-form fieldset label { display: flex; align-items: center; gap: .45rem; min-height: 48px; padding: .55rem; border: 1px solid var(--line); border-radius: .55rem; background: rgba(24, 52, 69, .42); cursor: pointer; }
-.new-game-form .piece-set-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.new-game-form .piece-set-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .new-game-form .piece-set-card { position: relative; display: grid; grid-template-columns: auto 72px minmax(0, 1fr); gap: .7rem; min-height: 94px; padding: .65rem; overflow: hidden; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
 .piece-set-card:has(input:checked) { border-color: var(--cyan); background: linear-gradient(135deg, rgba(38, 139, 176, .42), rgba(68, 39, 112, .34)); box-shadow: inset 0 0 22px rgba(62, 212, 239, .12), 0 0 20px rgba(40, 188, 221, .10); }
 .piece-set-card > input { width: 18px; height: 18px; margin: 0; accent-color: var(--cyan-strong); }
@@ -193,6 +193,31 @@ button { border: 0; }
 .cathedral-preview i:nth-of-type(2) { left: 29px; color: #ef3e74; background: #ef3e74; }
 .cathedral-preview i:nth-of-type(3) { right: 16px; color: #41c962; background: #41c962; transform: rotate(18deg); }
 .cathedral-preview b { position: absolute; z-index: 3; inset: auto 8px 5px; height: 4px; border-radius: 999px; background: #67f3ff; box-shadow: 0 0 8px #67f3ff; }
+.classic-preview { background: linear-gradient(135deg, #f1efe8 0 49.5%, #08090b 50%); border-color: rgba(255, 255, 255, .58); }
+.classic-preview span, .classic-preview b { position: absolute; z-index: 2; font-size: 2.6rem; line-height: 1; font-style: normal; text-shadow: 0 5px 8px #0008; }
+.classic-preview span { inset: 6px auto auto 7px; color: #fffdf4; -webkit-text-stroke: 1px #333; }
+.classic-preview b { inset: auto 6px 3px auto; color: #060709; text-shadow: 0 2px 2px #fff7; }
+.classic-preview i { position: absolute; z-index: 3; inset: auto 6px 5px; height: 2px; background: linear-gradient(90deg, #fff, #555 48%, #111 52%, #fff); box-shadow: 0 2px 8px #000a; }
+
+.lab-ledcolor-config { margin: -.2rem 0 1rem; border: 1px solid rgba(97, 231, 255, .4); border-radius: .72rem; overflow: hidden; background: linear-gradient(145deg, rgba(10, 38, 54, .82), rgba(31, 19, 56, .72)); box-shadow: inset 0 0 30px rgba(69, 225, 255, .055); }
+.visual-config-tabs { padding: .36rem; border-bottom: 1px solid transparent; }
+.visual-config-tabs button { width: 100%; display: grid; grid-template-columns: auto 1fr auto; justify-content: stretch; text-align: start; border-color: rgba(98, 234, 255, .35); background: rgba(12, 44, 61, .76); }
+.visual-config-tabs button[aria-selected="true"] { border-color: #67eaff; background: linear-gradient(90deg, rgba(39, 140, 179, .55), rgba(83, 44, 118, .45)); }
+.visual-config-tabs button span { display: grid; place-items: center; width: 30px; aspect-ratio: 1; border-radius: .4rem; color: #06151c; background: #71edff; font-size: .67rem; font-weight: 900; }
+.visual-config-tabs button strong { align-self: center; }
+.visual-config-tabs button i { align-self: center; color: var(--cyan); font-size: 1.15rem; font-style: normal; }
+.lab-ledcolor-panel { padding: .35rem .75rem .8rem; }
+.lab-ledcolor-panel > p { margin: .3rem 0 .75rem; color: var(--muted); font-size: .72rem; line-height: 1.45; }
+.lab-color-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .55rem; }
+.lab-color-control, .lab-range-control { min-width: 0; display: grid; grid-template-columns: 34px minmax(0, 1fr); grid-template-areas: "swatch label" "swatch value"; column-gap: .55rem; align-items: center; min-height: 55px; padding: .48rem; border: 1px solid var(--line); border-radius: .55rem; color: #dbeaf2; background: rgba(7, 21, 31, .56); font-size: .7rem; }
+.lab-color-control > span { grid-area: label; align-self: end; }
+.lab-color-control input[type="color"] { grid-area: swatch; width: 34px; height: 38px; padding: 2px; border: 1px solid rgba(255,255,255,.3); border-radius: .4rem; background: #09131c; cursor: pointer; }
+.lab-color-control output { grid-area: value; align-self: start; color: var(--muted); font: 600 .61rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; text-transform: uppercase; }
+.lab-range-control { grid-column: span 3; grid-template-columns: minmax(120px, .7fr) 1fr; grid-template-areas: none; }
+.lab-range-control > div { display: grid; grid-template-columns: 1fr 50px; gap: .55rem; align-items: center; }
+.lab-range-control input { width: 100%; accent-color: var(--cyan-strong); }
+.lab-range-control output { color: var(--cyan); text-align: end; font: 700 .68rem/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.lab-ledcolor-panel > button { margin-top: .65rem; min-height: 36px; font-size: .68rem; }
 .form-grid, .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
 .form-grid label, .settings-grid label, .menu-footer label { display: grid; gap: .35rem; color: var(--muted); font-size: .75rem; }
 .form-grid input, .form-grid select, .menu-footer select, .browser-bar input, .settings-grid input[type="range"] { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: .5rem; color: #fff; background: #10283a; padding: .55rem .7rem; }
@@ -326,6 +351,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .form-grid, .settings-grid { grid-template-columns: 1fr; }
   .new-game-form fieldset { grid-template-columns: 1fr; }
   .new-game-form .piece-set-picker { grid-template-columns: 1fr; }
+  .lab-color-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lab-range-control { grid-column: span 2; }
 }
 
 @media (max-width: 700px) {
@@ -352,7 +379,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .new-game-form .piece-set-card { grid-template-columns: auto 58px minmax(0, 1fr); min-height: 80px; padding: .5rem; }
   .piece-set-preview { width: 54px; height: 54px; }
   .premium-preview span { font-size: 2.35rem; }
+  .classic-preview span, .classic-preview b { font-size: 2.2rem; }
   .piece-set-copy small { font-size: .62rem; }
+  .lab-color-grid { grid-template-columns: 1fr; }
+  .lab-range-control { grid-column: span 1; grid-template-columns: 1fr; gap: .35rem; }
   .panel-heading { gap: .55rem; margin-bottom: .8rem; }
   .panel-heading > span { font-size: 1.1rem; }
   .panel-heading p { font-size: .75rem; }

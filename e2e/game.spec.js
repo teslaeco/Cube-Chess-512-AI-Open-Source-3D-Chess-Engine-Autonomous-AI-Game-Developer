@@ -140,6 +140,122 @@ test("chooses Crayon Cathedral before player mode and uses it in the real game",
   });
 });
 
+test("uses Lab high-detail geometry for the third Classic Black & White board", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.locator("[data-language]").selectOption("pl");
+  await page.locator('input[name="pieceSet"][value="CLASSIC_BLACK_WHITE"]').check();
+  await expect(page.locator("#app")).toHaveAttribute(
+    "data-piece-set",
+    "CLASSIC_BLACK_WHITE",
+  );
+  await expect(page.locator("#app")).toHaveAttribute(
+    "data-visual-theme",
+    "CLASSIC_BLACK_WHITE",
+  );
+  await expect(page.locator("[data-lab-ledcolor-config]")).toBeHidden();
+
+  await expect.poll(() => page.evaluate(() => {
+    const app = window.__cubeChessApplication;
+    const objects = [...app.renderer.pieceRenderer.pieces.values()];
+    const styles = new Set();
+    for (const object of objects) {
+      object.traverse((child) => {
+        const material = Array.isArray(child.material)
+          ? child.material[0]
+          : child.material;
+        if (material?.userData?.forgeTextureStyle) {
+          styles.add(material.userData.forgeTextureStyle);
+        }
+      });
+    }
+    const board = app.renderer.boardRenderer;
+    return {
+      ready: objects.filter(
+        (object) => object.userData.highDetailModelState === "ready",
+      ).length,
+      styles: [...styles],
+      lightSquare: board.levelMaterials.get(0)[0].color.getHexString(),
+      darkSquare: board.levelMaterials.get(0)[1].color.getHexString(),
+      activeOpacity: board.visualTheme.activeOpacity,
+    };
+  }), { timeout: 30_000 }).toEqual({
+    ready: 32,
+    styles: ["classic-black-white-sculpted-pbr"],
+    lightSquare: "f2f0e9",
+    darkSquare: "090a0d",
+    activeOpacity: 0.94,
+  });
+
+  await page.getByTestId("start-game").click();
+  await expect(page.locator("[data-start-menu]")).not.toHaveClass(/open/);
+  expect(await page.evaluate(() => ({
+    pieceSet: window.__cubeChessApplication.presentation.gameConfig.pieceSet,
+    persisted: localStorage.getItem("cubeChessPieceSet"),
+  }))).toEqual({
+    pieceSet: "CLASSIC_BLACK_WHITE",
+    persisted: "CLASSIC_BLACK_WHITE",
+  });
+});
+
+test("opens the Lab LEDColor tab and applies saved live colors and lighting", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.locator("[data-language]").selectOption("pl");
+  await page.locator('input[name="pieceSet"][value="FORGEMCP_PREMIUM"]').check();
+  await expect(page.getByTestId("lab-ledcolor-tab")).toBeVisible();
+  await expect(page.locator("[data-lab-ledcolor-panel]")).toBeVisible();
+
+  for (const [testId, value] of [
+    ["lab-lightSquareColor", "#ccddee"],
+    ["lab-darkSquareColor", "#172033"],
+    ["lab-whitePieceColor", "#ffddaa"],
+    ["lab-blackPieceColor", "#aaccee"],
+    ["lab-ledColor", "#ff3366"],
+    ["lab-lightColor", "#badaff"],
+    ["lab-light-intensity", "1.25"],
+  ]) {
+    await page.getByTestId(testId).fill(value);
+  }
+
+  await expect.poll(() => page.evaluate(() => {
+    const app = window.__cubeChessApplication;
+    const objects = [...app.renderer.pieceRenderer.pieces.values()];
+    const white = objects.find(
+      (object) => object.userData.piece?.color === "white" &&
+        object.userData.highDetailModelState === "ready",
+    );
+    const surface = white?.getObjectByProperty("isMesh", true);
+    const board = app.renderer.boardRenderer;
+    return {
+      ready: objects.filter(
+        (object) => object.userData.highDetailModelState === "ready",
+      ).length,
+      lightSquare: board.levelMaterials.get(0)[0].color.getHexString(),
+      darkSquare: board.levelMaterials.get(0)[1].color.getHexString(),
+      pieceTint: surface?.material?.color?.getHexString?.(),
+      led: surface?.material?.emissive?.getHexString?.(),
+      keyLight: app.renderer.sceneController.keyLight.color.getHexString(),
+      keyIntensity: app.renderer.sceneController.keyLight.intensity,
+    };
+  }), { timeout: 30_000 }).toEqual({
+    ready: 32,
+    lightSquare: "ccddee",
+    darkSquare: "172033",
+    pieceTint: "ffddaa",
+    led: "ff3366",
+    keyLight: "badaff",
+    keyIntensity: 3.375,
+  });
+
+  await page.getByTestId("start-game").click();
+  const savedSettings = await page.evaluate(() => ({
+    config: window.__cubeChessApplication.presentation.gameConfig.labLedColorSettings,
+    stored: JSON.parse(localStorage.getItem("cubeChessLabLedColorSettings")),
+  }));
+  expect(savedSettings.config).toEqual(savedSettings.stored);
+  expect(savedSettings.config.ledColor).toBe("#ff3366");
+  expect(savedSettings.config.lightIntensity).toBe(1.25);
+});
+
 test("keeps selection while a White pawn moves from level A to B", async ({ page }) => {
   await page.locator("[data-language]").selectOption("pl");
   await page.getByTestId("start-game").click();

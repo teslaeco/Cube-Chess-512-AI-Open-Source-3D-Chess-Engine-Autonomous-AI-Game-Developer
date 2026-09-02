@@ -1,12 +1,17 @@
 import * as THREE from "three";
 import { CrayonCathedralPieceSet } from "./CrayonCathedralPieceSet.js";
 import {
+  CLASSIC_BLACK_WHITE_PRESET,
   CRAYON_CATHEDRAL_PRESET,
   FORGEMCP_PREMIUM_PRESET,
   LEGACY_COMPACT_PRESET,
   PLAYER_SELECTABLE_VISUAL_PRESETS,
   SUPPORTED_VISUAL_PRESETS,
 } from "../state/pieceVisualPresets.js";
+import {
+  normalizeLabLedColorSettings,
+  sameLabLedColorSettings,
+} from "../state/labLedColorSettings.js";
 import {
   HIGH_DETAIL_CHESS_REVISION,
   HIGH_DETAIL_CHESS_SOURCE_ID,
@@ -19,9 +24,16 @@ import {
   OPEN_SOURCE_STAUNTON_V14_SOURCE_ID,
   OpenSourceStauntonV14PieceSet,
 } from "./OpenSourceStauntonV14PieceSet.js";
+import {
+  applyClassicBlackWhiteFallback,
+  applyLabLedColorFallback,
+  createClassicBlackWhiteMaterial,
+  createLabLedColorMaterial,
+} from "./VisualThemeMaterials.js";
 
 export const OPEN_SOURCE_PRESET = FORGEMCP_PREMIUM_PRESET;
 export {
+  CLASSIC_BLACK_WHITE_PRESET,
   CRAYON_CATHEDRAL_PRESET,
   LEGACY_COMPACT_PRESET,
   PLAYER_SELECTABLE_VISUAL_PRESETS,
@@ -62,6 +74,7 @@ export class PieceGeometryFactory {
     this.originalModels = this.highDetailModels;
     this.openSourceModels = new OpenSourceStauntonV14PieceSet();
     this.crayonCathedralModels = new CrayonCathedralPieceSet();
+    this.labLedColorSettings = normalizeLabLedColorSettings();
     this.__forgeVisualMode = OPEN_SOURCE_PRESET;
   }
 
@@ -71,6 +84,9 @@ export class PieceGeometryFactory {
     }
     if (this.__forgeVisualMode === LEGACY_COMPACT_PRESET) {
       return this.createLegacy(type, color);
+    }
+    if (this.__forgeVisualMode === CLASSIC_BLACK_WHITE_PRESET) {
+      return this.createClassicBlackWhite(type, color);
     }
     return this.createPremium(type, color);
   }
@@ -83,18 +99,66 @@ export class PieceGeometryFactory {
     return preset;
   }
 
+  setLabLedColorSettings(settings) {
+    const normalized = normalizeLabLedColorSettings(settings);
+    const changed = !sameLabLedColorSettings(
+      this.labLedColorSettings,
+      normalized,
+    );
+    const piecesChanged =
+      this.labLedColorSettings.whitePieceColor !== normalized.whitePieceColor ||
+      this.labLedColorSettings.blackPieceColor !== normalized.blackPieceColor ||
+      this.labLedColorSettings.ledColor !== normalized.ledColor;
+    this.labLedColorSettings = normalized;
+    return { changed, piecesChanged, settings: { ...normalized } };
+  }
+
   createPremium(type, color) {
     const fallback = this.openSourceModels.create(type, color);
+    applyLabLedColorFallback(fallback, color, this.labLedColorSettings);
     fallback.userData = {
       ...fallback.userData,
       forgeVisualSource: `${OPEN_SOURCE_STAUNTON_V14_SOURCE_ID}-loading-fallback`,
       forgeVisualPreset: OPEN_SOURCE_PRESET,
       forgeVisualRevision: OPEN_SOURCE_STAUNTON_V14_REVISION,
     };
-    const holder = this.highDetailModels.create(type, color, fallback);
+    const holder = this.highDetailModels.create(type, color, fallback, {
+      visualPreset: FORGEMCP_PREMIUM_PRESET,
+      materialFactory: (template, pieceType, side) =>
+        createLabLedColorMaterial(
+          template,
+          pieceType,
+          side,
+          this.labLedColorSettings,
+        ),
+    });
     holder.userData = {
       ...holder.userData,
       forgeVisualPreset: OPEN_SOURCE_PRESET,
+      forgeVisualRevision: HIGH_DETAIL_CHESS_REVISION,
+      requestedVisualSource: HIGH_DETAIL_CHESS_SOURCE_ID,
+    };
+    return holder;
+  }
+
+  createClassicBlackWhite(type, color) {
+    const fallback = applyClassicBlackWhiteFallback(
+      this.openSourceModels.create(type, color),
+      color,
+    );
+    fallback.userData = {
+      ...fallback.userData,
+      forgeVisualSource: `${OPEN_SOURCE_STAUNTON_V14_SOURCE_ID}-classic-loading-fallback`,
+      forgeVisualPreset: CLASSIC_BLACK_WHITE_PRESET,
+      forgeVisualRevision: OPEN_SOURCE_STAUNTON_V14_REVISION,
+    };
+    const holder = this.highDetailModels.create(type, color, fallback, {
+      visualPreset: CLASSIC_BLACK_WHITE_PRESET,
+      materialFactory: createClassicBlackWhiteMaterial,
+    });
+    holder.userData = {
+      ...holder.userData,
+      forgeVisualPreset: CLASSIC_BLACK_WHITE_PRESET,
       forgeVisualRevision: HIGH_DETAIL_CHESS_REVISION,
       requestedVisualSource: HIGH_DETAIL_CHESS_SOURCE_ID,
     };

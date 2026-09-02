@@ -53,9 +53,15 @@ function releaseFallbackMaterials(fallback) {
   for (const material of materials) material.dispose();
 }
 
-export function prepareHighDetailPiece(geometry, materialTemplate, type, color) {
+export function prepareHighDetailPiece(
+  geometry,
+  materialTemplate,
+  type,
+  color,
+  { materialFactory = createHighDetailChessMaterial } = {},
+) {
   ensureHighDetailChessUvs(geometry);
-  const material = createHighDetailChessMaterial(materialTemplate, type, color);
+  const material = materialFactory(materialTemplate, type, color);
 
   const surface = new THREE.Mesh(geometry, material);
   surface.name = `${color}-${type}-uploaded-high-detail-surface`;
@@ -74,8 +80,11 @@ export function prepareHighDetailPiece(geometry, materialTemplate, type, color) 
   normalized.userData = {
     forgeVisualSource: HIGH_DETAIL_CHESS_SOURCE_ID,
     forgeVisualRevision: HIGH_DETAIL_CHESS_REVISION,
-    forgeTextureStyle: HIGH_DETAIL_CHESS_TEXTURE_STYLE,
-    forgeTextureRevision: HIGH_DETAIL_CHESS_TEXTURE_REVISION,
+    forgeTextureStyle:
+      material.userData?.forgeTextureStyle ?? HIGH_DETAIL_CHESS_TEXTURE_STYLE,
+    forgeTextureRevision:
+      material.userData?.forgeTextureRevision ??
+      HIGH_DETAIL_CHESS_TEXTURE_REVISION,
     ownerUploadedChessAsset: true,
   };
   return normalized;
@@ -154,13 +163,21 @@ export class HighDetailChessModelSet {
     return result;
   }
 
-  create(type, color, fallback) {
+  create(
+    type,
+    color,
+    fallback,
+    {
+      visualPreset = "FORGEMCP_PREMIUM",
+      materialFactory = createHighDetailChessMaterial,
+    } = {},
+  ) {
     const holder = new THREE.Group();
     holder.name = `${color}-${type}`;
     holder.userData = {
       highDetailModelState: "loading",
       forgeVisualSource: `${HIGH_DETAIL_CHESS_SOURCE_ID}-loading`,
-      forgeVisualPreset: "FORGEMCP_PREMIUM",
+      forgeVisualPreset: visualPreset,
       forgeVisualRevision: HIGH_DETAIL_CHESS_REVISION,
       highDetailAssetUrl: HIGH_DETAIL_CHESS_MODEL_URLS[type],
     };
@@ -173,6 +190,7 @@ export class HighDetailChessModelSet {
           this.materials[color],
           type,
           color,
+          { materialFactory },
         );
         releaseFallbackMaterials(fallback);
         holder.clear();
