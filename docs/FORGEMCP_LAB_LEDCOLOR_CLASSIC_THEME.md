@@ -79,6 +79,11 @@ Validation performed on 2026-09-02 for this change:
 - production Vite build and PWA smoke test passed;
 - the two targeted real-browser scenarios passed in Chromium desktop and the
   mobile Chrome profile;
+- the production browser harness passed `LEGACY_COMPACT → Lab LEDColor →
+  LEGACY_COMPACT`, preserving all 32 active pieces and measuring 27,552 →
+  2,838,104 rendered triangles before the verified rollback;
+- the production close-up harness validated and captured all 12 type/side
+  combinations with the Lab LEDColor five-map material stack;
 - desktop and mobile layouts were visually inspected from real rendered
   screenshots.
 

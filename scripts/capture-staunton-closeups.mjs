@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "@playwright/test";
+import { LAB_LED_COLOR_MATERIAL_STYLE } from "../web/renderer/VisualThemeMaterials.js";
 
 const baseUrl = process.env.FORGEMCP_PREVIEW_URL ?? "http://127.0.0.1:4173";
 const artifactDir = process.env.FORGEMCP_CLOSEUP_DIR ?? "artifacts/forgemcp-premium-live/closeups";
@@ -125,8 +126,8 @@ try {
       if (inspection.modelState !== "ready" || inspection.meshes === 0 || inspection.triangles < 70_000) {
         throw new Error(`Close-up ${side} ${type} has invalid model evidence: ${JSON.stringify(inspection)}`);
       }
-      if (!inspection.textureStyles.includes("reference-marble-obsidian-cyan-gold") || inspection.fullyTexturedMeshes !== inspection.meshes) {
-        throw new Error(`Close-up ${side} ${type} is missing the approved texture stack: ${JSON.stringify(inspection)}`);
+      if (!inspection.textureStyles.includes(LAB_LED_COLOR_MATERIAL_STYLE) || inspection.fullyTexturedMeshes !== inspection.meshes) {
+        throw new Error(`Close-up ${side} ${type} is missing the Lab LEDColor texture stack: ${JSON.stringify(inspection)}`);
       }
       await page.waitForTimeout(100);
       await canvas.screenshot({ path: `${artifactDir}/${side}-${type}.png` });

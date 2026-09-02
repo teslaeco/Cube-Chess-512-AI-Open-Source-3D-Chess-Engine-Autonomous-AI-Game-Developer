@@ -1,4 +1,4 @@
-name: ForgeMCP Premium Piece CI
+name: Lab LEDColor and Classic Theme CI
 
 on:
   pull_request:
@@ -39,7 +39,7 @@ jobs:
         run: npm run typecheck
       - name: Unit tests
         run: npm test
-      - name: Measure real premium geometry
+      - name: Measure Lab LEDColor high-detail geometry
         run: node scripts/measure-forgemcp-premium-pieces.mjs
       - name: Production build
         run: npm run build
@@ -59,12 +59,12 @@ jobs:
           exit 1
       - name: Live Chromium WebMCP before-after verification
         run: node scripts/verify-forgemcp-premium-live.mjs
-      - name: Capture authenticated uploaded-model close-ups
+      - name: Capture Lab LEDColor high-detail close-ups
         run: node scripts/capture-staunton-closeups.mjs
       - name: Upload live before-after evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: forgemcp-premium-live-evidence
+          name: lab-ledcolor-live-evidence
           path: artifacts/forgemcp-premium-live/
           if-no-files-found: warn
