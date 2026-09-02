@@ -16,13 +16,18 @@ import {
 } from "../renderer/CrayonCathedralTextureSet.js";
 import { pieceCellEnvelope } from "../renderer/pieceScaleProfile.js";
 import {
+  CLASSIC_BLACK_WHITE_MATERIAL_STYLE,
+  LAB_LED_COLOR_MATERIAL_STYLE,
+} from "../renderer/VisualThemeMaterials.js";
+import {
+  CLASSIC_BLACK_WHITE_PRESET,
   CRAYON_CATHEDRAL_PRESET,
   FORGEMCP_PREMIUM_PRESET,
   LEGACY_COMPACT_PRESET,
   PLAYER_SELECTABLE_VISUAL_PRESETS,
 } from "../state/pieceVisualPresets.js";
 
-const TOOL_REVISION = "2026-09-01-multi-piece-set-verification-v6";
+const TOOL_REVISION = "2026-09-02-three-visual-themes-verification-v7";
 const PREMIUM_PRESET = FORGEMCP_PREMIUM_PRESET;
 const LEGACY_PRESET = LEGACY_COMPACT_PRESET;
 const PIECE_TYPES = ["pawn", "rook", "knight", "bishop", "queen", "king"];
@@ -44,6 +49,8 @@ function inspectObject(object) {
   const materialSignatures = new Set();
   const textureStyles = new Set();
   let fullyTexturedMeshes = 0;
+  let labLedColorMeshes = 0;
+  let classicBlackWhiteMeshes = 0;
   object?.traverse?.((child) => {
     if (child.userData?.forgeVisualSource) sources.add(child.userData.forgeVisualSource);
     if (child.userData?.meshyModelState) sources.add(`meshy-${child.userData.meshyModelState}`);
@@ -64,6 +71,12 @@ function inspectObject(object) {
       ].join(":"));
     }
     if (material?.userData?.forgeTextureStyle) textureStyles.add(material.userData.forgeTextureStyle);
+    if (material?.userData?.forgeTextureStyle === LAB_LED_COLOR_MATERIAL_STYLE) {
+      labLedColorMeshes += 1;
+    }
+    if (material?.userData?.forgeTextureStyle === CLASSIC_BLACK_WHITE_MATERIAL_STYLE) {
+      classicBlackWhiteMeshes += 1;
+    }
     if (material?.map && material?.roughnessMap && material?.metalnessMap && material?.bumpMap && material?.emissiveMap) {
       fullyTexturedMeshes += 1;
     }
@@ -75,6 +88,8 @@ function inspectObject(object) {
     materialSignatures: [...materialSignatures],
     textureStyles: [...textureStyles],
     fullyTexturedMeshes,
+    labLedColorMeshes,
+    classicBlackWhiteMeshes,
   };
 }
 
@@ -111,6 +126,8 @@ function snapshotPieceVisuals(application) {
   const sources = [...new Set(inspected.flatMap((item) => item.sources))];
   const textureStyles = [...new Set(inspected.flatMap((item) => item.textureStyles))];
   const fullyTexturedMeshes = inspected.reduce((sum, item) => sum + item.fullyTexturedMeshes, 0);
+  const labLedColorMeshes = inspected.reduce((sum, item) => sum + item.labLedColorMeshes, 0);
+  const classicBlackWhiteMeshes = inspected.reduce((sum, item) => sum + item.classicBlackWhiteMeshes, 0);
   const typeTriangles = Object.fromEntries(PIECE_TYPES.map((type) => {
     const sample = inspected.find((item) => item.piece?.type === type);
     return [type, sample?.triangles ?? null];
@@ -140,6 +157,8 @@ function snapshotPieceVisuals(application) {
       crayonCathedral: CRAYON_CATHEDRAL_TEXTURE_REVISION,
     },
     fullyTexturedMeshes,
+    labLedColorMeshes,
+    classicBlackWhiteMeshes,
     selectedPieceId: pieceRenderer.selectedPieceId ?? null,
     levels: application.presentation.snapshot().levels.map((level) => ({ index: level.index, visible: level.visible })),
     coordinates: clonePieceCoordinates(pieceRenderer),
@@ -150,6 +169,8 @@ function snapshotPieceVisuals(application) {
       "web/renderer/HighDetailChessTextureSet.js",
       "web/renderer/CrayonCathedralPieceSet.js",
       "web/renderer/CrayonCathedralTextureSet.js",
+      "web/renderer/VisualThemeMaterials.js",
+      "web/renderer/visualThemes.js",
       "public/assets/high-detail-chess-models/*.ccm.b64",
       "scripts/build-high-detail-chess-assets.mjs",
       "web/renderer/MeshyChessModelSet.js",
@@ -171,6 +192,9 @@ function rememberOriginalFactory(factory) {
   }
   if (!factory.__forgeCrayonCathedralCreate && typeof factory.createCrayonCathedral === "function") {
     factory.__forgeCrayonCathedralCreate = factory.createCrayonCathedral.bind(factory);
+  }
+  if (!factory.__forgeClassicBlackWhiteCreate && typeof factory.createClassicBlackWhite === "function") {
+    factory.__forgeClassicBlackWhiteCreate = factory.createClassicBlackWhite.bind(factory);
   }
 }
 
@@ -204,6 +228,24 @@ function rebuildPieceObjects(application) {
 function applyVisualMode(application, preset) {
   const factory = application.renderer.pieceRenderer.factory;
   rememberOriginalFactory(factory);
+  if (
+    PLAYER_SELECTABLE_VISUAL_PRESETS.includes(preset) &&
+    typeof application.previewPieceSet === "function"
+  ) {
+    application.previewPieceSet(
+      preset,
+      application.presentation?.gameConfig?.labLedColorSettings ??
+        application.hud?.labLedColorSettings,
+    );
+    return;
+  }
+  if (
+    PLAYER_SELECTABLE_VISUAL_PRESETS.includes(preset) &&
+    typeof application.renderer.setPieceVisualPreset === "function"
+  ) {
+    application.renderer.setPieceVisualPreset(preset);
+    return;
+  }
   if (typeof factory.setVisualMode === "function") {
     factory.setVisualMode(preset);
   } else if (preset === PREMIUM_PRESET) {
@@ -212,6 +254,9 @@ function applyVisualMode(application, preset) {
   } else if (preset === CRAYON_CATHEDRAL_PRESET && factory.__forgeCrayonCathedralCreate) {
     factory.create = factory.__forgeCrayonCathedralCreate;
     factory.__forgeVisualMode = CRAYON_CATHEDRAL_PRESET;
+  } else if (preset === CLASSIC_BLACK_WHITE_PRESET && factory.__forgeClassicBlackWhiteCreate) {
+    factory.create = factory.__forgeClassicBlackWhiteCreate;
+    factory.__forgeVisualMode = CLASSIC_BLACK_WHITE_PRESET;
   } else if (preset === LEGACY_PRESET) {
     factory.create = factory.__forgeOriginalCreate;
     factory.__forgeVisualMode = LEGACY_PRESET;
@@ -227,6 +272,10 @@ function applyPremiumMode(application) {
 
 function applyCrayonCathedralMode(application) {
   applyVisualMode(application, CRAYON_CATHEDRAL_PRESET);
+}
+
+function applyClassicBlackWhiteMode(application) {
+  applyVisualMode(application, CLASSIC_BLACK_WHITE_PRESET);
 }
 
 function restoreLegacyMode(application) {
@@ -297,11 +346,21 @@ async function waitForHighDetailModels(pieceRenderer, timeoutMs = 20_000) {
   return { ...states, timedOut: states.loading > 0 };
 }
 
-function hasPremiumSource(snapshot) {
+function hasHighDetailSource(snapshot) {
   return snapshot.sources.includes(HIGH_DETAIL_CHESS_SOURCE_ID) &&
     snapshot.sources.includes("high-detail-ready") &&
     !snapshot.sources.includes("high-detail-loading") &&
     !snapshot.sources.includes("high-detail-fallback");
+}
+
+function hasPremiumSource(snapshot) {
+  return hasHighDetailSource(snapshot) &&
+    snapshot.textureStyles.includes(LAB_LED_COLOR_MATERIAL_STYLE);
+}
+
+function hasClassicBlackWhiteSource(snapshot) {
+  return hasHighDetailSource(snapshot) &&
+    snapshot.textureStyles.includes(CLASSIC_BLACK_WHITE_MATERIAL_STYLE);
 }
 
 function hasReadyLegacySource(snapshot) {
@@ -432,7 +491,9 @@ export async function previewPieceVisualUpgrade(input = {}) {
     proposedGeometry: geometryQa,
     action: requestedPreset === CRAYON_CATHEDRAL_PRESET
       ? "Rebuild every active and captured piece with the original windowed Crayon Cathedral geometry and its stained-glass five-map PBR materials."
-      : "Rebuild every active and captured piece from the owner-uploaded high-detail GLB derivatives with the approved marble/obsidian PBR texture stack.",
+      : requestedPreset === CLASSIC_BLACK_WHITE_PRESET
+        ? "Rebuild every active and captured piece from the owner-uploaded high-detail geometry with fixed white/black physical materials and the classic board lighting rig."
+        : "Rebuild every active and captured piece as Lab LEDColor using the owner-uploaded high-detail geometry and configurable PBR colors.",
     reversible: true,
     liveMutationPerformed: false,
     provenance: before.provenance,
@@ -453,7 +514,9 @@ export async function upgradePieceVisuals(input = {}) {
 
   const targetAlreadyReady = requestedPreset === PREMIUM_PRESET
     ? hasPremiumSource(before)
-    : hasCrayonCathedralSource(before);
+    : requestedPreset === CLASSIC_BLACK_WHITE_PRESET
+      ? hasClassicBlackWhiteSource(before)
+      : hasCrayonCathedralSource(before);
   if (before.preset === requestedPreset && targetAlreadyReady) {
     return structuredResult("PASS", {
       status: "ALREADY_APPLIED",
@@ -469,9 +532,15 @@ export async function upgradePieceVisuals(input = {}) {
     });
   }
 
-  if (requestedPreset === CRAYON_CATHEDRAL_PRESET) applyCrayonCathedralMode(application);
-  else applyPremiumMode(application);
-  const modelStates = requestedPreset === PREMIUM_PRESET
+  if (requestedPreset === CRAYON_CATHEDRAL_PRESET) {
+    applyCrayonCathedralMode(application);
+  } else if (requestedPreset === CLASSIC_BLACK_WHITE_PRESET) {
+    applyClassicBlackWhiteMode(application);
+  } else {
+    applyPremiumMode(application);
+  }
+  const highDetailPreset = requestedPreset !== CRAYON_CATHEDRAL_PRESET;
+  const modelStates = highDetailPreset
     ? await waitForHighDetailModels(pieceRenderer)
     : crayonCathedralModelStates(pieceRenderer);
   if (application.presentation?.gameConfig) {
@@ -488,11 +557,15 @@ export async function upgradePieceVisuals(input = {}) {
   const differentPlayerMaterials = JSON.stringify(after.colorMaterials.white) !== JSON.stringify(after.colorMaterials.black);
   const targetSourceVerified = requestedPreset === PREMIUM_PRESET
     ? hasPremiumSource(after)
-    : hasCrayonCathedralSource(after);
+    : requestedPreset === CLASSIC_BLACK_WHITE_PRESET
+      ? hasClassicBlackWhiteSource(after)
+      : hasCrayonCathedralSource(after);
   const expectedTextureStyle = requestedPreset === PREMIUM_PRESET
-    ? HIGH_DETAIL_CHESS_TEXTURE_STYLE
-    : CRAYON_CATHEDRAL_TEXTURE_STYLE;
-  const modelsReady = requestedPreset === PREMIUM_PRESET
+    ? LAB_LED_COLOR_MATERIAL_STYLE
+    : requestedPreset === CLASSIC_BLACK_WHITE_PRESET
+      ? CLASSIC_BLACK_WHITE_MATERIAL_STYLE
+      : CRAYON_CATHEDRAL_TEXTURE_STYLE;
+  const modelsReady = highDetailPreset
     ? modelStates.loading === 0 &&
       modelStates.fallback === 0 &&
       modelStates.unknown === 0 &&
@@ -511,15 +584,39 @@ export async function upgradePieceVisuals(input = {}) {
     sourceChanged: JSON.stringify([...before.sources].sort()) !== JSON.stringify([...after.sources].sort()),
     targetSourceVerified,
     targetTexturesVerified: after.textureStyles.includes(expectedTextureStyle) &&
-      after.fullyTexturedMeshes === after.totalSourceMeshes,
+      (requestedPreset === CLASSIC_BLACK_WHITE_PRESET
+        ? after.classicBlackWhiteMeshes === after.totalSourceMeshes
+        : after.fullyTexturedMeshes === after.totalSourceMeshes),
     whiteBlackMaterialsDiffer: differentPlayerMaterials,
     presetApplied: after.preset === requestedPreset,
   };
   // Keep the preset-specific evidence keys consumed by the existing CI harness
   // while exposing the shared targetSourceVerified key to newer callers.
-  if (requestedPreset === PREMIUM_PRESET) qa.premiumSourceVerified = targetSourceVerified;
-  else qa.crayonCathedralSourceVerified = targetSourceVerified;
-  qa.result = Object.values(qa).every((value) => value === true || value === "PASS") ? "PASS" : "FAIL";
+  if (requestedPreset === PREMIUM_PRESET) {
+    qa.premiumSourceVerified = targetSourceVerified;
+    qa.labLedColorSourceVerified = targetSourceVerified;
+  } else if (requestedPreset === CLASSIC_BLACK_WHITE_PRESET) {
+    qa.classicBlackWhiteSourceVerified = targetSourceVerified;
+  } else {
+    qa.crayonCathedralSourceVerified = targetSourceVerified;
+  }
+  const requiredQa = [
+    qa.activePieceCountPreserved,
+    qa.capturedPieceCountPreserved,
+    qa.coordinatesPreserved,
+    qa.selectedPiecePreserved,
+    qa.levelVisibilityPreserved,
+    qa.allTargetPieceTypesValid,
+    qa.targetModelsReady,
+    qa.triangleCountsMeasured,
+    qa.targetSourceVerified,
+    qa.targetTexturesVerified,
+    qa.whiteBlackMaterialsDiffer,
+    qa.presetApplied,
+  ];
+  qa.result = requiredQa.every((value) => value === true || value === "PASS")
+    ? "PASS"
+    : "FAIL";
   return structuredResult(qa.result === "PASS" ? "PASS" : "FAIL", {
     status: qa.result === "PASS" ? "APPLIED" : "APPLIED_WITH_QA_FAILURE",
     presetBefore: before.preset,
@@ -612,8 +709,8 @@ export async function registerVisualWebMcpTools() {
   if (!modelContext || typeof modelContext.registerTool !== "function") return { availability: "WEBMCP_UNAVAILABLE", registered: 0 };
   const tools = [
     { name: "inspect_piece_visuals", description: "Inspect real Cube Chess Three.js geometry, PBR texture maps, measured triangle counts, fit QA and provenance.", inputSchema: INPUT_NONE, outputSchema: OUTPUT, execute: inspectPieceVisuals },
-    { name: "preview_piece_visual_upgrade", description: "Preview either selectable 3D piece collection—ForgeMCP Premium or Crayon Cathedral—and run deterministic geometry/material QA without mutating the live game.", inputSchema: INPUT_PREVIEW, outputSchema: OUTPUT, execute: previewPieceVisualUpgrade },
-    { name: "upgrade_piece_visuals", description: "After explicit human approval, rebuild every live Cube Chess piece with the selected Premium or Crayon Cathedral geometry and PBR textures, then return measured before/after QA.", inputSchema: INPUT_UPGRADE, outputSchema: OUTPUT, execute: upgradePieceVisuals },
+    { name: "preview_piece_visual_upgrade", description: "Preview any selectable Cube Chess visual theme—Lab LEDColor, Crayon Cathedral or Classic Black & White—and run deterministic geometry/material QA without mutating the live game.", inputSchema: INPUT_PREVIEW, outputSchema: OUTPUT, execute: previewPieceVisualUpgrade },
+    { name: "upgrade_piece_visuals", description: "After explicit human approval, rebuild every live Cube Chess piece and board with the selected visual theme, then return measured before/after QA.", inputSchema: INPUT_UPGRADE, outputSchema: OUTPUT, execute: upgradePieceVisuals },
     { name: "rollback_piece_visuals", description: "After explicit human approval, restore the legacy compact Meshy runtime piece pipeline and return measured rollback QA.", inputSchema: INPUT_APPROVAL, outputSchema: OUTPUT, execute: rollbackPieceVisuals },
   ];
   let registered = 0;
@@ -624,5 +721,7 @@ export async function registerVisualWebMcpTools() {
 export const FORGEMCP_VISUAL_PRESETS = Object.freeze({
   LEGACY: LEGACY_PRESET,
   PREMIUM: PREMIUM_PRESET,
+  LAB_LED_COLOR: PREMIUM_PRESET,
   CRAYON_CATHEDRAL: CRAYON_CATHEDRAL_PRESET,
+  CLASSIC_BLACK_WHITE: CLASSIC_BLACK_WHITE_PRESET,
 });

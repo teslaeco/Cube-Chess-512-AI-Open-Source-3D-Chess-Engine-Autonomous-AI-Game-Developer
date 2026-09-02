@@ -6,6 +6,10 @@ import { ChessRenderer } from "../renderer/ChessRenderer.js";
 import { SaveRepository } from "../storage/SaveRepository.js";
 import { GameHud } from "../ui/GameHud.js";
 import { GamePresentation } from "./GamePresentation.js";
+import {
+  normalizeLabLedColorSettings,
+  storeLabLedColorSettings,
+} from "../state/labLedColorSettings.js";
 
 function downloadJson(filename, payload) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -39,7 +43,8 @@ export class CubeChessApplication {
     this.hud = new GameHud(root, {
       reset: () => this.renderer.resetCamera(),
       startGame: (config) => this.startGame(config),
-      previewPieceSet: (preset) => this.previewPieceSet(preset),
+      previewPieceSet: (preset, settings) =>
+        this.previewPieceSet(preset, settings),
       undo: () => this.renderer.undo(),
       redo: () => this.renderer.redo(),
       openMenu: () => this.renderer.openMenu(),
@@ -71,9 +76,11 @@ export class CubeChessApplication {
       importSave: (file) => this.importSave(file),
     });
     // Build the first 32 objects directly in the persisted collection. This
-    // avoids decoding Premium assets only to replace them immediately when the
-    // player previously chose Crayon Cathedral.
+    // avoids decoding Lab LEDColor assets only to replace them immediately when
+    // the player previously chose Crayon Cathedral or Classic Black & White.
     this.presentation.gameConfig.pieceSet = this.hud.selectedPieceSet;
+    this.presentation.gameConfig.labLedColorSettings =
+      this.hud.labLedColorSettings;
     this.renderer = new ChessRenderer(
       this.stage,
       this.presentation,
@@ -84,7 +91,10 @@ export class CubeChessApplication {
       this.renderer,
     );
     this.renderer.setFog(localStorage.getItem("cubeChessFog") === "1");
-    this.previewPieceSet(this.hud.selectedPieceSet);
+    this.previewPieceSet(
+      this.hud.selectedPieceSet,
+      this.hud.labLedColorSettings,
+    );
     this.attractMode.start();
   }
 
@@ -115,11 +125,23 @@ export class CubeChessApplication {
     this.aiRequestPending = false;
     this.renderer.startGame(config);
     this.root.dataset.pieceSet = this.presentation.gameConfig.pieceSet;
+    this.root.dataset.visualTheme =
+      this.renderer.boardRenderer.group.userData.visualTheme;
   }
 
-  previewPieceSet(preset) {
-    const changed = this.renderer.setPieceVisualPreset(preset);
+  previewPieceSet(preset, labLedColorSettings = this.hud.labLedColorSettings) {
+    const normalizedSettings = normalizeLabLedColorSettings(
+      labLedColorSettings,
+    );
+    const changed = this.renderer.setPieceVisualPreset(preset, {
+      labLedColorSettings: normalizedSettings,
+    });
+    this.presentation.gameConfig.pieceSet =
+      this.renderer.pieceRenderer.factory.__forgeVisualMode;
+    this.presentation.gameConfig.labLedColorSettings = normalizedSettings;
     this.root.dataset.pieceSet = this.renderer.pieceRenderer.factory.__forgeVisualMode;
+    this.root.dataset.visualTheme =
+      this.renderer.boardRenderer.group.userData.visualTheme;
     globalThis.__forgeMcpPublishVisualDiagnostics?.();
     return changed;
   }
@@ -260,8 +282,13 @@ export class CubeChessApplication {
     this.aiRequestPending = false;
     this.renderer.loadGame(record.payload);
     this.hud.selectedPieceSet = this.presentation.gameConfig.pieceSet;
+    this.hud.labLedColorSettings = storeLabLedColorSettings(
+      this.presentation.gameConfig.labLedColorSettings,
+    );
     localStorage.setItem("cubeChessPieceSet", this.hud.selectedPieceSet);
     this.root.dataset.pieceSet = this.presentation.gameConfig.pieceSet;
+    this.root.dataset.visualTheme =
+      this.renderer.boardRenderer.group.userData.visualTheme;
     this.presentation.message = "saveLoaded";
     this.renderer.refresh();
     return true;

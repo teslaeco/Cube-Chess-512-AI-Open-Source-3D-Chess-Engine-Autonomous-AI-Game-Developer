@@ -93,12 +93,12 @@ try {
     const tool = globalThis.__forgemcpRegisteredTools?.upgrade_piece_visuals;
     return tool.execute({ preset: "FORGEMCP_PREMIUM", humanApproved: true });
   });
-  if (upgraded?.state !== "PASS") throw new Error(`Premium live upgrade failed: ${JSON.stringify(upgraded)}`);
-  if (upgraded?.data?.presetAfter !== "FORGEMCP_PREMIUM") throw new Error("Premium preset was not applied");
-  if (upgraded?.data?.qa?.result !== "PASS") throw new Error(`Premium live QA failed: ${JSON.stringify(upgraded.data.qa)}`);
+  if (upgraded?.state !== "PASS") throw new Error(`Lab LEDColor live upgrade failed: ${JSON.stringify(upgraded)}`);
+  if (upgraded?.data?.presetAfter !== "FORGEMCP_PREMIUM") throw new Error("Lab LEDColor compatibility preset was not applied");
+  if (upgraded?.data?.qa?.result !== "PASS") throw new Error(`Lab LEDColor live QA failed: ${JSON.stringify(upgraded.data.qa)}`);
   if (upgraded?.data?.liveMutationPerformed !== true) throw new Error("Upgrade did not perform a live mutation");
   if (upgraded?.data?.qa?.geometryChanged !== true || upgraded?.data?.qa?.sourceChanged !== true) throw new Error("Upgrade did not measurably change geometry and provenance");
-  if (upgraded?.data?.qa?.premiumSourceVerified !== true) throw new Error(`Premium source was not verified: ${JSON.stringify(upgraded.data?.after?.sources)}`);
+  if (upgraded?.data?.qa?.labLedColorSourceVerified !== true) throw new Error(`Lab LEDColor source was not verified: ${JSON.stringify(upgraded.data?.after?.sources)}`);
 
   await page.screenshot({ path: `${artifactDir}/after.png`, fullPage: true });
 
@@ -143,7 +143,7 @@ try {
     trianglesBefore: upgraded.data.trianglesBefore,
     trianglesAfter: upgraded.data.trianglesAfter,
     triangleDelta: upgraded.data.triangleDelta,
-    perTypePremiumTriangles: upgraded.data.perTypePremiumTriangles,
+    perTypeLabLedColorTriangles: upgraded.data.perTypeTriangles,
     qa: upgraded.data.qa,
     rollbackPreset: rollback.data.presetAfter,
     rollbackQa: rollback.data.qa,

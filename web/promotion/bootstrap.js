@@ -7,10 +7,15 @@ import {
 } from "../renderer/HighDetailChessModelSet.js";
 import { HIGH_DETAIL_CHESS_TEXTURE_STYLE } from "../renderer/HighDetailChessTextureSet.js";
 import {
+  CLASSIC_BLACK_WHITE_MATERIAL_STYLE,
+  LAB_LED_COLOR_MATERIAL_STYLE,
+} from "../renderer/VisualThemeMaterials.js";
+import {
   CRAYON_CATHEDRAL_SOURCE_ID,
 } from "../renderer/CrayonCathedralPieceSet.js";
 import { CRAYON_CATHEDRAL_TEXTURE_STYLE } from "../renderer/CrayonCathedralTextureSet.js";
 import {
+  CLASSIC_BLACK_WHITE_PRESET,
   CRAYON_CATHEDRAL_PRESET,
   FORGEMCP_PREMIUM_PRESET,
 } from "../state/pieceVisualPresets.js";
@@ -43,6 +48,7 @@ function inspectLiveVisuals(application) {
       openSourcePieces: 0,
       premiumPieces: 0,
       texturedPieces: 0,
+      classicBlackWhitePieces: 0,
       crayonCathedralPieces: 0,
       meshyPieces: 0,
       totalTriangles: 0,
@@ -53,6 +59,7 @@ function inspectLiveVisuals(application) {
   let openSourcePieces = 0;
   let meshyPieces = 0;
   let texturedPieces = 0;
+  let classicBlackWhitePieces = 0;
   let crayonCathedralPieces = 0;
   let totalTriangles = 0;
   const sources = new Set();
@@ -62,6 +69,7 @@ function inspectLiveVisuals(application) {
       object.userData?.highDetailModelState === "ready";
     let meshy = false;
     let textured = false;
+    let classicBlackWhite = false;
     let crayonCathedral = object.userData?.forgeVisualSource === CRAYON_CATHEDRAL_SOURCE_ID &&
       object.userData?.crayonCathedralModelState === "ready";
     totalTriangles += countTriangles(object);
@@ -72,13 +80,19 @@ function inspectLiveVisuals(application) {
       const material = Array.isArray(child.material) ? child.material[0] : child.material;
       if (child.userData?.forgeVisualSource === CRAYON_CATHEDRAL_SOURCE_ID) crayonCathedral = true;
       if (
-        material?.userData?.forgeTextureStyle === HIGH_DETAIL_CHESS_TEXTURE_STYLE &&
+        [
+          HIGH_DETAIL_CHESS_TEXTURE_STYLE,
+          LAB_LED_COLOR_MATERIAL_STYLE,
+        ].includes(material?.userData?.forgeTextureStyle) &&
         material.map && material.roughnessMap && material.metalnessMap && material.bumpMap && material.emissiveMap
       ) {
         textured = true;
       }
       if (material?.userData?.forgeTextureStyle === CRAYON_CATHEDRAL_TEXTURE_STYLE) {
         crayonCathedral = true;
+      }
+      if (material?.userData?.forgeTextureStyle === CLASSIC_BLACK_WHITE_MATERIAL_STYLE) {
+        classicBlackWhite = true;
       }
     });
     if (openSource) {
@@ -90,6 +104,7 @@ function inspectLiveVisuals(application) {
       sources.add("compact-meshy-runtime");
     }
     if (textured) texturedPieces += 1;
+    if (classicBlackWhite) classicBlackWhitePieces += 1;
     if (crayonCathedral) {
       crayonCathedralPieces += 1;
       sources.add(CRAYON_CATHEDRAL_SOURCE_ID);
@@ -104,6 +119,7 @@ function inspectLiveVisuals(application) {
     openSourcePieces,
     premiumPieces: openSourcePieces, // compatibility for existing CI evidence consumers
     texturedPieces,
+    classicBlackWhitePieces,
     crayonCathedralPieces,
     meshyPieces,
     totalTriangles,
@@ -117,15 +133,19 @@ function publishDiagnostics(application) {
   const badge = document.getElementById("forgemcp-visual-runtime-badge");
   if (badge) {
     const mode = diagnostics.preset === OPEN_SOURCE_PRESET
-      ? "TEXTURED HIGH DETAIL"
+      ? "LAB LEDCOLOR"
       : diagnostics.preset === CRAYON_CATHEDRAL_PRESET
         ? "CRAYON CATHEDRAL"
-        : diagnostics.preset;
+        : diagnostics.preset === CLASSIC_BLACK_WHITE_PRESET
+          ? "CLASSIC BLACK & WHITE"
+          : diagnostics.preset;
     const verifiedPieces = diagnostics.preset === OPEN_SOURCE_PRESET
       ? diagnostics.texturedPieces
       : diagnostics.preset === CRAYON_CATHEDRAL_PRESET
         ? diagnostics.crayonCathedralPieces
-        : diagnostics.openSourcePieces;
+        : diagnostics.preset === CLASSIC_BLACK_WHITE_PRESET
+          ? diagnostics.classicBlackWhitePieces
+          : diagnostics.openSourcePieces;
     badge.textContent = `CUBE VISUAL: ${mode} · ${verifiedPieces}/${diagnostics.activePieces}`;
     badge.dataset.preset = diagnostics.preset;
     badge.dataset.openSourcePieces = String(diagnostics.openSourcePieces);
@@ -133,6 +153,7 @@ function publishDiagnostics(application) {
     badge.dataset.meshyPieces = String(diagnostics.meshyPieces);
     badge.dataset.texturedPieces = String(diagnostics.texturedPieces);
     badge.dataset.crayonCathedralPieces = String(diagnostics.crayonCathedralPieces);
+    badge.dataset.classicBlackWhitePieces = String(diagnostics.classicBlackWhitePieces);
     badge.dataset.revision = diagnostics.revision;
   }
   return diagnostics;

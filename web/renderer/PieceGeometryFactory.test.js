@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { PieceGeometryFactory } from "./PieceGeometryFactory.js";
 import {
+  CLASSIC_BLACK_WHITE_PRESET,
   CRAYON_CATHEDRAL_PRESET,
   FORGEMCP_PREMIUM_PRESET,
 } from "../state/pieceVisualPresets.js";
@@ -57,7 +58,7 @@ describe("piece cell fitting", () => {
     expect(center.z).toBeCloseTo(0, 6);
   });
 
-  it("switches between Premium and Crayon Cathedral without replacing the factory", () => {
+  it("switches between Lab LEDColor, Crayon Cathedral and Classic Black & White without replacing the factory", () => {
     const factory = new PieceGeometryFactory();
     factory.setVisualMode(CRAYON_CATHEDRAL_PRESET);
     const cathedral = factory.create("king", "white");
@@ -66,6 +67,9 @@ describe("piece cell fitting", () => {
 
     factory.setVisualMode(FORGEMCP_PREMIUM_PRESET);
     expect(factory.__forgeVisualMode).toBe(FORGEMCP_PREMIUM_PRESET);
+
+    factory.setVisualMode(CLASSIC_BLACK_WHITE_PRESET);
+    expect(factory.__forgeVisualMode).toBe(CLASSIC_BLACK_WHITE_PRESET);
   });
 
   it("rejects unknown visual presets", () => {

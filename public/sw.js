@@ -1,4 +1,4 @@
-const CACHE_VERSION = "cube-chess-512-v3-forgemcp-premium";
+const CACHE_VERSION = "cube-chess-512-v4-lab-ledcolor-classic";
 const APP_SHELL = ["./", "./manifest.webmanifest", "./icons/cube-chess.svg"];
 
 self.addEventListener("install", (event) => {

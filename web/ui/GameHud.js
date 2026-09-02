@@ -5,10 +5,16 @@ import {
   translate,
 } from "../i18n/locales.js";
 import {
+  CLASSIC_BLACK_WHITE_PRESET,
   CRAYON_CATHEDRAL_PRESET,
   FORGEMCP_PREMIUM_PRESET,
   normalizePlayerVisualPreset,
 } from "../state/pieceVisualPresets.js";
+import {
+  DEFAULT_LAB_LED_COLOR_SETTINGS,
+  readStoredLabLedColorSettings,
+  storeLabLedColorSettings,
+} from "../state/labLedColorSettings.js";
 
 const MENU_ITEMS = [
   ["newGame", "newGame"],
@@ -62,6 +68,11 @@ export class GameHud {
         ? undefined
         : localStorage.getItem("cubeChessPieceSet"),
     );
+    this.labLedColorSettings = readStoredLabLedColorSettings(
+      typeof localStorage === "undefined" ? null : localStorage,
+    );
+    this.labLedColorPanelOpen =
+      this.selectedPieceSet === FORGEMCP_PREMIUM_PRESET;
     this.element = document.createElement("aside");
     this.element.className = "hud";
     this.element.innerHTML = `
@@ -205,12 +216,38 @@ export class GameHud {
       } else if (target.matches("[data-piece-set]")) {
         this.selectedPieceSet = normalizePlayerVisualPreset(target.value);
         localStorage.setItem("cubeChessPieceSet", this.selectedPieceSet);
-        this.actions.previewPieceSet(this.selectedPieceSet);
+        if (this.selectedPieceSet === FORGEMCP_PREMIUM_PRESET) {
+          this.labLedColorPanelOpen = true;
+        }
+        this.syncLabLedColorPanel();
+        this.actions.previewPieceSet(
+          this.selectedPieceSet,
+          this.labLedColorSettings,
+        );
       } else if (target.matches("[data-audio-file]")) {
         this.loadLocalAudio(target.files?.[0]);
       }
     };
     this.element.addEventListener("change", this.handleChange);
+
+    this.handleInput = (event) => {
+      const target = event.target;
+      const setting = target.dataset?.labSetting;
+      if (!setting || !Object.hasOwn(this.labLedColorSettings, setting)) return;
+      const value = setting === "lightIntensity"
+        ? Number(target.value)
+        : target.value;
+      this.labLedColorSettings = storeLabLedColorSettings({
+        ...this.labLedColorSettings,
+        [setting]: value,
+      });
+      this.updateLabLedColorOutput(setting);
+      this.actions.previewPieceSet(
+        this.selectedPieceSet,
+        this.labLedColorSettings,
+      );
+    };
+    this.element.addEventListener("input", this.handleInput);
 
     this.handleSubmit = (event) => {
       if (event.target.matches("[data-new-game-form]")) {
@@ -224,6 +261,7 @@ export class GameHud {
           difficulty: data.get("difficulty"),
           clockMinutes: data.get("clockMinutes"),
           pieceSet: data.get("pieceSet"),
+          labLedColorSettings: this.labLedColorSettings,
         });
       } else if (event.target.matches("[data-browser-form]")) {
         event.preventDefault();
@@ -313,6 +351,20 @@ export class GameHud {
         this.resetAccessibilitySettings();
         this.renderPanel();
         break;
+      case "toggle-lab-ledcolor":
+        this.labLedColorPanelOpen = !this.labLedColorPanelOpen;
+        this.syncLabLedColorPanel();
+        break;
+      case "reset-lab-ledcolor":
+        this.labLedColorSettings = storeLabLedColorSettings(
+          DEFAULT_LAB_LED_COLOR_SETTINGS,
+        );
+        this.writeLabLedColorControls();
+        this.actions.previewPieceSet(
+          this.selectedPieceSet,
+          this.labLedColorSettings,
+        );
+        break;
       case "virtual-key": {
         const input = this.element.querySelector("[data-browser-query]");
         if (input) {
@@ -361,6 +413,7 @@ export class GameHud {
     });
     panel.innerHTML = this.panelMarkup(this.activePanel);
     this.populateLanguages();
+    this.syncLabLedColorPanel();
     const importInput = panel.querySelector("[data-import-file]");
     importInput?.addEventListener("change", async () => {
       const file = importInput.files?.[0];
@@ -368,6 +421,50 @@ export class GameHud {
       await this.actions.importSave(file);
       await this.refreshSaves();
     });
+  }
+
+  labColorControl(setting, labelKey) {
+    return `<label class="lab-color-control"><span>${this.t(labelKey)}</span><input type="color" value="${escapeHtml(this.labLedColorSettings[setting])}" data-lab-setting="${setting}" data-testid="lab-${setting}"><output>${escapeHtml(this.labLedColorSettings[setting])}</output></label>`;
+  }
+
+  syncLabLedColorPanel() {
+    const config = this.element.querySelector("[data-lab-ledcolor-config]");
+    if (!config) return;
+    const selected =
+      this.selectedPieceSet === FORGEMCP_PREMIUM_PRESET;
+    config.hidden = !selected;
+    const tab = config.querySelector('[data-action="toggle-lab-ledcolor"]');
+    const panel = config.querySelector("[data-lab-ledcolor-panel]");
+    if (tab) tab.setAttribute(
+      "aria-selected",
+      selected && this.labLedColorPanelOpen ? "true" : "false",
+    );
+    if (panel) panel.hidden = !selected || !this.labLedColorPanelOpen;
+  }
+
+  updateLabLedColorOutput(setting) {
+    const input = this.element.querySelector(
+      `[data-lab-setting="${setting}"]`,
+    );
+    if (!input) return;
+    const output = setting === "lightIntensity"
+      ? this.element.querySelector('[data-lab-output="lightIntensity"]')
+      : input.parentElement?.querySelector("output");
+    if (output) {
+      output.textContent = setting === "lightIntensity"
+        ? `${this.labLedColorSettings.lightIntensity.toFixed(2)}×`
+        : this.labLedColorSettings[setting];
+    }
+  }
+
+  writeLabLedColorControls() {
+    for (const [setting, value] of Object.entries(this.labLedColorSettings)) {
+      const input = this.element.querySelector(
+        `[data-lab-setting="${setting}"]`,
+      );
+      if (input) input.value = String(value);
+      this.updateLabLedColorOutput(setting);
+    }
   }
 
   panelMarkup(panel) {
@@ -388,7 +485,32 @@ export class GameHud {
                 <span class="piece-set-preview cathedral-preview" aria-hidden="true"><span class="mini-window"></span><i></i><i></i><i></i><b></b></span>
                 <span class="piece-set-copy"><strong>${this.t("crayonCathedralPieceSet")}</strong><small>${this.t("crayonCathedralPieceSetDescription")}</small></span>
               </label>
+              <label class="piece-set-card" data-testid="piece-set-classic">
+                <input data-piece-set type="radio" name="pieceSet" value="${CLASSIC_BLACK_WHITE_PRESET}" ${selectedPieceSet === CLASSIC_BLACK_WHITE_PRESET ? "checked" : ""}>
+                <span class="piece-set-preview classic-preview" aria-hidden="true"><span>♕</span><b>♛</b><i></i></span>
+                <span class="piece-set-copy"><strong>${this.t("classicBlackWhitePieceSet")}</strong><small>${this.t("classicBlackWhitePieceSetDescription")}</small></span>
+              </label>
             </fieldset>
+            <section class="lab-ledcolor-config" data-lab-ledcolor-config ${selectedPieceSet === FORGEMCP_PREMIUM_PRESET ? "" : "hidden"}>
+              <nav class="visual-config-tabs" role="tablist" aria-label="${escapeHtml(this.t("labLedColorTab"))}">
+                <button type="button" role="tab" data-action="toggle-lab-ledcolor" data-testid="lab-ledcolor-tab" aria-controls="lab-ledcolor-panel" aria-selected="${this.labLedColorPanelOpen ? "true" : "false"}">
+                  <span>02</span><strong>${this.t("labLedColorTab")}</strong><i aria-hidden="true">⌄</i>
+                </button>
+              </nav>
+              <div id="lab-ledcolor-panel" class="lab-ledcolor-panel" role="tabpanel" data-lab-ledcolor-panel ${this.labLedColorPanelOpen ? "" : "hidden"}>
+                <p>${this.t("labLedColorDescription")}</p>
+                <div class="lab-color-grid">
+                  ${this.labColorControl("lightSquareColor", "lightSquareColor")}
+                  ${this.labColorControl("darkSquareColor", "darkSquareColor")}
+                  ${this.labColorControl("whitePieceColor", "whitePieceColor")}
+                  ${this.labColorControl("blackPieceColor", "blackPieceColor")}
+                  ${this.labColorControl("ledColor", "ledColor")}
+                  ${this.labColorControl("lightColor", "lightColor")}
+                  <label class="lab-range-control"><span>${this.t("lightIntensity")}</span><div><input type="range" min="0.5" max="1.5" step="0.05" value="${this.labLedColorSettings.lightIntensity}" data-lab-setting="lightIntensity" data-testid="lab-light-intensity"><output data-lab-output="lightIntensity">${this.labLedColorSettings.lightIntensity.toFixed(2)}×</output></div></label>
+                </div>
+                <button type="button" data-action="reset-lab-ledcolor">${this.t("resetLabLedColor")}</button>
+              </div>
+            </section>
             <fieldset class="game-mode-picker"><legend>${this.t("chooseMode")}</legend>
               <label><input type="radio" name="mode" value="local" checked> ${this.t("localTwoPlayers")}</label>
               <label><input type="radio" name="mode" value="computer"> ${this.t("versusComputer")}</label>
@@ -594,6 +716,7 @@ export class GameHud {
     if (this.audioUrl) URL.revokeObjectURL(this.audioUrl);
     this.element.removeEventListener("click", this.handleClick);
     this.element.removeEventListener("change", this.handleChange);
+    this.element.removeEventListener("input", this.handleInput);
     this.element.removeEventListener("submit", this.handleSubmit);
     window.removeEventListener("keydown", this.handleKeyDown);
     this.element.remove();

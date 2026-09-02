@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { visualThemeForPreset } from "./visualThemes.js";
 
 export class SceneController {
   constructor(container) {
@@ -32,24 +33,41 @@ export class SceneController {
     this.keyLight.position.set(8, 14, 7);
     this.keyLight.castShadow = !interactionTestMode;
     this.keyLight.shadow.mapSize.set(2048, 2048);
+    this.keyLight.shadow.camera.left = -12;
+    this.keyLight.shadow.camera.right = 12;
+    this.keyLight.shadow.camera.top = 16;
+    this.keyLight.shadow.camera.bottom = -8;
+    this.keyLight.shadow.camera.near = 0.5;
+    this.keyLight.shadow.camera.far = 45;
+    this.keyLight.shadow.bias = -0.00018;
+    this.keyLight.shadow.normalBias = 0.018;
+    this.keyLight.shadow.radius = 3;
     this.fillLight = new THREE.DirectionalLight(0xbfdcff, 1.15);
     this.fillLight.position.set(-9, 8, -6);
+    this.rimLight = new THREE.DirectionalLight(0x62f4ff, 0.55);
+    this.rimLight.position.set(-2, 11, 12);
     this.scene.add(
       this.ambient,
       this.hemisphere,
       this.keyLight,
       this.fillLight,
+      this.rimLight,
     );
 
+    this.groundMaterial = new THREE.MeshStandardMaterial({
+      color: 0x162233,
+      roughness: 0.95,
+    });
     const ground = new THREE.Mesh(
       new THREE.CircleGeometry(13, 64),
-      new THREE.MeshStandardMaterial({ color: 0x162233, roughness: 0.95 }),
+      this.groundMaterial,
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.14;
     ground.receiveShadow = true;
     this.scene.add(ground);
     this.disposables = [ground];
+    this.setVisualTheme();
   }
 
   setBrightness(value) {
@@ -61,6 +79,24 @@ export class SceneController {
   setFog(enabled) {
     this.scene.fog = enabled ? new THREE.Fog(0x101822, 24, 68) : null;
     localStorage.setItem("cubeChessFog", enabled ? "1" : "0");
+  }
+
+  setVisualTheme(preset, labLedColorSettings) {
+    const theme = visualThemeForPreset(preset, labLedColorSettings);
+    this.scene.background.set(theme.backgroundColor);
+    this.groundMaterial.color.set(theme.groundColor);
+    this.ambient.intensity = theme.ambientIntensity;
+    this.hemisphere.color.set(theme.hemisphereSkyColor);
+    this.hemisphere.groundColor.set(theme.hemisphereGroundColor);
+    this.hemisphere.intensity = theme.hemisphereIntensity;
+    this.keyLight.color.set(theme.keyLightColor);
+    this.keyLight.intensity = theme.keyLightIntensity;
+    this.fillLight.color.set(theme.fillLightColor);
+    this.fillLight.intensity = theme.fillLightIntensity;
+    this.rimLight.color.set(theme.rimLightColor);
+    this.rimLight.intensity = theme.rimLightIntensity;
+    this.scene.userData.visualTheme = theme.name;
+    return { ...theme };
   }
 
   resize(width, height) {

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { CELL_SIZE, boardPosition } from "./coordinates.js";
 import { visibleLayerOpacity } from "./layerVisibility.js";
+import { visualThemeForPreset } from "./visualThemes.js";
 
 const LIGHT_COLOR = 0xd9d9d9;
 const DARK_COLOR = 0x222a34;
@@ -23,6 +24,8 @@ export class BoardRenderer {
     this.movePaths.name = "Cross-level move paths";
     this.group.add(this.movePaths);
     this.resources = [];
+    this.visualTheme = visualThemeForPreset();
+    this.activeLevel = 0;
 
     const squareGeometry = new THREE.BoxGeometry(
       CELL_SIZE * 0.96,
@@ -98,9 +101,12 @@ export class BoardRenderer {
 
     const materials = [LIGHT_COLOR, DARK_COLOR].map(
       (color) =>
-        new THREE.MeshStandardMaterial({
+        new THREE.MeshPhysicalMaterial({
           color,
           roughness: 0.82,
+          metalness: 0.02,
+          clearcoat: 0.12,
+          clearcoatRoughness: 0.38,
           transparent: true,
           opacity: 0.15,
           depthWrite: false,
@@ -118,12 +124,13 @@ export class BoardRenderer {
   }
 
   setLevels(levels, activeLevel) {
+    this.activeLevel = activeLevel;
     for (const level of levels) {
       const group = this.levelGroups.get(level.index);
       group.visible = level.visible;
       const active = level.index === activeLevel;
       const opacity = active
-        ? 0.72
+        ? this.visualTheme.activeOpacity
         : Math.min(0.10, visibleLayerOpacity(level.index, activeLevel) * 0.36);
       for (const material of this.levelMaterials.get(level.index)) {
         material.opacity = opacity;
@@ -132,6 +139,29 @@ export class BoardRenderer {
       this.wireMaterials.get(level.index).opacity = active ? 0.085 : Math.min(0.018, opacity * 0.22);
       group.renderOrder = active ? 10 : level.index;
     }
+  }
+
+  setVisualTheme(preset, labLedColorSettings) {
+    this.visualTheme = visualThemeForPreset(preset, labLedColorSettings);
+    for (const materials of this.levelMaterials.values()) {
+      materials[0].color.set(this.visualTheme.lightSquareColor);
+      materials[1].color.set(this.visualTheme.darkSquareColor);
+      for (const material of materials) {
+        material.roughness = this.visualTheme.roughness;
+        material.metalness = this.visualTheme.metalness;
+        material.clearcoat = this.visualTheme.clearcoat;
+        material.clearcoatRoughness = Math.max(
+          0.08,
+          this.visualTheme.roughness * 0.45,
+        );
+        material.needsUpdate = true;
+      }
+    }
+    for (const material of this.wireMaterials.values()) {
+      material.color.set(this.visualTheme.gridColor);
+    }
+    this.group.userData.visualTheme = this.visualTheme.name;
+    return { ...this.visualTheme };
   }
 
   setHighlights(selectedSquare, legalTargets = []) {

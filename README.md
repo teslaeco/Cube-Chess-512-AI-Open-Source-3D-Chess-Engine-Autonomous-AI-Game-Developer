@@ -49,6 +49,24 @@ Explore the [ForgeMCP repository](https://github.com/Terraforming-Planet/ForgeMC
 the [Cube ForgeMCP page](https://teslaeco.github.io/Cube-Chess-512-AI-Open-Source-3D-Chess-Engine-Autonomous-AI-Game-Developer/forgemcp/),
 and the [Terra Observation System](https://terraforming-planet.github.io/Polar-Sun-Moon-Analysis/).
 
+### PRE-CHALLENGE WORK
+
+Before 2026-08-25 18:00 UTC, this repository already contained the Cube Chess
+8×8×8 rules and state model, Three.js presentation, computer opponent, local
+saves, PWA foundation, localization/accessibility infrastructure and test
+server. Their presence in a Challenge-period branch does not make them new
+WebMCP work.
+
+### WEBMCP CHALLENGE WORK — ADDED DURING 2026-08-25 18:00 UTC–2026-09-03 20:00 UTC
+
+- **2026-09-02 — Lab LEDColor + Classic Black & White:**
+  [implementation commit `5218f1e`](https://github.com/teslaeco/Cube-Chess-512-AI-Open-Source-3D-Chess-Engine-Autonomous-AI-Game-Developer/commit/5218f1edf412139a91293e018d2ecb4bf4188c65)
+  adds the third real player theme, live Lab palette/lighting controls,
+  persistence, production renderer integration and extended WebMCP inspection
+  and approval-gated switching. See the
+  [implementation and verification record](docs/FORGEMCP_LAB_LEDCOLOR_CLASSIC_THEME.md)
+  and its unit/browser tests. The existing Cube rules and AI are unchanged.
+
 ## Open-source milestone and future direction
 
 This edition established a working foundation for three-dimensional chess across
@@ -93,10 +111,14 @@ collaboration proposals may be directed to the project owner through the
 - a nine-section start menu, local two-player mode and a Web Worker computer
   opponent with three search limits;
 - a legal engine-driven attract demo that stops when a real game starts;
-- two player-selectable 3D collections before game-mode selection: the existing
-  ForgeMCP Premium set and the original procedural, stained-glass
-  [Crayon Cathedral collection](docs/FORGEMCP_CRAYON_CATHEDRAL_PIECES.md), with
-  the choice preserved in local preferences and versioned saves;
+- three player-selectable board and 3D-piece themes before game-mode selection:
+  the configurable **Lab LEDColor** high-detail set, the original procedural,
+  stained-glass
+  [Crayon Cathedral collection](docs/FORGEMCP_CRAYON_CATHEDRAL_PIECES.md), and
+  the fixed high-detail
+  [Classic Black & White theme](docs/FORGEMCP_LAB_LEDCOLOR_CLASSIC_THEME.md),
+  with the choice and Lab LEDColor settings preserved in local preferences and
+  versioned saves;
 - responsive desktop, phone and tablet layouts, keyboard focus handling, RTL,
   high contrast, large text and reduced-motion preferences;
 - 38 BCP 47 locale choices, including `ar-PS`. Polish and English are complete;
