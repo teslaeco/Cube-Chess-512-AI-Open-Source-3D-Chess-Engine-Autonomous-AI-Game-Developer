@@ -19,6 +19,23 @@
   <body>
     <main id="app" aria-label="Cube Chess 512 visualizer"></main>
     <a class="forgemcp-project-tab" href="./forgemcp/" aria-label="Open ForgeMCP Multi-Agent Research and Game Studio project page"><span>WEBMCP</span> ForgeMCP</a>
+    <script>
+      // Explicit reviewer entry: select the same anonymous guest mode offered by
+      // the visible "Zagraj jako gość" button before the application/AuthGate starts.
+      // This creates no account and grants no account, ranking or multiplayer privileges.
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('guest') !== '1') return;
+        const uuid = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        sessionStorage.setItem('cubeChessIdentity', JSON.stringify({
+          mode: 'guest',
+          provider: 'guest',
+          playerId: `guest-link-${uuid}`,
+          displayName: 'Gość',
+        }));
+        document.documentElement.dataset.directGuest = 'true';
+      })();
+    </script>
     <script type="module" src="/web/promotion/bootstrap.js"></script>
   </body>
 </html>
