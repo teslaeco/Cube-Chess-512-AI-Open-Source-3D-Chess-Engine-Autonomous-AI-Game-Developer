@@ -16,7 +16,7 @@ const MORE_PROVIDERS = [
   { id: "wechat", label: "WeChat", className: "auth-wechat" },
   { id: "qq", label: "QQ", className: "auth-qq" },
   { id: "line", label: "LINE", className: "auth-line" },
-  { id: "phone", label: "Telefon / SMS", className: "auth-phone" },
+  { id: "phone", label: "Phone / SMS", className: "auth-phone" },
 ];
 const ALL_PROVIDERS = [...PRIMARY_PROVIDERS, ...MORE_PROVIDERS];
 
@@ -54,7 +54,7 @@ export function createGuestIdentity(randomUUID = () => crypto.randomUUID()) {
     mode: "guest",
     provider: "guest",
     playerId: `guest-${randomUUID()}`,
-    displayName: "Gość",
+    displayName: "Guest",
   };
 }
 
@@ -65,24 +65,24 @@ export function isDirectGuestEntry(locationLike = window.location) {
 }
 
 function providerMarkup(provider) {
-  return `<button type="button" class="auth-provider ${provider.className}" data-auth="${provider.id}"><span class="auth-provider-icon" aria-hidden="true">${iconSvg(provider.id)}</span><span>Zaloguj przez ${provider.label}</span></button>`;
+  return `<button type="button" class="auth-provider ${provider.className}" data-auth="${provider.id}"><span class="auth-provider-icon" aria-hidden="true">${iconSvg(provider.id)}</span><span>Continue with ${provider.label}</span></button>`;
 }
 
 function accountForm(mode) {
   const title =
     mode === "register"
-      ? "Załóż konto"
+      ? "Create account"
       : mode === "reset"
-        ? "Zresetuj hasło"
-        : "Zaloguj e-mailem";
+        ? "Reset password"
+        : "Sign in with email";
   return `<form class="auth-account-form" data-account-form data-mode="${mode}">
-    <div class="auth-form-heading"><strong>${title}</strong><button type="button" data-account-close aria-label="Zamknij">×</button></div>
-    ${mode === "register" ? `<label>Nazwa gracza<input name="displayName" required minlength="2" maxlength="40" autocomplete="nickname"></label>` : ""}
-    <label>E-mail<input name="email" type="email" required autocomplete="email"></label>
-    ${mode !== "reset" ? `<label>Hasło<input name="password" type="password" required minlength="12" autocomplete="${mode === "register" ? "new-password" : "current-password"}"></label>` : ""}
-    ${mode === "register" ? `<label class="auth-consent"><input name="acceptTerms" type="checkbox" required> Akceptuję regulamin i politykę prywatności.</label>` : ""}
+    <div class="auth-form-heading"><strong>${title}</strong><button type="button" data-account-close aria-label="Close">×</button></div>
+    ${mode === "register" ? `<label>Player name<input name="displayName" required minlength="2" maxlength="40" autocomplete="nickname"></label>` : ""}
+    <label>Email<input name="email" type="email" required autocomplete="email"></label>
+    ${mode !== "reset" ? `<label>Password<input name="password" type="password" required minlength="12" autocomplete="${mode === "register" ? "new-password" : "current-password"}"></label>` : ""}
+    ${mode === "register" ? `<label class="auth-consent"><input name="acceptTerms" type="checkbox" required> I accept the terms and privacy policy.</label>` : ""}
     <button class="auth-account-submit" type="submit">${title}</button>
-    ${mode === "login" ? `<button type="button" class="auth-forgot-inline" data-account="reset">Nie pamiętam hasła</button>` : ""}
+    ${mode === "login" ? `<button type="button" class="auth-forgot-inline" data-account="reset">Forgot password</button>` : ""}
     <p class="auth-form-message" data-account-message aria-live="polite"></p>
   </form>`;
 }
@@ -99,17 +99,17 @@ export class AuthGate {
     this.element.setAttribute("aria-labelledby", "auth-title");
     this.element.innerHTML = `<div class="auth-card">
       <p class="auth-eyebrow">Terraforming Planet · Open Source</p>
-      <div class="auth-brand"><span>512</span><div><strong>Cube Chess 512 AI</strong><small>8×8×8 · 512 pól</small></div></div>
-      <h1 id="auth-title">Witaj w Cube Chess 512</h1>
-      <p class="auth-intro">Zaloguj się, aby zachować znajomych, ranking i historię partii, albo rozpocznij od razu jako gość.</p>
+      <div class="auth-brand"><span>512</span><div><strong>Cube Chess 512 AI</strong><small>8×8×8 · 512 fields</small></div></div>
+      <h1 id="auth-title">Welcome to Cube Chess 512</h1>
+      <p class="auth-intro">Sign in to keep friends, ranking and game history, or continue immediately as a guest.</p>
       <div class="auth-primary-list">${PRIMARY_PROVIDERS.map(providerMarkup).join("")}</div>
-      <button type="button" class="auth-more-toggle" data-auth-more aria-expanded="false"><span>Więcej sposobów logowania</span><span class="auth-more-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span></button>
+      <button type="button" class="auth-more-toggle" data-auth-more aria-expanded="false"><span>More sign-in options</span><span class="auth-more-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span></button>
       <div class="auth-more-panel" data-auth-more-panel hidden>${MORE_PROVIDERS.map(providerMarkup).join("")}</div>
-      <div class="auth-account-actions"><button type="button" data-account="register">Załóż konto</button><button type="button" data-account="login">Zaloguj e-mailem</button></div>
+      <div class="auth-account-actions"><button type="button" data-account="register">Create account</button><button type="button" data-account="login">Sign in with email</button></div>
       <div data-account-panel></div>
-      <div class="auth-divider"><span>lub</span></div>
-      <button type="button" class="auth-guest" data-auth="guest">Zagraj jako gość <span aria-hidden="true">→</span></button>
-      <p class="auth-note" data-auth-note>${authBackendConfigured() ? "Połączenie z Supabase Auth jest skonfigurowane." : "Tryb gościa działa od razu. Rejestracja i logowanie wymagają publicznej konfiguracji Supabase."}</p>
+      <div class="auth-divider"><span>or</span></div>
+      <button type="button" class="auth-guest" data-auth="guest">Play as guest <span aria-hidden="true">→</span></button>
+      <p class="auth-note" data-auth-note>${authBackendConfigured() ? "Supabase Auth connection is configured." : "Guest mode works immediately. Registration and sign-in require public Supabase configuration."}</p>
     </div>`;
     container.append(this.element);
 
@@ -146,10 +146,10 @@ export class AuthGate {
 
   async restore() {
     const note = this.element.querySelector("[data-auth-note]");
-    note.textContent = "Sprawdzanie sesji…";
+    note.textContent = "Checking session…";
 
     // Explicit reviewer/guest entry uses exactly the same anonymous identity
-    // contract as the visible "Zagraj jako gość" button, but completes it
+    // contract as the visible "Play as guest" button, but completes it
     // synchronously so the provider login screen never flashes on screen.
     if (isDirectGuestEntry()) {
       const storedIdentity = parseStoredIdentity(sessionStorage.getItem(SESSION_KEY));
@@ -182,11 +182,11 @@ export class AuthGate {
 
       sessionStorage.removeItem(SESSION_KEY);
       note.textContent = authBackendConfigured()
-        ? "Zaloguj się lub rozpocznij jako gość."
-        : "Tryb gościa działa od razu. Supabase Auth nie jest skonfigurowany.";
+        ? "Sign in or continue as a guest."
+        : "Guest mode works immediately. Supabase Auth is not configured.";
     } catch (error) {
       sessionStorage.removeItem(SESSION_KEY);
-      note.textContent = error instanceof Error ? error.message : "Nie udało się odtworzyć sesji.";
+      note.textContent = error instanceof Error ? error.message : "Could not restore the session.";
       note.setAttribute("role", "alert");
     }
   }
@@ -200,22 +200,22 @@ export class AuthGate {
     const message = form.querySelector("[data-account-message]");
     const submit = form.querySelector("button[type='submit']");
     submit.disabled = true;
-    message.textContent = "Łączenie…";
+    message.textContent = "Connecting…";
     try {
       const data = Object.fromEntries(new FormData(form));
       if (form.dataset.mode === "register") {
         await this.api.register({ ...data, acceptTerms: data.acceptTerms === "on" });
-        message.textContent = "Sprawdź skrzynkę e-mail i potwierdź konto.";
+        message.textContent = "Check your email and confirm your account.";
       } else if (form.dataset.mode === "reset") {
         await this.api.forgotPassword({ email: data.email });
-        message.textContent = "Jeżeli konto istnieje, wysłaliśmy bezpieczny link resetujący.";
+        message.textContent = "If the account exists, we sent a secure reset link.";
       } else {
         const identity = await this.api.login({ email: data.email, password: data.password });
         sessionStorage.setItem(SESSION_KEY, JSON.stringify(identity));
         this.complete(identity);
       }
     } catch (error) {
-      message.textContent = error instanceof Error ? error.message : "Nie udało się wykonać operacji.";
+      message.textContent = error instanceof Error ? error.message : "Could not complete the operation.";
       message.setAttribute("role", "alert");
     } finally {
       submit.disabled = false;
@@ -232,7 +232,7 @@ export class AuthGate {
     if (!authBackendConfigured()) {
       const note = this.element.querySelector("[data-auth-note]");
       const label = ALL_PROVIDERS.find((entry) => entry.id === provider)?.label ?? provider;
-      note.textContent = `Logowanie przez ${label} wymaga konfiguracji Supabase i danych dostawcy. Na razie wybierz tryb gościa.`;
+      note.textContent = `Signing in with ${label} requires Supabase configuration and provider credentials. For now, choose guest mode.`;
       note.setAttribute("role", "alert");
       return;
     }
@@ -252,7 +252,7 @@ export class AuthGate {
     this.identity = null;
     this.element.classList.remove("auth-gate-hidden");
     this.element.removeAttribute("aria-hidden");
-    this.element.querySelector("[data-auth-note]").textContent = "Wylogowano pomyślnie.";
+    this.element.querySelector("[data-auth-note]").textContent = "Signed out successfully.";
   }
 
   dispose() {
