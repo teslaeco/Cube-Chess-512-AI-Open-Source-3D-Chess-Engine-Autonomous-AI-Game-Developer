@@ -7,7 +7,7 @@ describe("startup authentication identity", () => {
       mode: "guest",
       provider: "guest",
       playerId: "guest-guest-test-id",
-      displayName: "Gość",
+      displayName: "Guest",
     });
   });
 
@@ -16,7 +16,7 @@ describe("startup authentication identity", () => {
       mode: "guest",
       provider: "guest",
       playerId: "guest-123",
-      displayName: "Gość",
+      displayName: "Guest",
     };
 
     expect(parseStoredIdentity(JSON.stringify(identity))).toEqual(identity);
