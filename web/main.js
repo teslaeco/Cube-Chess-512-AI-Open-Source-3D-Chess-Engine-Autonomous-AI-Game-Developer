@@ -6,6 +6,7 @@ import "./styles/tutorial.css";
 import "./styles/forum.css";
 import { CubeChessApplication } from "./app/CubeChessApplication.js";
 import { AuthGate } from "./auth/AuthGate.js";
+import { bootstrapGuestEntry } from "./auth/GuestEntry.js";
 import { UserProfileMenu } from "./auth/UserProfileMenu.js";
 import { ForumPanel } from "./forum/ForumPanel.js";
 import { OnlineMenuEnhancer } from "./online/OnlineMenuEnhancer.js";
@@ -19,17 +20,7 @@ import { TutorialController } from "./tutorial/TutorialController.js";
 
 const root = document.querySelector("#app");
 
-if (import.meta.env.DEV && new URLSearchParams(window.location.search).get("e2e") === "1") {
-  sessionStorage.setItem(
-    "cubeChessIdentity",
-    JSON.stringify({
-      mode: "guest",
-      provider: "guest",
-      playerId: "guest-e2e",
-      displayName: "E2E Guest",
-    }),
-  );
-}
+bootstrapGuestEntry({ isDev: import.meta.env.DEV });
 
 const application = new CubeChessApplication(root);
 const tutorial = new TutorialController(root, application);
