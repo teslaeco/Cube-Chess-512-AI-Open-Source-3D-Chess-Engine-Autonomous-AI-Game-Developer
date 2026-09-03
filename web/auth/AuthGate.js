@@ -58,6 +58,12 @@ export function createGuestIdentity(randomUUID = () => crypto.randomUUID()) {
   };
 }
 
+export function isDirectGuestEntry(locationLike = window.location) {
+  const search = String(locationLike?.search ?? "");
+  const pathname = String(locationLike?.pathname ?? "");
+  return new URLSearchParams(search).get("guest") === "1" || /\/guest\.html$/.test(pathname);
+}
+
 function providerMarkup(provider) {
   return `<button type="button" class="auth-provider ${provider.className}" data-auth="${provider.id}"><span class="auth-provider-icon" aria-hidden="true">${iconSvg(provider.id)}</span><span>Zaloguj przez ${provider.label}</span></button>`;
 }
@@ -141,6 +147,18 @@ export class AuthGate {
   async restore() {
     const note = this.element.querySelector("[data-auth-note]");
     note.textContent = "Sprawdzanie sesji…";
+
+    // Explicit reviewer/guest entry uses exactly the same anonymous identity
+    // contract as the visible "Zagraj jako gość" button, but completes it
+    // synchronously so the provider login screen never flashes on screen.
+    if (isDirectGuestEntry()) {
+      const storedIdentity = parseStoredIdentity(sessionStorage.getItem(SESSION_KEY));
+      const identity = storedIdentity?.mode === "guest" ? storedIdentity : createGuestIdentity();
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(identity));
+      this.complete(identity);
+      return;
+    }
+
     try {
       const oauthIdentity = await this.api.restoreSessionFromUrl();
       if (oauthIdentity) {
