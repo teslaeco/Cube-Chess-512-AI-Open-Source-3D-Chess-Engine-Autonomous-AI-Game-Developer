@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createGuestIdentity, parseStoredIdentity } from "../auth/AuthGate.js";
+import { createGuestIdentity, isDirectGuestEntry, parseStoredIdentity } from "../auth/AuthGate.js";
 
 describe("startup authentication identity", () => {
   it("creates a deterministic temporary guest identity", () => {
@@ -23,5 +23,13 @@ describe("startup authentication identity", () => {
     expect(parseStoredIdentity("not-json")).toBeNull();
     expect(parseStoredIdentity(JSON.stringify({ mode: "guest" }))).toBeNull();
     expect(parseStoredIdentity(JSON.stringify({ mode: "invalid", playerId: "x" }))).toBeNull();
+  });
+
+  it("recognizes only explicit ForgeMCP guest entry URLs", () => {
+    expect(isDirectGuestEntry({ pathname: "/guest.html", search: "" })).toBe(true);
+    expect(isDirectGuestEntry({ pathname: "/", search: "?guest=1" })).toBe(true);
+    expect(isDirectGuestEntry({ pathname: "/", search: "?guest=0" })).toBe(false);
+    expect(isDirectGuestEntry({ pathname: "/", search: "" })).toBe(false);
+    expect(isDirectGuestEntry({ pathname: "/login", search: "?next=guest.html" })).toBe(false);
   });
 });
