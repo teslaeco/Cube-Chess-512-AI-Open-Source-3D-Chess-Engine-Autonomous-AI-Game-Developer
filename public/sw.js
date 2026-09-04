@@ -1,5 +1,10 @@
-const CACHE_VERSION = "cube-chess-512-v4-lab-ledcolor-classic";
-const APP_SHELL = ["./", "./manifest.webmanifest", "./icons/cube-chess.svg"];
+const CACHE_VERSION = "cube-chess-512-v5-english-judge-ui";
+const APP_SHELL = [
+  "./",
+  "./english-judge-default.js",
+  "./manifest.webmanifest",
+  "./icons/cube-chess.svg",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -47,7 +52,11 @@ self.addEventListener("fetch", (event) => {
   // Production JS/CSS bundles are hashed by Vite. Network-first here prevents
   // an already-installed PWA from pinning an old visual runtime while still
   // keeping an offline fallback when the network is unavailable.
-  if (url.pathname.includes("/assets/") || url.pathname.endsWith("/sw.js")) {
+  if (
+    url.pathname.includes("/assets/") ||
+    url.pathname.endsWith("/sw.js") ||
+    url.pathname.endsWith("/english-judge-default.js")
+  ) {
     event.respondWith(networkFirst(event.request));
     return;
   }
