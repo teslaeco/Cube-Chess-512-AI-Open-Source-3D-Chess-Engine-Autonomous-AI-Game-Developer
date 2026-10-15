@@ -1,16 +1,22 @@
 import { test, expect } from "@playwright/test";
 
-test.beforeEach(async ({ page }) => {
-  // All interactions are local guest play. Do not contact identity, billing or AI providers.
+async function localOnly(page) {
+  page.on("pageerror", error => console.error("LOCAL_GAME_PAGE_ERROR:", error.message));
   await page.route("**/*", route => {
     const url = new URL(route.request().url());
     return ["127.0.0.1", "localhost"].includes(url.hostname) ? route.continue() : route.abort();
   });
-  await page.goto("./guest.html?guest=1");
+}
+
+async function openWelcomeAsGuest(page) {
+  await localOnly(page);
+  await page.goto("./", { waitUntil: "domcontentloaded" });
+  await page.locator('[data-auth="guest"]').click();
   await expect(page.getByTestId("start-game")).toBeVisible();
-});
+}
 
 test("cancel keeps the match; confirm returns to menu without reloading and preserves saves", async ({ page }) => {
+  await openWelcomeAsGuest(page);
   await page.getByTestId("start-game").click();
   await page.evaluate(() => {
     const app = window.__cubeChessApplication;
@@ -54,10 +60,20 @@ test("cancel keeps the match; confirm returns to menu without reloading and pres
 });
 
 test("About presents the new chess-focused copy in English and Polish", async ({ page }) => {
+  await openWelcomeAsGuest(page);
   await page.getByTestId("menu-about").click();
   await expect(page.locator(".about-copy")).toContainText("512 squares");
   await expect(page.locator(".about-copy")).toContainText("updates are coming soon");
   await page.evaluate(() => window.__cubeChessApplication.renderer.setLanguage("pl"));
   await expect(page.locator(".about-copy")).toContainText("512 polami");
   await expect(page.locator(".about-copy")).toContainText("aktualizacje będą dostępne wkrótce");
+});
+
+test("the direct guest entry becomes interactive instead of looping its mutation observer", async ({ page }) => {
+  await localOnly(page);
+  await page.goto("./guest.html?guest=1", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("start-game")).toBeVisible();
+  await expect(page.locator("#forgemcp-guest-loading")).toBeHidden();
+  await page.getByTestId("menu-about").click();
+  await expect(page.locator(".about-copy")).toContainText("512 squares");
 });

@@ -28,12 +28,16 @@ describe("confirmed in-document return to menu", () => {
   it("cancel preserves the exact match, identity, connection and open panels", () => {
     const { app, socket } = fixture();
     const before = app.presentation.serialize();
+    // Pieces live in the presentation; the serialized save nests its board state.
+    const piecesBefore = structuredClone(app.presentation.pieces);
     const identity = app.identity;
     const confirm = vi.fn(() => false);
     expect(returnToMenu(app, confirm)).toBe(false);
     expect(confirm.mock.calls[0][0]).toContain("Unsaved progress will be lost");
     expect(app.presentation.gameId).toBe(before.id);
-    expect(app.presentation.pieces).toEqual(before.pieces);
+    expect(app.presentation.pieces).toEqual(piecesBefore);
+    expect(app.presentation.pieces).toHaveLength(32);
+    expect(app.presentation.appState).toBe("playing");
     expect(app.identity).toBe(identity);
     expect(app.cancelSessionWork).not.toHaveBeenCalled();
     expect(app.hud.resetOpenPanels).not.toHaveBeenCalled();
