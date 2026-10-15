@@ -1,6 +1,7 @@
 import { GameHud as BaseGameHud } from "./GameHud.js";
 import { gameExperienceText } from "./gameExperienceCopy.js";
 import "../styles/game-experience.css";
+import "../styles/premium-hud.css";
 
 /** Extend the existing HUD without duplicating its boards, settings or save UI. */
 export class GameHud extends BaseGameHud {
@@ -10,6 +11,7 @@ export class GameHud extends BaseGameHud {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "menu-button exit-match-button";
+      button.setAttribute("aria-label", this.t("returnToMenu"));
       button.dataset.action = "return-to-menu";
       button.dataset.testid = testId;
       button.hidden = true;
@@ -29,7 +31,8 @@ export class GameHud extends BaseGameHud {
   update(state) {
     super.update(state);
     this.element.querySelectorAll('[data-action="return-to-menu"]').forEach(button => {
-      button.textContent = this.t("returnToMenu");
+      button.textContent = `↩ ${this.t("returnToMenu")}`;
+      button.setAttribute("aria-label", this.t("returnToMenu"));
       button.hidden = state.appState === "demo";
     });
   }
