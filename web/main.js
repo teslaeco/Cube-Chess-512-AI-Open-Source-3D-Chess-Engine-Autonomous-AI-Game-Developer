@@ -144,8 +144,8 @@ const onlineMenu = new OnlineMenuEnhancer(root, (onlineGame) => {
   application.startGame({
     mode: "local",
     humanSide: isWhite ? "white" : "black",
-    whiteName: isWhite ? onlineGame.displayName : "Gracz online",
-    blackName: isWhite ? "Gracz online" : onlineGame.displayName,
+    whiteName: isWhite ? onlineGame.displayName : "Online player",
+    blackName: isWhite ? "Online player" : onlineGame.displayName,
     clockMinutes: 0,
   });
   application.presentation.gameConfig.mode = "online";

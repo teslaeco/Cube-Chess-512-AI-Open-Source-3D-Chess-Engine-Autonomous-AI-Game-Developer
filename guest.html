@@ -29,6 +29,9 @@
         const updateReadyState = () => {
           const app = document.querySelector('#app');
           if (app?.dataset?.authMode !== 'guest') return;
+          // Stop observing before our own attributes change: otherwise this
+          // callback continuously schedules itself and starves rendering.
+          observer.disconnect();
           document.documentElement.dataset.directGuestActivated = 'true';
           document.documentElement.dataset.directGuestReady = 'true';
         };
