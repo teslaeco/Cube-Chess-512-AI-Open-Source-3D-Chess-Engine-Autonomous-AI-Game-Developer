@@ -19,25 +19,26 @@ test("cancel keeps the match; confirm returns to menu without reloading and pres
   await openWelcomeAsGuest(page);
   await page.getByTestId("start-game").click();
   await page.evaluate(() => {
-    const app = window.__cubeChessApplication;
+    const app = window.__forgeMcpCubeApplication;
     app.renderer.executeAutomatedMove(app.presentation.getLegalMovesForSide()[0]);
     window.__menuDocumentSentinel = "same-document";
   });
-  await expect.poll(() => page.evaluate(() => window.__cubeChessApplication.presentation.busy)).toBe(false);
+  await expect.poll(() => page.evaluate(() => window.__forgeMcpCubeApplication.presentation.busy)).toBe(false);
   const before = await page.evaluate(() => {
-    const state = window.__cubeChessApplication.presentation;
+    const state = window.__forgeMcpCubeApplication.presentation;
     return { id: state.gameId, pieces: JSON.stringify(state.pieces), sequence: state.moveSequence };
   });
-  await page.evaluate(() => window.__cubeChessApplication.saveGame());
+  await page.evaluate(() => window.__forgeMcpCubeApplication.saveGame());
   let documentRequests = 0;
   page.on("request", request => { if (request.resourceType() === "document") documentRequests++; });
   page.once("dialog", async dialog => {
-    expect(dialog.message()).toContain("Unsaved progress will be lost");
+    const warning = dialog.message();
     await dialog.dismiss();
+    expect(warning).toContain("Unsaved progress will be lost");
   });
   await page.getByTestId("return-to-menu").click();
   expect(await page.evaluate(() => {
-    const state = window.__cubeChessApplication.presentation;
+    const state = window.__forgeMcpCubeApplication.presentation;
     return { id: state.gameId, pieces: JSON.stringify(state.pieces), sequence: state.moveSequence };
   })).toEqual(before);
   await expect(page.locator("[data-start-menu]")).toHaveAttribute("aria-hidden", "true");
@@ -47,11 +48,11 @@ test("cancel keeps the match; confirm returns to menu without reloading and pres
   await expect(page.getByTestId("start-game")).toBeVisible();
   expect(await page.evaluate(() => window.__menuDocumentSentinel)).toBe("same-document");
   expect(documentRequests).toBe(0);
-  const saved = await page.evaluate(() => window.__cubeChessApplication.saveRepository.list());
+  const saved = await page.evaluate(() => window.__forgeMcpCubeApplication.saveRepository.list());
   expect(saved.some(record => record.id === before.id)).toBe(true);
   for (let repeat = 0; repeat < 2; repeat++) {
     await page.getByTestId("start-game").click();
-    expect(await page.evaluate(() => window.__cubeChessApplication.presentation.moveSequence)).toBe(0);
+    expect(await page.evaluate(() => window.__forgeMcpCubeApplication.presentation.moveSequence)).toBe(0);
     page.once("dialog", dialog => dialog.accept());
     await page.getByTestId("return-to-menu").click();
     await expect(page.getByTestId("start-game")).toBeVisible();
@@ -64,7 +65,7 @@ test("About presents the new chess-focused copy in English and Polish", async ({
   await page.getByTestId("menu-about").click();
   await expect(page.locator(".about-copy")).toContainText("512 squares");
   await expect(page.locator(".about-copy")).toContainText("updates are coming soon");
-  await page.evaluate(() => window.__cubeChessApplication.renderer.setLanguage("pl"));
+  await page.evaluate(() => window.__forgeMcpCubeApplication.renderer.setLanguage("pl"));
   await expect(page.locator(".about-copy")).toContainText("512 polami");
   await expect(page.locator(".about-copy")).toContainText("aktualizacje będą dostępne wkrótce");
 });

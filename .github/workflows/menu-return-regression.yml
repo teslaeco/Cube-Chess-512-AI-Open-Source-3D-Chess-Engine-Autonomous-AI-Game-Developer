@@ -11,9 +11,6 @@ jobs:
   interaction:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    env:
-      LIBGL_ALWAYS_SOFTWARE: '1'
-      GALLIUM_DRIVER: llvmpipe
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -24,5 +21,9 @@ jobs:
           cache: npm
       - run: npm ci --no-audit
       - run: npx playwright install --with-deps chromium
-      - name: Verify actual desktop and mobile guest interactions without external providers
-        run: npx playwright test e2e/menu-return.spec.js --project=chromium-desktop --project=mobile-chrome --workers=1 --retries=0
+      - name: Verify built desktop and mobile guest interactions without external providers
+        run: npx playwright test --config=playwright.menu.config.js --workers=1 --retries=0
+      - name: Print bounded local browser failure context
+        if: failure()
+        run: |
+          find test-results -name error-context.md -type f -print -exec head -120 {} \; || true
