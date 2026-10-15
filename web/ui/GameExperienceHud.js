@@ -7,7 +7,9 @@ import "../styles/premium-hud.css";
 export class GameHud extends BaseGameHud {
   constructor(container, actions) {
     super(container, actions);
-    for (const [selector, testId] of [[".header-actions", "return-to-menu"], [".menu-footer", "menu-return-to-menu"]]) {
+    // One menu destination only: gameplay uses the confirmed Exit control.
+    // The ordinary Menu control is reserved for the demo/start screen.
+    for (const [selector, testId] of [[".header-actions", "return-to-menu"]]) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "menu-button exit-match-button";
@@ -30,10 +32,17 @@ export class GameHud extends BaseGameHud {
 
   update(state) {
     super.update(state);
+    const inMatch = state.appState !== "demo";
+    const openMenu = this.element.querySelector('.game-header [data-action="open-menu"]');
+    if (openMenu) {
+      openMenu.hidden = inMatch;
+      openMenu.disabled = inMatch;
+      openMenu.setAttribute("aria-hidden", String(inMatch));
+    }
     this.element.querySelectorAll('[data-action="return-to-menu"]').forEach(button => {
       button.textContent = `↩ ${this.t("returnToMenu")}`;
       button.setAttribute("aria-label", this.t("returnToMenu"));
-      button.hidden = state.appState === "demo";
+      button.hidden = !inMatch;
     });
   }
 
