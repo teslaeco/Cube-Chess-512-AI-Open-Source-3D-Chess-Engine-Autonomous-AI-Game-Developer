@@ -30,7 +30,10 @@ export function returnToMenu(application, confirm = message => window.confirm(me
   pieces.animations.clear();
   application.renderer.selection.clearPendingSelection();
   application.hud.resetOpenPanels();
-  application.attractMode.start();
+  // Keep the menu static after a match: restarting the animated demo can
+  // saturate software WebGL and leave the next Start button unstable.
+  // The existing renderer and presentation are reset in place, not reloaded.
+  application.renderer.startDemo();
   application.renderer.openMenu();
   application.hud.element.querySelector('[data-testid="menu-newGame"]')?.focus();
   return true;
