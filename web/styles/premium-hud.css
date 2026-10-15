@@ -1,0 +1,301 @@
+/* Cube Chess 512 premium compact HUD.
+ * Keep all game actions; place account + exit in a real shared grid instead of
+ * stacking independent fixed overlays. No board geometry or logic changes.
+ */
+.cube-chess-app {
+  --premium-blue: #4bbcf4;
+  --premium-green: #54eec3;
+  --premium-edge: rgba(88, 185, 235, .46);
+  --premium-glass: rgba(7, 22, 36, .90);
+}
+
+.cube-chess-app .game-header {
+  inset: max(9px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right))
+    auto max(10px, env(safe-area-inset-left));
+  min-height: 66px;
+  grid-template-columns: minmax(130px, 1fr) minmax(148px, auto) auto minmax(165px, 230px);
+  grid-template-areas: "brand turn actions profile";
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--premium-edge);
+  border-radius: 14px;
+  background: linear-gradient(110deg, rgba(8, 27, 43, .96), rgba(5, 17, 30, .93));
+  box-shadow: 0 0 18px #36bbf41a, inset 0 1px 0 #8ee7f72b;
+  backdrop-filter: blur(14px);
+}
+.cube-chess-app .brand-lockup { grid-area: brand; gap: 7px; min-width: 0; }
+.cube-chess-app .brand-lockup strong { font-size: clamp(12px, 1.3vw, 16px); color: #f4fdff; letter-spacing: .015em; }
+.cube-chess-app .brand-lockup small { color: #acd3e8; letter-spacing: .09em; }
+.cube-chess-app .brand-cube {
+  width: 36px;
+  flex: none;
+  border-color: var(--premium-green);
+  color: var(--premium-green);
+  text-shadow: 0 0 10px #54eec38c;
+  box-shadow: 0 0 14px #54eec33a, inset 0 0 10px #54eec31c;
+}
+.cube-chess-app .turn-indicator {
+  grid-area: turn;
+  display: block;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: normal;
+  color: #b6d6ed;
+}
+.cube-chess-app .turn-indicator strong { color: #f7ffff; }
+.cube-chess-app .header-divider { color: var(--premium-green); margin-inline: 4px; }
+.cube-chess-app .header-actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: 0;
+}
+.cube-chess-app .game-header .header-actions button {
+  min-height: 36px;
+  border-color: #61bfff70;
+  border-radius: 9px;
+  background: linear-gradient(150deg, #16405e, #0a2940);
+  box-shadow: inset 0 1px #b5eaff24;
+  font-size: 12px;
+}
+.cube-chess-app .game-header .header-actions button:hover,
+.cube-chess-app .game-header .header-actions button:focus-visible {
+  border-color: var(--premium-green);
+  box-shadow: 0 0 13px #54eec355;
+}
+.cube-chess-app .game-header .header-actions .exit-match-button {
+  min-height: 38px;
+  max-width: none;
+  flex: 0 0 auto;
+  border-color: #54eec3b5;
+  background: linear-gradient(145deg, #15525c, #0a314a);
+  color: #dffff5;
+  font-weight: 800;
+  box-shadow: 0 0 11px #54eec32b, inset 0 1px #d9fff430;
+}
+.cube-chess-app .header-actions .icon-button { min-width: 36px; color: #9feefd !important; }
+
+/* The signed-in account is a true member of the HUD grid. Its dropdown may
+ * overlay the board only when the player explicitly opens it.
+ */
+.cube-chess-app .game-header .user-profile-menu {
+  grid-area: profile;
+  position: relative;
+  inset: auto;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  z-index: 8;
+}
+.cube-chess-app .game-header .user-profile-trigger {
+  width: 100%;
+  min-width: 0;
+  min-height: 43px;
+  margin: 0;
+  gap: 7px;
+  padding: 5px 8px;
+  border: 1px solid #4fcfc5a1;
+  border-radius: 11px;
+  background: linear-gradient(120deg, #0b273d, #0c192f);
+  box-shadow: 0 0 13px #37dab326;
+}
+.cube-chess-app .game-header .user-profile-avatar { width: 30px; height: 30px; flex: none; font-size: 13px; }
+.cube-chess-app .game-header .user-profile-summary strong { font-size: 12px; }
+.cube-chess-app .game-header .user-profile-summary small { font-size: 10px; }
+.cube-chess-app .game-header .user-profile-panel {
+  position: absolute;
+  inset: calc(100% + 8px) 0 auto auto;
+  width: min(320px, calc(100vw - 20px));
+  max-height: calc(100dvh - 110px);
+  overflow-y: auto;
+  border-color: #5ccac6aa;
+  box-shadow: 0 15px 35px #0009, 0 0 15px #55eec32e;
+}
+.cube-chess-app .game-header .user-profile-panel[hidden] { display: none; }
+.cube-chess-app .game-header .user-profile-trigger:focus-visible,
+.cube-chess-app .game-header .header-actions button:focus-visible,
+.cube-chess-app .control-dock button:focus-visible,
+.cube-chess-app .level-dock button:focus-visible {
+  outline: 2px solid var(--premium-green);
+  outline-offset: 2px;
+}
+
+.cube-chess-app .game-status-card {
+  inset: max(87px, calc(env(safe-area-inset-top) + 77px))
+    auto auto max(10px, env(safe-area-inset-left));
+  width: min(204px, 42vw);
+  gap: 3px 8px;
+  padding: 9px 11px;
+  border-color: #47b9ea78;
+  border-radius: 12px;
+  background: var(--premium-glass);
+  box-shadow: 0 0 14px #40aef623;
+  font-size: 11px;
+}
+.cube-chess-app .game-status-card p {
+  margin-top: 3px;
+  font-size: 10px;
+  color: #65eacf;
+  overflow-wrap: anywhere;
+}
+
+.cube-chess-app .level-dock {
+  inset-inline-start: max(9px, env(safe-area-inset-left));
+  grid-template-columns: repeat(2, 34px);
+  gap: 4px;
+  padding: 5px;
+  border-color: #52aeee87;
+  border-radius: 11px;
+  background: var(--premium-glass);
+  box-shadow: 0 0 14px #3aaffd23;
+}
+.cube-chess-app .level-dock button {
+  min-height: 34px;
+  padding: 3px 2px;
+  border-radius: 7px;
+  font-size: 11px;
+  background: #102a40;
+}
+.cube-chess-app .level-dock button.active {
+  background: linear-gradient(140deg, #68e3ff, #5cefc3);
+  border-color: #bbfff1;
+  box-shadow: 0 0 12px #56ecbc7a;
+}
+.cube-chess-app .control-dock {
+  inset: auto max(12px, env(safe-area-inset-right))
+    calc(60px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  width: auto;
+  max-width: none;
+  transform: none;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px;
+  border-color: #4dc9d877;
+  border-radius: 12px;
+  background: rgba(4, 20, 34, .90);
+  box-shadow: 0 0 14px #4bccf523, 0 8px 18px #0005;
+  scrollbar-width: thin;
+  scrollbar-color: #369caf transparent;
+}
+.cube-chess-app .control-dock button {
+  min-width: 53px;
+  min-height: 44px;
+  padding: 3px 7px;
+  gap: 2px;
+  border: 1px solid #49b9ea75;
+  border-radius: 8px;
+  background: linear-gradient(145deg, rgba(16, 59, 79, .98), rgba(8, 37, 58, .94));
+  color: #e7f7ff;
+}
+.cube-chess-app .control-dock button span:first-child { font-size: 15px; }
+.cube-chess-app .control-dock button span:last-child {
+  display: block;
+  max-width: 64px;
+  font-size: 9px;
+  color: #c0dbe9;
+  line-height: 1.12;
+  text-align: center;
+}
+.cube-chess-app .control-dock button:disabled { opacity: .38; }
+
+@media (max-width: 960px) {
+  .cube-chess-app .game-header {
+    min-height: 96px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "brand profile" "turn actions";
+    gap: 5px 8px;
+  }
+  .cube-chess-app .turn-indicator { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 3px; text-align: start; }
+  .cube-chess-app .header-divider { margin-inline: 1px; }
+  .cube-chess-app .header-actions { justify-content: flex-end; }
+  .cube-chess-app .game-status-card { inset-block-start: max(114px, calc(env(safe-area-inset-top) + 106px)); }
+}
+@media (max-width: 700px) {
+  .cube-chess-app .game-header {
+    inset: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+      auto max(8px, env(safe-area-inset-left));
+    min-height: 92px;
+    gap: 4px 6px;
+    padding: 6px 8px;
+    border-radius: 11px;
+  }
+  .cube-chess-app .brand-lockup { gap: 5px; }
+  .cube-chess-app .brand-cube { width: 28px; font-size: 9px; }
+  .cube-chess-app .brand-lockup strong { font-size: 12px; }
+  .cube-chess-app .brand-lockup small { display: block; font-size: 9px; letter-spacing: .035em; }
+  .cube-chess-app .turn-indicator { font-size: 10px; line-height: 1.24; }
+  .cube-chess-app .turn-indicator strong { margin-inline-start: 1px; }
+  .cube-chess-app .game-header .header-actions { gap: 3px; flex-wrap: nowrap; }
+  .cube-chess-app .game-header .header-actions button { min-height: 32px; padding: 0 6px; font-size: 10px; }
+  .cube-chess-app .game-header .header-actions .icon-button { min-width: 28px; padding: 0 2px; }
+  .cube-chess-app .game-header .header-actions .menu-button[data-action="open-menu"] { min-width: 27px; }
+  .cube-chess-app .game-header .header-actions .menu-button[data-action="open-menu"] [data-i="menu"] { display: none; }
+  .cube-chess-app .game-header .header-actions .exit-match-button { min-height: 34px; padding: 0 6px; font-size: 10px; font-weight: 800; }
+  .cube-chess-app .game-header .user-profile-trigger { min-height: 34px; padding: 3px 5px; gap: 5px; }
+  .cube-chess-app .game-header .user-profile-avatar { width: 26px; height: 26px; font-size: 11px; }
+  .cube-chess-app .game-header .user-profile-summary strong { font-size: 10px; }
+  .cube-chess-app .game-header .user-profile-summary small { display: none; }
+  .cube-chess-app .game-header .user-profile-panel { max-height: calc(100dvh - 120px); }
+  .cube-chess-app .game-status-card {
+    inset: max(112px, calc(env(safe-area-inset-top) + 104px))
+      auto auto max(8px, env(safe-area-inset-left));
+    width: min(150px, 43vw);
+    gap: 2px 5px;
+    padding: 7px 8px;
+    font-size: 10px;
+  }
+  .cube-chess-app .game-status-card p { font-size: 9px; line-height: 1.15; }
+  .cube-chess-app .level-dock {
+    inset: 53% auto auto max(8px, env(safe-area-inset-left));
+    transform: translateY(-24%);
+    grid-template-columns: repeat(2, 30px);
+    max-height: 42dvh;
+    gap: 3px;
+    padding: 4px;
+  }
+  .cube-chess-app .level-dock button { min-height: 32px; font-size: 10px; }
+  .cube-chess-app .control-dock {
+    inset: auto max(8px, env(safe-area-inset-right))
+      calc(55px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 4px;
+  }
+  .cube-chess-app .control-dock button { min-height: 43px; min-width: 44px; padding: 3px 5px; }
+  .cube-chess-app .control-dock button span:first-child { font-size: 13px; }
+  .cube-chess-app .control-dock button span:last-child { display: block; max-width: 62px; font-size: 9px; }
+  .cube-chess-app .game-status-card,
+  .cube-chess-app .level-dock { backdrop-filter: blur(8px); }
+}
+@media (max-width: 370px) {
+  .cube-chess-app .game-header .header-actions .icon-button { display: none; }
+  .cube-chess-app .brand-lockup strong { font-size: 11px; }
+  .cube-chess-app .turn-indicator { font-size: 9px; }
+}
+@media (orientation: landscape) and (max-height: 540px) {
+  .cube-chess-app .game-header {
+    min-height: 52px;
+    grid-template-columns: minmax(115px, 1fr) auto auto minmax(115px, 155px);
+    grid-template-areas: "brand turn actions profile";
+    gap: 6px;
+  }
+  .cube-chess-app .game-status-card { display: none; }
+  .cube-chess-app .level-dock { top: 52%; grid-template-columns: repeat(2, 30px); transform: translateY(-35%); }
+  .cube-chess-app .control-dock { bottom: calc(47px + env(safe-area-inset-bottom)); }
+}
+.high-contrast .cube-chess-app .game-header,
+.high-contrast .cube-chess-app .game-status-card,
+.high-contrast .cube-chess-app .level-dock,
+.high-contrast .cube-chess-app .control-dock {
+  background: #000;
+  border-color: #fff;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cube-chess-app .game-header button,
+  .cube-chess-app .control-dock button,
+  .cube-chess-app .level-dock button { transition: none; }
+}
