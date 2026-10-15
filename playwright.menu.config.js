@@ -10,7 +10,7 @@ export default defineConfig({
   use: { ...base.use, video: 'off' },
   webServer: {
     ...base.webServer,
-    command: 'npm run build:web && npx vite preview --host 127.0.0.1 --port 4173',
+    command: 'npm run build && npx vite preview --host 127.0.0.1 --port 4173',
     reuseExistingServer: false,
   },
   projects: base.projects.filter(project => ['chromium-desktop', 'mobile-chrome'].includes(project.name)).map(project => ({
