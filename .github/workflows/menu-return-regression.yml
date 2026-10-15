@@ -1,0 +1,28 @@
+name: Menu return interaction regression
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: menu-return-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  interaction:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      GALLIUM_DRIVER: llvmpipe
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit
+      - run: npx playwright install --with-deps chromium
+      - name: Verify actual desktop and mobile guest interactions without external providers
+        run: npx playwright test e2e/menu-return.spec.js --project=chromium-desktop --project=mobile-chrome --workers=1 --retries=0

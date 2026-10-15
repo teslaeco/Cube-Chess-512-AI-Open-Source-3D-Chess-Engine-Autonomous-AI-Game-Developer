@@ -1,0 +1,6 @@
+.exit-match-button { min-height: 44px; max-width: 11rem; white-space: normal; }
+.exit-match-button[hidden] { display: none !important; }
+@media (max-width: 600px) {
+  .game-header .header-actions { flex-wrap: wrap; }
+  .game-header .exit-match-button { font-size: .75rem; padding: .4rem .6rem; }
+}
