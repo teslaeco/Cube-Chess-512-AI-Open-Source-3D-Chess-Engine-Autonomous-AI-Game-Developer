@@ -17,7 +17,7 @@ function fixture() {
     saveRepository: { saved },
     onlineGame: { socket }, onlineSocketHandler: () => {},
     cancelSessionWork: vi.fn(),
-    renderer: { openMenu: vi.fn(() => presentation.openMenu()), selection: { clearPendingSelection: vi.fn() }, pieceRenderer: { animations: new Map() } },
+    renderer: { openMenu: vi.fn(() => presentation.openMenu()), startDemo: vi.fn(() => presentation.startDemo()), selection: { clearPendingSelection: vi.fn() }, pieceRenderer: { animations: new Map() } },
     hud: { t: key => gameExperienceText("en", key), resetOpenPanels: vi.fn(), element: { querySelector: () => ({ focus: vi.fn() }) } },
     attractMode: { stop: vi.fn(), start: vi.fn(() => presentation.startDemo()) },
   };
@@ -56,6 +56,8 @@ describe("confirmed in-document return to menu", () => {
     expect(app.presentation.squares).toHaveLength(512);
     expect(app.cancelSessionWork).toHaveBeenCalledOnce();
     expect(app.renderer.selection.clearPendingSelection).toHaveBeenCalledOnce();
+    expect(app.renderer.startDemo).toHaveBeenCalledOnce();
+    expect(app.attractMode.start).not.toHaveBeenCalled();
     expect(socket.removeEventListener).toHaveBeenCalledOnce();
     expect(socket.close).toHaveBeenCalledWith(1000, "Return to main menu");
     expect(app.onlineGame).toBeNull();
