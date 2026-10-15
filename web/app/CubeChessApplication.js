@@ -7,6 +7,7 @@ import { SaveRepository } from "../storage/SaveRepository.js";
 import { GameHud } from "../ui/GameExperienceHud.js";
 import { GamePresentation } from "./GamePresentation.js";
 import { returnToMenu } from "./returnToMenu.js";
+import { confirmLeavingActiveMatch } from "./leaveGuard.js";
 import {
   normalizeLabLedColorSettings,
   storeLabLedColorSettings,
@@ -78,6 +79,10 @@ export class CubeChessApplication {
     this.renderer.setFog(localStorage.getItem("cubeChessFog") === "1");
     this.previewPieceSet(this.hud.selectedPieceSet, this.hud.labLedColorSettings);
     this.attractMode.start();
+    // Register only after the demo has started, so initial page loading never
+    // produces a misleading unsaved-match warning.
+    this.handleBeforeUnload = (event) => confirmLeavingActiveMatch(event, this.presentation);
+    window.addEventListener("beforeunload", this.handleBeforeUnload);
   }
 
   applyStoredAccessibility() {
@@ -270,6 +275,7 @@ export class CubeChessApplication {
   }
 
   dispose() {
+    if (this.handleBeforeUnload) window.removeEventListener("beforeunload", this.handleBeforeUnload);
     this.cancelSessionWork();
     this.attractMode.dispose();
     this.ai.dispose();
