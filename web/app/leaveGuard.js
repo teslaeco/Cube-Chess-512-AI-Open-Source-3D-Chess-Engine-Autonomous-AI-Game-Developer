@@ -18,6 +18,6 @@ export function confirmLeavingActiveMatch(event, presentation) {
   if (!hasActiveChessMatch(presentation)) return false;
   event.preventDefault();
   // Required as a legacy compatibility signal; browsers show their own text.
-  event.returnValue = "";
+  event.returnValue = true;
   return true;
 }
