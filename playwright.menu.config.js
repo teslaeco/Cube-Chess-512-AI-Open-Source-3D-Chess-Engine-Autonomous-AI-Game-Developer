@@ -5,7 +5,7 @@ import base from './playwright.config.js';
 // Software WebGL is explicit on GPU-less runners; game geometry stays unchanged.
 export default defineConfig({
   ...base,
-  testMatch: ['**/menu-return.spec.js', '**/premium-hud.spec.js'],
+  testMatch: ['**/menu-return.spec.js', '**/premium-hud.spec.js', '**/single-menu-guard.spec.js'],
   retries: 0,
   use: { ...base.use, video: 'off' },
   webServer: {
