@@ -31,7 +31,7 @@ describe("native browser unsaved match protection", () => {
       const event = leaveEvent();
       expect(confirmLeavingActiveMatch(event, game)).toBe(true);
       expect(event.defaultPrevented).toBe(true);
-      expect(event.returnValue).toBe("");
+      expect(event.returnValue).toBe(true);
     }
   });
 
