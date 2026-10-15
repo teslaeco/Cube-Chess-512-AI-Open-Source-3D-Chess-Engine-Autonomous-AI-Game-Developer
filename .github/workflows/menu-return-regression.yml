@@ -9,6 +9,11 @@ concurrency:
   cancel-in-progress: true
 jobs:
   interaction:
+    name: Browser ${{ matrix.project }}
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium-desktop, mobile-chrome]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -22,7 +27,7 @@ jobs:
       - run: npm ci --no-audit
       - run: npx playwright install --with-deps chromium
       - name: Verify built desktop and mobile guest interactions without external providers
-        run: npx playwright test --config=playwright.menu.config.js --workers=1 --retries=0
+        run: npx playwright test --config=playwright.menu.config.js --project=${{ matrix.project }} --workers=1 --retries=0
       - name: Print bounded local browser failure context
         if: failure()
         run: |
