@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
 
+// Each individual action must still complete within 30 seconds on software WebGL.
+test.use({ actionTimeout: 30_000, navigationTimeout: 30_000 });
+
 async function localOnly(page) {
   page.on("pageerror", error => console.error("LOCAL_GAME_PAGE_ERROR:", error.message));
   await page.route("**/*", route => {
@@ -16,6 +19,10 @@ async function openWelcomeAsGuest(page) {
 }
 
 test("cancel keeps the match; confirm returns to menu without reloading and preserves saves", async ({ page }) => {
+  // Three complete matches share one document. The previous desktop run passed
+  // cancel/confirm/save/no-reload, then exhausted its total 90s in repeat setup.
+  // Give the whole stress sequence 180s without loosening per-action deadlines.
+  test.setTimeout(180_000);
   await openWelcomeAsGuest(page);
   await page.getByTestId("start-game").click();
   await page.evaluate(() => {
