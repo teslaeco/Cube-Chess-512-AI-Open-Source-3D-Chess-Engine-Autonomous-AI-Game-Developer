@@ -28,8 +28,9 @@ test("exactly one game menu control remains and an active match requests native 
     state: window.__forgeMcpCubeApplication.presentation.appState,
   }));
   expect(before.state).toBe("playing");
+  const dialogPromise = page.waitForEvent("dialog", { timeout: 12_000 });
   const attemptedReload = page.evaluate(() => window.location.reload()).catch(() => undefined);
-  const dialog = await page.waitForEvent("dialog", { timeout: 12_000 });
+  const dialog = await dialogPromise;
   expect(dialog.type()).toBe("beforeunload");
   await dialog.dismiss();
   await attemptedReload;
