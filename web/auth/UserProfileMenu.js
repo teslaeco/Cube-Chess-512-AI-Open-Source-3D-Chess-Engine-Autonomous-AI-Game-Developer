@@ -36,7 +36,10 @@ export class UserProfileMenu {
           <p>Rozbudowana edycja bio, kraju, zdjęcia profilowego i statystyk zostanie podłączona do tabeli profiles w kolejnym etapie.</p>
         </section>
       </section>`;
-    container.append(this.element);
+    // Anchor the account control in the actual game HUD grid, not on top of
+    // unrelated menu/exit buttons. Keep a fallback for standalone embeds.
+    const header = container.querySelector('.game-header');
+    (header ?? container).append(this.element);
 
     this.handleClick = async (event) => {
       const trigger = event.target.closest("[data-profile-trigger]");
